@@ -144,13 +144,10 @@ class HyperOpt(dict):
     Examples
     --------
     >>> HyperOpt(a=1.)
-    There are 1 configurations to test.
     {'a': HyperRange: [ 1.0 ]}
     >>> HyperOpt(a=1., b=True)
-    There are 1 configurations to test.
     {'a': HyperRange: [ 1.0 ], 'b': HyperRange: [ True ]}
     >>> configs = HyperOpt(a=1., b=True, d=HyperRange(50, 53, 4))
-    There are 4 configurations to test.
     >>> len(configs)
     4
     >>> configs
@@ -179,16 +176,6 @@ class HyperOpt(dict):
         print_err(f"There are {len(configs)} configurations to test.")
         self._ranges = configs
         self._keys = tuple(self._ranges[0])
-
-    # def __getitem__(self, key: Union[int, str, slice]) -> Union[Tuple[Dict[str, Any]], HyperRange]:
-    #     if isinstance(key, int):
-    #         return self._ranges[key]
-    #     elif isinstance(key, slice):
-    #         return self._ranges[key]
-    #     elif isinstance(key, str):
-    #         return tuple(r[key] for r in self._ranges)
-    #     else:
-    #         return super().__getitem__(key)
 
     def __iter__(self) -> Iterator[Dict[str, Any]]:
         yield from self._ranges
