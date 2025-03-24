@@ -19,6 +19,7 @@ class Config:
 
     def __post_init__(self):
         self.backend_installed: bool = False
+        self.set_backend(self.backend, precision=self.precision)
 
     def set_backend(self, backend: str = None, precision: str = None):
         if backend is not None:

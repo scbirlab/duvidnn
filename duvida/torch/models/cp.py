@@ -22,14 +22,14 @@ from ...stateless.typing import Array, ArrayLike
 
 @dataclass(repr=False, eq=False, slots=True)
 class DuvidaBatchMolGraph:
-    """A :class:`BatchMolGraph` represents a batch of individual :class:`MolGraph`\s.
+    """A :class:`BatchMolGraph` represents a batch of individual :class:`MolGraph`s.
 
     It has all the attributes of a ``MolGraph`` with the addition of the ``batch`` attribute. This
-    class is intended for use with data loading, so it uses :obj:`~torch.Tensor`\s to store data
+    class is intended for use with data loading, so it uses :obj:`~torch.Tensor`s to store data
     """
 
     mgs: InitVar[Iterable[MolGraph]]
-    """A list of individual :class:`MolGraph`\s to be batched together"""
+    """A list of individual :class:`MolGraph`s to be batched together"""
     V: torch.Tensor = field(init=False)
     """the atom feature matrix"""
     E: torch.Tensor = field(init=False)
@@ -83,7 +83,7 @@ class DuvidaBatchMolGraph:
         self.batch = torch.tensor(np.concatenate(batch_indexes)).long()
 
     def __len__(self) -> int:
-        """the number of individual :class:`MolGraph`\s in this batch"""
+        """the number of individual :class:`MolGraph`s in this batch"""
         return self.__size
 
     def to(self, device: Union[str, torch.device]):
