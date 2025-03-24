@@ -1,0 +1,68 @@
+[project]
+name = "duvida"
+version = "0.0.1"
+authors = [
+  { name="Eachan Johnson", email="eachan.johnson@crick.ac.uk" },
+]
+description = "Calculating exact and approximate confidence and information metrics for deep learning on general purpose and chemistry tasks."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { file = "LICENSE" }
+keywords = [
+  "ai",
+  "active-learning", 
+  "bayesian-optimization",
+  "data",
+  "deep-learning",
+  "machine-learning",
+]
+
+classifiers = [  
+  
+  "Development Status :: 3 - Alpha",
+
+  # Indicate who your project is intended for
+  "Intended Audience :: Science/Research",
+  "Topic :: Scientific/Engineering :: Artificial Intelligence",
+
+  "License :: OSI Approved :: MIT License",
+
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3 :: Only",
+]
+
+dependencies = [
+  "carabiner-tools>=0.0.4",
+  "datasets",
+  "huggingface_hub",
+  "numpy",
+  "tqdm",
+]
+
+[project.optional-dependencies]
+#tf = ["duvida[datasets]", "tensorflow"]
+jax = ["duvida[datasets]", "jax"]
+jax_cuda12 = ["duvida[datasets]", "jax[cuda12]"]
+jax_cuda12_local = ["duvida[datasets]", "jax[cuda12_local]"]
+torch = ["duvida[datasets]", "torch", "torchvision", "lightning"]
+transformers = ["duvida[datasets]", "transformers"]
+chem = ["duvida[torch]", "chemprop>=2.1.0", "schemist>=0.0.4.post1"]
+
+[project.urls]
+"Homepage" = "https://github.com/scbirlab/duvida"
+"Bug Tracker" = "https://github.com/scbirlab/duvida/issues"
+
+[project.scripts] 
+duvida = "duvida.cli:main"
+
+[tool.setuptools]
+# If there are data files included in your packages that need to be
+# installed, specify them here.
+#package-data = {"duvida" = ["*.csv"]}
+
+[build-system]
+# These are the assumed default build requirements from pip:
+# https://pip.pypa.io/en/stable/reference/pip/#pep-517-and-518-support
+requires = ["setuptools>=43.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
