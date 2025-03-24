@@ -41,12 +41,12 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-#tf = ["duvida[datasets]", "tensorflow"]
-jax = ["duvida[datasets]", "jax"]
-jax_cuda12 = ["duvida[datasets]", "jax[cuda12]"]
-jax_cuda12_local = ["duvida[datasets]", "jax[cuda12_local]"]
-torch = ["duvida[datasets]", "torch", "torchvision", "lightning"]
-transformers = ["duvida[datasets]", "transformers"]
+#tf = ["duvida", "tensorflow"]
+jax = ["duvida", "jax"]
+jax_cuda12 = ["duvida", "jax[cuda12]"]
+jax_cuda12_local = ["duvida", "jax[cuda12_local]"]
+torch = ["duvida", "torch", "torchvision", "lightning"]
+transformers = ["duvida", "transformers"]
 chem = ["duvida[torch]", "chemprop>=2.1.0", "schemist>=0.0.4.post1"]
 
 [project.urls]
