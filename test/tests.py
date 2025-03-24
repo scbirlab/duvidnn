@@ -1,7 +1,7 @@
 import doctest
-import duvida as dv
+import duvida
 
 if __name__ == '__main__':
-    doctest.testmod(dv.stateless.hessians)
-    doctest.testmod(dv.stateless.hvp)
-    doctest.testmod(dv.stateless.information)
+    doctest.testmod(duvida.stateless.hessians)
+    doctest.testmod(duvida.stateless.hvp)
+    doctest.testmod(duvida.stateless.information)
