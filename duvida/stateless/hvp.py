@@ -37,7 +37,6 @@ def hvp(f: Callable,
     --------
     >>> from duvida.stateless.config import config
     >>> config.set_backend("jax", precision="double")
-    'jax'
     >>> from duvida.stateless.utils import grad, hessian
     >>> import duvida.stateless.numpy as dnp 
     >>> f = lambda x: dnp.sum(x ** 3. + x ** 2. + 4.)
