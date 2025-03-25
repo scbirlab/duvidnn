@@ -79,7 +79,8 @@ def squared_jacobian(
     Examples
     --------
     >>> from duvida.stateless.config import config
-    >>> config.set_backend("jax", precision="double"))
+    >>> config.set_backend("jax", precision="double")
+    'jax'
     >>> from duvida.stateless.utils import hessian
     >>> import duvida.stateless.numpy as dnp 
     >>> f = lambda x: dnp.sum(x ** 3. + x ** 2. + 4.)
@@ -130,7 +131,8 @@ def exact_diagonal(
     Examples
     --------
     >>> from duvida.stateless.config import config
-    >>> config.set_backend("jax", precision="double"))
+    >>> config.set_backend("jax", precision="double")
+    'jax'
     >>> from duvida.stateless.utils import hessian
     >>> import duvida.stateless.numpy as dnp 
     >>> f = lambda x: dnp.sum(x ** 3. + x ** 2. + 4.)
@@ -202,7 +204,7 @@ def bekas(
     Examples
     --------
     >>> from duvida.stateless.config import config
-    >>> config.set_backend("jax", precision="double"))
+    >>> config.set_backend("jax", precision="double")
     'jax'
     >>> from duvida.stateless.utils import hessian
     >>> import duvida.stateless.numpy as dnp 
