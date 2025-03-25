@@ -1,5 +1,6 @@
 """Backend configuration."""
 
+from typing import Optional
 from dataclasses import dataclass, field
 import importlib
 import os
@@ -18,16 +19,31 @@ class Config:
     fallback: bool = True
 
     def __post_init__(self):
-        self.backend_installed: bool = False
+        self.backend_installed: bool = self._backend_installed()
+        self.set_backend()
 
-    def set_backend(self, backend: str = None, precision: str = None):
+    def set_backend(
+        self, 
+        backend: Optional[str] = None, 
+        precision: Optional[str] = None
+    ) -> None:
+        """Set the autodiff backend for duvida.
+
+        Examples
+        --------
+        >>> config.set_backend("torch"); config
+        Config(backend='torch', precision='double', fallback=True)
+        >>> config.set_backend("jax"); config
+        Config(backend='jax', precision='double', fallback=True)
+
+        """
         if backend is not None:
             self.backend = backend
         self._import_backend()
         if precision is not None:
             self.precision = precision
         self._set_precision()
-        return self.backend
+        return None
 
     @staticmethod
     def _import_jax() -> bool:
@@ -47,8 +63,8 @@ class Config:
         elif precision == 'float':
             return config.update('jax_enable_x64', False)
         elif precision == 'half':
-            raise NotImplementedError("Half precision not vaialable on JAX.")
-            # return config.update('jax_enable_x16', True)
+            # TODO: Find implementation of half precision in JAX. JMP?
+            raise NotImplementedError("Half precision not available on JAX.")
         else:
             raise ValueError(f"Precision '{precision}' not valid.")
 
@@ -77,14 +93,17 @@ class Config:
         os.environ[DUVIDA_PRECISION] = self.precision
         return None
 
+    def _backend_installed(self) -> bool:
+        return importlib.util.find_spec(self.backend) is not None
+
     def _import_backend(self) -> None:
         if self.backend == 'jax':
-            importable = importlib.util.find_spec("jax") is not None
+            importable = self._backend_installed()
             if not importable and self.fallback:
                 self.backend == 'torch'
         
         if self.backend == 'torch':
-            importable = importlib.util.find_spec("torch") is not None
+            importable = self._backend_installed()
         elif not importable:
             raise ValueError(f"Backend '{self.backend}' is not supported.")
 
