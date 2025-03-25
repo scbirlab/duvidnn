@@ -45,7 +45,7 @@ class Config:
         if precision == 'double':
             return config.update('jax_enable_x64', True)
         elif precision == 'float':
-            return None #config.update('jax_enable_x32', True)
+            return config.update('jax_enable_x64', False)
         elif precision == 'half':
             raise NotImplementedError("Half precision not vaialable on JAX.")
             # return config.update('jax_enable_x16', True)
