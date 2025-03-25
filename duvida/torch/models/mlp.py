@@ -28,7 +28,7 @@ class TorchMLPBase(Module, ABC):
         batch_norm: bool = False,
         *args, **kwargs
     ):
-        super().__init__(*args, **kwargs)
+        super().__init__()
         self.n_input = n_input
         self.n_hidden = n_hidden
         self.n_units = n_units
@@ -118,7 +118,9 @@ class MLPModelBox(ModelBox, VarianceMixin):
         self, 
         *args, **kwargs
     ):
-        super().__init__()
+        super().__init__(
+            *args, **kwargs,
+        )
         self._mlp_kwargs = kwargs
 
     def create_model(self, *args, **kwargs) -> TorchMLPEnsemble:

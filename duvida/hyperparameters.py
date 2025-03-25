@@ -161,7 +161,7 @@ class HyperOpt(dict):
 
     """
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, silent: bool = False, *args, **kwargs):
         super().__init__(self, *args, **kwargs)
         for key in self.keys():
             val = self[key]
@@ -173,7 +173,8 @@ class HyperOpt(dict):
                     self[key] = val
         iterator = product(*(self.get(key) for key in self.keys()))
         configs = tuple(dict(zip(self.keys(), args)) for args in iterator)
-        print_err(f"There are {len(configs)} configurations to test.")
+        if not silent:
+            print_err(f"There are {len(configs)} configurations to test.")
         self._ranges = configs
         self._keys = tuple(self._ranges[0])
 
@@ -187,7 +188,8 @@ class HyperOpt(dict):
     def from_file(
         cls, 
         file: Union[str, TextIOWrapper], 
-        serialized: bool = False
+        serialized: bool = False,
+        **kwargs
     ):
         """Create a HyperOpt object from a JSON or serialized file.
 
@@ -195,7 +197,7 @@ class HyperOpt(dict):
         if not serialized:
             f = cast(file, to=TextIOWrapper)
             d = json.load(f)
-            return cls(**d)
+            return cls(**kwargs, **d)
         else:
             with open(file, "rb") as f:
                 obj = pickle.load(f)

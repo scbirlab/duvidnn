@@ -4,7 +4,6 @@ from typing import Callable, Dict, Iterable, Mapping, Tuple, Optional, Union
 from functools import partial
 import os
 
-from carabiner import print_err
 from datasets import Dataset
 from lightning import LightningModule, Trainer
 from numpy import ndarray
@@ -284,37 +283,27 @@ class DoubtMixin(DoubtMixinBase):
 
 class ModelBox(ModelBoxBase, DataMixin, DoubtMixin):
 
-    def save_checkpoint(
+    def save_weights(
         self,
-        checkpoint_dir: str
+        checkpoint: str
     ) -> None:
-
-        print_err(f"Saving checkpoint at {checkpoint_dir}")
-        if not os.path.exists(checkpoint_dir):
-            os.makedirs(checkpoint_dir)
-        self.save_data_checkpoint(checkpoint_dir)
         torch.save(
             self.model.state_dict(), 
-            os.path.join(checkpoint_dir, "params.pt"),
+            os.path.join(checkpoint, "params.pt"),
         )
         return None
 
-    def load_checkpoint(
+    def load_weights(
         self,
         checkpoint: str
     ):
-        print_err(f"Loading checkpoint from {checkpoint}")
-
-        self.load_data_checkpoint(checkpoint)
-        if self.training_data is not None:
-            self.model = self.create_model()
-            state_dict = load_checkpoint_file(
-                checkpoint, 
-                filename="params.pt",
-                callback="pt",
-                none_on_error=False,
-            )
-            self.model.load_state_dict(state_dict)
+        state_dict = load_checkpoint_file(
+            checkpoint, 
+            filename="params.pt",
+            callback="pt",
+            none_on_error=False,
+        )
+        self.model.load_state_dict(state_dict)
         return self
 
     def eval_mode(self) -> None:

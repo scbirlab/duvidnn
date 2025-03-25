@@ -1,6 +1,7 @@
 """Command-line interface for duvida."""
 
 from argparse import FileType, Namespace
+from collections import defaultdict
 import json
 import os
 import pickle
@@ -35,8 +36,10 @@ def _hyperprep(args: Namespace) -> None:
 @clicommand(message='Training a Pytorch model')
 def _train(args: Namespace) -> None:
 
-    import torch
     from lightning.pytorch.callbacks import EarlyStopping
+    from lightning.pytorch.loggers import CSVLogger, TensorBoardLogger
+    import pandas as pd
+    import torch
 
     str_config = {
         "model_class": args.model_class.casefold(),
@@ -54,19 +57,9 @@ def _train(args: Namespace) -> None:
         "labels": args.labels,
         "cache": args.cache,
     }
-    training_args = {
-        "val_filename": args.validation,
-        "epochs": args.epochs, 
-        "batch_size": args.batch,
-        "trainer_opts": {
-            "logger": True, 
-            "enable_progress_bar": True, 
-            "enable_model_summary": True,
-        }
-    }
-
+    
     if args.config is not None:
-        new_config = HyperOpt.from_file(args.config)._ranges[args.config_index] 
+        new_config = HyperOpt.from_file(args.config, silent=True)._ranges[args.config_index] 
         str_config.update(new_config)
 
     modelbox = AutoModelBox(
@@ -79,28 +72,41 @@ def _train(args: Namespace) -> None:
         message=f"Model {modelbox.__class__.__name__} with {modelbox.size} parameters.",
     )
 
-    print_err(f">> Training {modelbox.__class__.__name__} with config {str_config}...")
+    save_prefix = os.path.join(
+        args.prefix, 
+        f"{modelbox.__class__.__name__}_x{modelbox.size}_epochs={args.epochs}",
+    )
+    training_args = {
+        "val_filename": args.validation,
+        "epochs": args.epochs, 
+        "batch_size": args.batch,
+    }
+    pprint_dict(str_config, message=f">> Training {modelbox.__class__.__name__} with configuration")
     if args.early_stopping is not None:
         callbacks = [EarlyStopping('val_loss', patience=args.early_stopping)]
     else:
         callbacks = None
     modelbox.train(
         callbacks=callbacks,
+        trainer_opts={  # passed to lightning.Trainer()
+            # "logger": True, 
+            "logger": [
+                CSVLogger(save_dir=os.path.join(save_prefix, "logs-csv")),
+                TensorBoardLogger(save_dir=os.path.join(save_prefix, "logs")),
+            ], 
+            "enable_progress_bar": True, 
+            "enable_model_summary": True,
+        },
         **training_args,
-    )
-
-    save_prefix = os.path.join(
-        args.prefix, 
-        f"{modelbox.__class__.__name__}_x{modelbox.size}_epochs={args.epochs}",
     )
     checkpoint_path = os.path.join(
         save_prefix,
-        "checkpoint.dv",
+        # "checkpoint.dv",
     )
     modelbox.save_checkpoint(checkpoint_path)
     for filename, obj in zip(
-        ("modelbox-config", "data-load-args", "training-args"),
-        (str_config, load_data_args, training_args),
+        ("data-load-args", "training-args"),
+        (load_data_args, training_args),
     ):
         with open(os.path.join(checkpoint_path, f"{filename}.json"), "w") as f:
             json.dump(obj, f, sort_keys=True, indent=4)
@@ -108,9 +114,10 @@ def _train(args: Namespace) -> None:
     # Check it loads
     # modelbox.load_checkpoint(checkpoint_path)
     modelbox = AutoModelBox.from_pretrained(checkpoint_path)
+    overall_metrics = defaultdict(list)
     for name, dataset in zip(
         ("train", "validation", "test"),
-        (args.training, args.validation, args.test)
+        (args.training, args.validation, args.test),
     ):
         if dataset is not None:
             if name == "train":
@@ -120,7 +127,7 @@ def _train(args: Namespace) -> None:
                 metrics={
                     "RMSE": rmse, 
                     "Pearson r": pearson_r, 
-                    "Spearman rho": spearman_r
+                    "Spearman rho": spearman_r,
                 },
             )
             with open(os.path.join(save_prefix, f"eval-metrics_{name}.json"), "w") as f:
@@ -133,6 +140,17 @@ def _train(args: Namespace) -> None:
                 metrics, 
                 message=f"Evaluation: {name}",
             )
+            overall_metrics["split"].append(name)
+            overall_metrics["split_filename"].append(dataset or load_data_args["filename"])
+            for d in (load_data_args, modelbox._input_configuration, training_args, metrics):
+                for key, val in d.items():
+                    if key != "trainer_opts":
+                        overall_metrics[key].append(val)
+                
+    pd.DataFrame(overall_metrics).to_csv(
+        os.path.join(save_prefix, f"metrics.csv"),
+        index=False,
+    )
     return None
     
 

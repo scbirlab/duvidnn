@@ -7,7 +7,7 @@ from io import TextIOWrapper
 import json
 import os
 
-from carabiner import cast
+from carabiner import cast, print_err
 from datasets import Dataset, IterableDataset, load_dataset
 from datasets.fingerprint import Hasher
 from numpy import asarray, concatenate, mean, newaxis, ndarray, stack
@@ -238,7 +238,7 @@ class DataMixinBase(ABC):
                 if ":" in hf_ref_full:
                     ds_config, ds_split = hf_ref_full.split("@")[-1].split(":")[:2]
                 else:
-                    ds_config, ds_split = None, None
+                    ds_config, ds_split = hf_ref_full.split("@")[-1], "train"
                 dataset = self._load_from_dataset(
                     load_dataset(hf_ref, ds_config, split=ds_split, cache_dir=cache), 
                     features, 
@@ -386,14 +386,51 @@ class ModelBoxBase(ABC):
     _out_key = DataMixinBase._out_key
     _prediction_key = "__prediction__"
 
-    def __init__(self):
+    def __init__(self, *args, **kwargs):
         self.model = None
         self._trainer = None
+        self._input_configuration = kwargs
 
-    @abstractmethod
     def save_checkpoint(
         self,
-        checkpoint_dir: str
+        checkpoint: str
+    ) -> None:
+        print_err(f"Saving checkpoint at {checkpoint}")
+        if not os.path.exists(checkpoint):
+            os.makedirs(checkpoint)
+        self.save_data_checkpoint(checkpoint)
+        modelbox_config = {
+            "model_class": self.__class__.__name__,
+        }
+        modelbox_config.update(self._input_configuration)
+        with open(os.path.join(checkpoint, "modelbox-config.json"), "w") as f:
+            json.dump(modelbox_config, f, sort_keys=True, indent=4)
+        self.save_weights(checkpoint)
+        return None
+
+    def load_checkpoint(
+        self,
+        checkpoint: str
+    ) -> None:
+        print_err(f"Loading checkpoint from {checkpoint}")
+        self.load_data_checkpoint(checkpoint)
+        if self.training_data is not None:
+            self.model = self.create_model()
+            self.load_weights(checkpoint)
+        return None
+
+    @abstractmethod
+    def save_weights(
+        self,
+        checkpoint: str
+    ):
+        pass
+    
+
+    @abstractmethod
+    def load_weights(
+        self,
+        checkpoint: str
     ):
         pass
 

@@ -8,3 +8,6 @@ _MODEL_CLASSES = {
     "fp": FPMLPModelBox,
     "chemprop": ChempropModelBox,
 }
+
+for _class in list(_MODEL_CLASSES.values()):
+    _MODEL_CLASSES[_class.__name__] = _class

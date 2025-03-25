@@ -56,10 +56,15 @@ class FPMLPModelBox(TorchFPModelBoxMixin, MLPModelBox):
         extra_featurizers: Optional[Union[Iterable[Callable], Callable]] = None,
         *args, **kwargs
     ):
+        super().__init__(
+            extra_featurizers=extra_featurizers, 
+            use_2d=use_2d, 
+            use_fp=use_fp, 
+            *args, **kwargs,
+        )
         self.use_fp = use_fp
         self.use_2d = use_2d
         self.extra_featurizers = extra_featurizers
-        super().__init__(*args, **kwargs)
 
 
 class ChempropDataMixin(DataMixin):
@@ -169,7 +174,12 @@ class ChempropModelBox(ChempropDoubtMixin, ChempropDataMixin, ChempropModelBoxMi
         extra_featurizers: Optional[Union[Iterable[Callable], Callable]] = None,
         *args, **kwargs
     ):
-        super().__init__()
+        super().__init__(
+            extra_featurizers=extra_featurizers, 
+            use_2d=use_2d, 
+            use_fp=use_fp, 
+            *args, **kwargs,
+        )
         self.use_fp = use_fp
         self.use_2d = use_2d
         self.extra_featurizers = extra_featurizers
