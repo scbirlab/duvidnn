@@ -9,8 +9,12 @@ DUVIDA_BACKEND = "DUVIDA_BACKEND"
 DUVIDA_PRECISION = "DUVIDA_PRECISION"
 if DUVIDA_BACKEND not in os.environ:
     os.environ[DUVIDA_BACKEND] = "jax"
+else:
+    print_err(f"Default duvida backend is: {os.environ[DUVIDA_BACKEND]}")
 if DUVIDA_PRECISION not in os.environ:
     os.environ[DUVIDA_PRECISION] = "double"
+else:
+    print_err(f"Default duvida precision is: {os.environ[DUVIDA_PRECISION]}")
 
 @dataclass
 class Config:
