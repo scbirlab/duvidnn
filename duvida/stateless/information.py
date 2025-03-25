@@ -31,7 +31,8 @@ def parameter_gradient(model: StatelessModel) -> Callable[[ArrayLike, ArrayLike]
     Examples
     --------    
     >>> from duvida.stateless.config import config
-    >>> config.set_backend("jax")
+    >>> config.set_backend("jax", precision="double")
+    'jax'
     >>> import duvida.stateless.numpy as dnp
     >>> f = lambda x, p1, p2: x ** p1 + p2
     >>> x = dnp.array([1., 2.])
@@ -85,7 +86,8 @@ def parameter_hessian_diagonal(
     Examples
     --------    
     >>> from duvida.stateless.config import config
-    >>> config.set_backend("jax")
+    >>> config.set_backend("jax", precision="double")
+    'jax'
     >>> import duvida.stateless.numpy as dnp 
     >>> f = lambda x, p1, p2: x ** p1 + p2
     >>> x = dnp.array([1., 2.])
@@ -152,7 +154,8 @@ def fisher_score(
     Examples
     --------   
     >>> from duvida.stateless.config import config
-    >>> config.set_backend("jax")
+    >>> config.set_backend("jax", precision="double")
+    'jax'
     >>> import duvida.stateless.numpy as dnp  
     >>> model = lambda x, p1, p2: x ** p1 + p2
     >>> mse_fn = lambda ypred, ytrue: dnp.sum(dnp.square(ypred - ytrue))
@@ -203,7 +206,8 @@ def fisher_information_diagonal(
     Examples
     --------    
     >>> from duvida.stateless.config import config
-    >>> config.set_backend("jax")
+    >>> config.set_backend("jax", precision="double")
+    'jax'
     >>> import duvida.stateless.numpy as dnp  
     >>> model = lambda x, p1, p2: x ** p1 + p2
     >>> mse_fn = lambda ypred, ytrue: dnp.sum(dnp.square(ypred - ytrue))
@@ -257,7 +261,8 @@ def doubtscore(
     Examples
     --------   
     >>> from duvida.stateless.config import config
-    >>> config.set_backend("jax")
+    >>> config.set_backend("jax", precision="double")
+    'jax'
     >>> import duvida.stateless.numpy as dnp   
     >>> model = lambda x, p1, p2: x ** p1 + p2
     >>> mse_fn = lambda ypred, ytrue: dnp.sum(dnp.square(ypred - ytrue))
@@ -365,7 +370,8 @@ def information_sensitivity(
     Examples
     --------    
     >>> from duvida.stateless.config import config
-    >>> config.set_backend("jax")
+    >>> config.set_backend("jax", precision="double")
+    'jax'
     >>> import duvida.stateless.numpy as dnp  
     >>> model = lambda x, p1, p2: x ** p1 + p2
     >>> mse_fn = lambda ypred, ytrue: dnp.sum(dnp.square(ypred - ytrue))

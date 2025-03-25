@@ -60,8 +60,8 @@ def reciprocal(f: Callable[[ArrayLike], Array]) -> Callable[[ArrayLike], Array]:
     >>> f = lambda x: x + 1.
     >>> f(3.)
     4.0
-    >>> reciprocal(f)(2.)
-    .25
+    >>> reciprocal(f)(1.)
+    0.5
 
     """
 
