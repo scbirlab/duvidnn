@@ -29,7 +29,7 @@ jobs:
         pip install -e .[chem,jax]
     - name: Test with pytest
       run: |
-        DUVIDA_BACKEND=jax pytest duvida --doctest-modules --junitxml=tests/test-results.xml --cov=com --cov-report=xml --cov-report=html
+        DUVIDA_BACKEND="jax" DUVIDA_PRECISION="double" pytest duvida --doctest-modules --junitxml=tests/test-results.xml --cov=com --cov-report=xml --cov-report=html
     - name: Test CLI
       run: |
         bash test/scripts/train.sh
