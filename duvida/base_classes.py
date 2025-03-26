@@ -174,10 +174,10 @@ class DataMixinBase(ABC):
         if cache is None:
             cache = self._default_cache
         random_name = Hasher.hash(dataframe)
-        df_temp_file = os.path.join(self._default_cache, "duvida", f"{random_name}.csv")
+        df_temp_file = os.path.join(cache, "duvida", f"{random_name}.csv")
         df_temp_dir = os.path.dirname(df_temp_file)
         if not os.path.exists(df_temp_dir):
-            os.mkdir(df_temp_dir)
+            os.makedirs(df_temp_dir)
         
         self._check_data_types(features, labels, dataframe, (DataFrame, Mapping))
         columns = self._check_column_presence(features, labels, dataframe)
