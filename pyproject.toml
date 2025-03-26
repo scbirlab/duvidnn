@@ -57,7 +57,7 @@ chem = ["duvida[torch]", "chemprop>=2.1.0", "schemist>=0.0.4.post1"]
 duvida = "duvida.cli:main"
 
 [tool.setuptools]
-packages = ["duvida"]
+#packages = ["duvida"]
 # If there are data files included in your packages that need to be
 # installed, specify them here.
 #package-data = {"duvida" = ["*.csv"]}

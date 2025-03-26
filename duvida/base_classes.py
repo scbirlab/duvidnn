@@ -283,12 +283,6 @@ class DataMixinBase(ABC):
                 - filename is a str
                 """
             )
-
-        print("++++++++++")
-        print(dataset)
-        print(features)
-        print(self._in_key, self._out_key)
-        print("++++++++++")
         
         input_dataset = (
             dataset
@@ -309,9 +303,6 @@ class DataMixinBase(ABC):
                 + [self._in_key, self._out_key]
             )
         )
-        print("++++++++++")
-        print(input_dataset)
-        print("++++++++++")
         processed_dataset = input_dataset.map(
             partial(
                 self.preprocess_data, 
