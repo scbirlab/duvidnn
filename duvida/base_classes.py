@@ -35,7 +35,7 @@ class DataMixinBase(ABC):
     output_shape = None
     _format: str = 'numpy'
     _format_kwargs: Optional[Mapping[str, Any]] = None
-    _default_cache = "~/.cache/huggingface"
+    _default_cache = "cache/duvida/data"
 
     def save_data_checkpoint(
         self, 
@@ -126,7 +126,10 @@ class DataMixinBase(ABC):
             for coltype, columns in coltypes.items()
         }
         x = {
-            coltype: concatenate([col if col.ndim > 1 else col[..., newaxis] for col in columns], axis=-1)
+            coltype: concatenate([
+                col if col.ndim > 1 else col[..., newaxis] 
+                for col in columns
+            ], axis=-1)
             for coltype, columns in x.items()
         }
         return x
@@ -177,6 +180,7 @@ class DataMixinBase(ABC):
     ) -> Dataset:
         if cache is None:
             cache = self._default_cache
+            print_err(f"Defaulting to cache: {cache}")
         random_name = Hasher.hash(dataframe)
         df_temp_file = os.path.join(cache, "duvida", f"{random_name}.csv")
         df_temp_dir = os.path.dirname(df_temp_file)
@@ -185,17 +189,17 @@ class DataMixinBase(ABC):
         
         self._check_data_types(features, labels, dataframe, (DataFrame, Mapping))
         columns = self._check_column_presence(features, labels, dataframe)
-        if isinstance(dataframe, DataFrame):
-            dataframe.to_csv(df_temp_file, index=False)
-        elif isinstance(dataframe, Mapping):
+        if isinstance(dataframe, Mapping):
             dataframe = DataFrame({
                 col: dataframe[col] for col in columns
             })
-            dataframe.to_csv(df_temp_file, index=False)
+        print_err(f"Caching dataframe at {df_temp_file}")
+        dataframe.to_csv(df_temp_file, index=False)
+        print_err(f"Reloading dataframe from {df_temp_file}")
         dataset = load_dataset(
             "csv", 
             data_files=df_temp_file, 
-            split="train", 
+            split="train",
             cache_dir=cache,
         )
         return dataset
@@ -233,7 +237,7 @@ class DataMixinBase(ABC):
             if isinstance(data, (Dataset, IterableDataset)):
                 dataset = self._load_from_dataset(data, features, labels)
             elif isinstance(data, (DataFrame, Mapping)):
-                dataset = self._load_from_dataframe(data, features, labels, cache)
+                dataset = self._load_from_dataframe(data, features, labels, cache=cache)
             else:
                 raise ValueError(
                     """
@@ -279,6 +283,12 @@ class DataMixinBase(ABC):
                 - filename is a str
                 """
             )
+
+        print("++++++++++")
+        print(dataset)
+        print(features)
+        print(self._in_key, self._out_key)
+        print("++++++++++")
         
         input_dataset = (
             dataset
@@ -299,6 +309,9 @@ class DataMixinBase(ABC):
                 + [self._in_key, self._out_key]
             )
         )
+        print("++++++++++")
+        print(input_dataset)
+        print("++++++++++")
         processed_dataset = input_dataset.map(
             partial(
                 self.preprocess_data, 
@@ -654,7 +667,7 @@ class ModelBoxBase(ABC):
         metrics: Optional[Iterable] = None,
         batch_size: int = 16,
         aggregator: Optional[Union[str, AggFunction]] = None,
-        cache: Optional[str] = None,
+        cache: Optional[str] = None
     ) -> Tuple[ndarray, Union[Tuple[float], Dict[str, float]]]:
 
         """Calculate metrics on training data or new data.
@@ -747,7 +760,7 @@ class DoubtMixinBase(ABC):
         x: Dataset, 
         reducer: Callable,
         columns: Optional[Union[str, Iterable[str]]] = None,
-        batch_size: int = 1000,
+        batch_size: int = 1000
     ) -> Dataset:
         if columns is not None:
             x = x.select_columns(
@@ -981,6 +994,7 @@ class DoubtMixinBase(ABC):
         candidate_labels: Optional[str] = None,
         dataset: Optional[Dataset] = None,
         batch_size: int = 16,
+        cache: Optional[str] = None,
         *args, **kwargs
     ) -> Dataset:
         self.release_memory()
@@ -996,6 +1010,7 @@ class DoubtMixinBase(ABC):
                 labels=candidate_labels,
                 data=candidates,
                 batch_size=batch_size,
+                cache=cache,
             )
             
         return self._get_info_score(
@@ -1038,6 +1053,7 @@ class VarianceMixin:
         self, 
         candidates: Union[ArrayLike, Dataset],
         batch_size: int = 16,
+        cache: Optional[str] = None,
         **kwargs
     ) -> ndarray:
 
@@ -1049,6 +1065,7 @@ class VarianceMixin:
                 data=candidates, 
                 aggregator="var", 
                 keepdims=False,
+                cache=cache,
                 **kwargs
             ).select_columns([self._prediction_key])
             return predictions.rename_column(self._prediction_key, self._variance_key)

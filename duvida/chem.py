@@ -31,7 +31,12 @@ class FPModelBoxMixinBase(ABC):
 
         Optionally use normalized 2D descriptors.
         """
-        if all([not use_fp, not use_2d, extra_featurizers is None, not _allow_no_features]):  # i.e. no features specified
+        if all([
+            not use_fp, 
+            not use_2d, 
+            extra_featurizers is None, 
+            not _allow_no_features,
+        ]):  # i.e. no features specified
             print_err("WARNING : FPModelBoxMixinBase : Specified both `use_fp=False` and `use_2d=False`, so defaulting to `use_fp=True`.")
             use_fp = True
 
@@ -57,7 +62,7 @@ class FPModelBoxMixinBase(ABC):
             extra_features = np.concatenate(extra_features, axis=-1)
 
         return {
-            _in_key: extra_features, 
+            _in_key: asarray(extra_features).astype("float"), 
             _out_key: asarray(data[_out_key])
         }
 
@@ -116,15 +121,33 @@ class FPModelBoxMixinBase(ABC):
                 extra_featurizers=None,
                 **kwargs
             )
-            refs = self._prepare_data(
-                data=self._input_training_data, 
-                features=self._in_key,
-                labels=self._out_key,
-                use_fp=True,
-                use_2d=False,
-                extra_featurizers=None,
-                **kwargs
+            refs = (
+                self._input_training_data
+                .map(
+                    partial(
+                        self.preprocess_data,
+                        _in_key=self._in_key, 
+                        _out_key=self._out_key,
+                        use_fp=True,
+                        use_2d=False,
+                        extra_featurizers=None,
+                        **kwargs
+                    ),
+                    batched=True,
+                    batch_size=batch_size,
+                    desc="Calculating fingerprints",
+                )
+                .with_format(self._format, **self._format_kwargs)
             )
+            # refs = self._prepare_data(
+            #     data=self._input_training_data, 
+            #     features=self._in_key,
+            #     labels=self._out_key,
+            #     use_fp=True,
+            #     use_2d=False,
+            #     extra_featurizers=None,
+            #     **kwargs
+            # )
             _nn_tanimoto = queries.map(
                 partial(
                     self._get_nn_tanimoto, 
@@ -135,7 +158,7 @@ class FPModelBoxMixinBase(ABC):
                 ),
                 batched=True,
                 batch_size=batch_size,
-                desc="Calculating Tanimoto Tanimoto similarity to nearest training neighbor",
+                desc="Calculating Tanimoto similarity to nearest training neighbor",
             )
             return _nn_tanimoto
         else:

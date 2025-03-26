@@ -60,5 +60,6 @@ class AutoModelBox:
         )
         modelbox = cls(**config)._instance
         modelbox.load_checkpoint(checkpoint, cache_dir=cache_dir)
+        modelbox._default_cache = cache_dir
         return modelbox
 
