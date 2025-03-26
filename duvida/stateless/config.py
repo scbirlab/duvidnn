@@ -9,12 +9,10 @@ DUVIDA_BACKEND = "DUVIDA_BACKEND"
 DUVIDA_PRECISION = "DUVIDA_PRECISION"
 if DUVIDA_BACKEND not in os.environ:
     os.environ[DUVIDA_BACKEND] = "jax"
-else:
-    print_err(f"Default duvida backend is: {os.environ[DUVIDA_BACKEND]}")
+print_err(f"Default duvida backend is: {os.environ[DUVIDA_BACKEND]}")
 if DUVIDA_PRECISION not in os.environ:
     os.environ[DUVIDA_PRECISION] = "double"
-else:
-    print_err(f"Default duvida precision is: {os.environ[DUVIDA_PRECISION]}")
+print_err(f"Default duvida precision is: {os.environ[DUVIDA_PRECISION]}")
 
 @dataclass
 class Config:
@@ -35,11 +33,15 @@ class Config:
 
         Examples
         --------
-        >>> config.set_backend("torch"); config
-        Config(backend='torch', precision='double', fallback=True)
+        >>> os.environ[DUVIDA_BACKEND]
+        'jax'
+        >>> os.environ[DUVIDA_PRECISION]
+        'double'
         >>> config.set_backend("jax"); config
         Config(backend='jax', precision='double', fallback=True)
-
+        >>> config.set_backend("torch"); config
+        Config(backend='torch', precision='double', fallback=True)
+        
         """
         if backend is not None:
             self.backend = backend
