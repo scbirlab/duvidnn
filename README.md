@@ -240,88 +240,70 @@ from duvida.torch.models.lt import LightningMixin
 from torch.nn import Module
 from torch.optim import Adam, Optimizer
 
-class TorchMLP(Module, LightningMixin):
+class SimpleMLP(torch.nn.Module, LightningMixin):
 
     def __init__(
         self, 
         n_input: int, 
-        n_hidden: int = 1,
         n_units: int = 16, 
+        n_out: int = 1,
+        activation: Callable = torch.nn.SiLU,  # Smooth activation to prevent vanishing gradient
         learning_rate: float = .01,
         optimizer: Optimizer = Adam,
-        dropout: float = 0., 
-        activation: Callable = SiLU,  # Smooth activation to prevent gradient collapse
-        n_out: int = 1, 
-        batch_norm: bool = False,
         *args, **kwargs
     ):
         super().__init__(*args, **kwargs)
         self.n_input = n_input
-        self.n_hidden = n_hidden
         self.n_units = n_units
-        self.learning_rate = learning_rate
-        self.dropout = dropout
         self.activation = activation
         self.n_out = n_out
-        self.batch_norm = batch_norm
-        self.save_hyperparameters()
-
-        # How to instantiate the model
-        self.model_layers = self.create_model()
-
+        self.model_layers = torch.nn.Sequential([
+            torch.nn.Linear(self.n_input, self.n_units),
+            self.activation(),
+            torch.nn.Linear(self.n_units, self.n_out),
+        ])
         # Lightning logic
         self._init_lightning(
             optimizer=optimizer, 
             learning_rate=learning_rate, 
-            model_attr='model_layers',
+            model_attr='model_layers',  # the attribute containing the model
         )
 
-    def _add_layer(
-        self, 
-        layer_input_size: int,
-        layers: Optional[Iterable[Module]] = None, 
-    ) -> List[Module]:
-        if layers is None:
-            layers = []
-        layers = cast(layers, to=list)
-        layers += [Linear(layer_input_size, self.n_units), self.activation()]
-        if self.dropout > 0.:
-            layers.append(Dropout(self.dropout))
-        if self.batch_norm:
-            layers.append(BatchNorm1d(self.n_units))
-        return layers
-
-    def create_model(self) -> Module:
-        layers = self._add_layer(self.n_input)
-        for _ in range(1, self.n_hidden):
-            layers = self._add_layer(self.n_units, layers)
-        layers.append(Linear(self.n_units, self.n_out))
-        return Sequential(*layers)
-
-    def forward(self, x: ArrayLike) -> Array:
+    def forward(self, x):
         return self.model_layers(x)
 ```
 
 Then subclass `duvida.torch.nn.ModelBox` and implement the `create_model()` method, which should
-simply return your instantiated model.
+simply return your instantiated model. If you want to preprocess input data on the fly, then
+add a `preprocess_data()` method which takes a data dictionary and returns a data dictionary.
 
 ```python
+from typing import Dict
+
+from duvida.torch.nn import ModelBox
+import numpy as np
+
 class MLPModelBox(ModelBox):
     
-    def __init__(
-        self, 
-        *args, **kwargs
-    ):
+    def __init__(self, *args, **kwargs):
         super().__init__()
         self._mlp_kwargs = kwargs
 
-    def create_model(self, *args, **kwargs) -> TorchMLP:
-        return TorchMLP(
+    def create_model(self, *args, **kwargs):
+        return SimpleMLP(
             n_input=self.input_shape[-1],
             n_out=self.output_shape[-1], 
             *args, **kwargs,
             **self._mlp_kwargs,
         )
+
+    # Define this method if your data needs preprocessing
+    @staticmethod
+    def preprocess_data(data: Dict[str, np.ndarray], _in_key, _out_key, **kwargs) -> Dict[str, np.ndarray]:
+        return {
+            _in_key: your_featurizer(data[_in_key]), 
+            _out_key: np.asarray(data[_out_key])
+        }
 ```
 
 If the built-in `ModelBox`es don't suit your needs, you can subclass the `base_classes.ModelBoxBase` abstract 
