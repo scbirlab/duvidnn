@@ -24,7 +24,7 @@ class Config:
 
     def __post_init__(self):
         self.backend_installed: bool = self._backend_installed()
-        self.set_backend()
+        # self.set_backend()
 
     def set_backend(
         self, 
