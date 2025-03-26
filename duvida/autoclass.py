@@ -1,5 +1,7 @@
 """Initializing ModelBoxes automatically."""
 
+from typing import Optional
+
 import json
 import os
 
@@ -7,7 +9,7 @@ from carabiner import print_err
 from huggingface_hub import hf_hub_download
 
 from .base_classes import ModelBoxBase
-
+from .checkpoint_utils import load_checkpoint_file
 try:
     from .torch.models import _MODEL_CLASS_DEFAULT, _MODEL_CLASSES
 except ImportError as e:
@@ -24,7 +26,6 @@ except ImportError as e:
 
         """
     )
-from .checkpoint_utils import load_checkpoint_file
 
 class AutoModelBox:
 
@@ -46,6 +47,7 @@ class AutoModelBox:
     def from_pretrained(
         cls,
         checkpoint: str,
+        cache_dir: Optional[str] = None,
         **kwargs
     ) -> ModelBoxBase:
         config_file = cls._config_file
@@ -53,9 +55,10 @@ class AutoModelBox:
             checkpoint=checkpoint,
             filename=config_file,
             callback="json",
+            cache_dir=cache_dir,
             **kwargs
         )
         modelbox = cls(**config)._instance
-        modelbox.load_checkpoint(checkpoint)
+        modelbox.load_checkpoint(checkpoint, cache_dir=cache_dir)
         return modelbox
 

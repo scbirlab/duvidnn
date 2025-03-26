@@ -1,13 +1,13 @@
 """"Utilities for loading and aving checkpoints."""
 
-from typing import Any, Callable, Dict, Union
+from typing import Any, Callable, Dict, Optional, Union
 from tempfile import TemporaryDirectory
 import os
 import json
 
 from carabiner import print_err
 from datasets import Dataset, IterableDataset, load_from_disk
-from huggingface_hub import hf_hub_download, snapshot_download
+from huggingface_hub import snapshot_download
 import torch
 
 def _load_json(checkpoint, filename) -> Dict[str, Any]:
@@ -35,6 +35,7 @@ def load_checkpoint_file(
     filename: str,
     callback: Union[str, Callable] = "json",
     none_on_error: bool = False,
+    cache_dir: Optional[str] = None,
     *args, **kwargs
 ) -> Union[Any, None]:
     if isinstance(callback, str):
@@ -61,6 +62,7 @@ def load_checkpoint_file(
                     repo_id=checkpoint,
                     allow_patterns=filename_pattern,
                     local_dir=tmpdirname,
+                    cache_dir=cache_dir,
                     *args, **kwargs
                 )
             except Exception as e:

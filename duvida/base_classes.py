@@ -71,13 +71,15 @@ class DataMixinBase(ABC):
 
     def load_data_checkpoint(
         self, 
-        checkpoint: str
+        checkpoint: str,
+        cache_dir: Optional[str] = None
     ):
         data_config = load_checkpoint_file(
             checkpoint, 
             filename="data-config.json",
             callback="json",
             none_on_error=False,
+            cache_dir=cache_dir,
         )
         for key, val in data_config.items():
             setattr(self, key, val)
@@ -86,12 +88,14 @@ class DataMixinBase(ABC):
             filename="input-data.hf",
             callback="hf-dataset",
             none_on_error=True,
+            cache_dir=cache_dir,
         )
         training_data = load_checkpoint_file(
             checkpoint, 
             filename="training-data.hf",
             callback="hf-dataset",
             none_on_error=True,
+            cache_dir=cache_dir,
         )
         if not training_data is None:
             self.training_data = training_data.with_format(
@@ -188,7 +192,12 @@ class DataMixinBase(ABC):
                 col: dataframe[col] for col in columns
             })
             dataframe.to_csv(df_temp_file, index=False)
-        dataset = load_dataset(df_temp_file, cache_dir=cache)
+        dataset = load_dataset(
+            "csv", 
+            data_files=df_temp_file, 
+            split="train", 
+            cache_dir=cache,
+        )
         return dataset
 
     def _ingest_data(
@@ -410,13 +419,14 @@ class ModelBoxBase(ABC):
 
     def load_checkpoint(
         self,
-        checkpoint: str
+        checkpoint: str,
+        cache_dir: Optional[str] = None
     ) -> None:
         print_err(f"Loading checkpoint from {checkpoint}")
-        self.load_data_checkpoint(checkpoint)
+        self.load_data_checkpoint(checkpoint, cache_dir=cache_dir)
         if self.training_data is not None:
             self.model = self.create_model()
-            self.load_weights(checkpoint)
+            self.load_weights(checkpoint, cache_dir=cache_dir)
         return None
 
     @abstractmethod
@@ -468,6 +478,7 @@ class ModelBoxBase(ABC):
                 cache=cache,
                 **kwargs
             )
+            print(dataset)
         elif data is not None:
             if isinstance(data, Iterable):
                 dataset = data

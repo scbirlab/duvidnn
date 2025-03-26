@@ -295,13 +295,15 @@ class ModelBox(ModelBoxBase, DataMixin, DoubtMixin):
 
     def load_weights(
         self,
-        checkpoint: str
+        checkpoint: str,
+        cache_dir: Optional[str] = None
     ):
         state_dict = load_checkpoint_file(
             checkpoint, 
             filename="params.pt",
             callback="pt",
             none_on_error=False,
+            cache_dir=cache_dir,
         )
         self.model.load_state_dict(state_dict)
         return self
