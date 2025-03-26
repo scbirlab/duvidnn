@@ -2,6 +2,7 @@
 
 from argparse import FileType, Namespace
 from collections import defaultdict
+from glob import glob
 import json
 import os
 import pickle
@@ -14,6 +15,63 @@ from . import __version__
 from .autoclass import AutoModelBox, _MODEL_CLASS_DEFAULT, _MODEL_CLASSES
 from .hyperparameters import HyperOpt
 from .evaluation import rmse, pearson_r, spearman_r
+
+_LR_DEFAULT: float = .01
+
+def _plot_history(
+    lightning_csv, 
+    filename: str
+) -> None:
+
+    from carabiner.mpl import add_legend, colorblind_palette, grid, figsaver
+    import pandas as pd
+    import numpy as np
+
+    data_to_plot = (
+        pd.read_csv(lightning_csv)
+        .groupby(['epoch', 'step'])
+        .agg(np.nanmean)
+        .reset_index()
+    )
+
+    fig, ax = grid(aspect_ratio=1.5)
+    for _y in ('val_loss', 'loss'):
+        if _y in data_to_plot:
+            ax.plot(
+                'step', _y, 
+                data=data_to_plot, 
+                label=_y,
+            )
+            ax.scatter(
+                'step', _y, 
+                data=data_to_plot,
+                s=1.,
+            )
+    add_legend(ax)
+    ax.set(
+        xlabel='Training step', 
+        ylabel='Loss', 
+        yscale='log',
+    )
+    figsaver(format="png")(fig, name=filename, df=data_to_plot)
+    return None
+
+
+def _get_most_recent_lightning_log(
+    save_dir: str,
+    filename: str,
+    name: str = "lightning_logs",
+    version_prefix: str = "version"
+) -> str:
+    path = os.path.join(save_dir, name)
+    logs = sorted(glob(os.path.join(path, f"{version_prefix}_*")))
+    max_version = max([int(v.split("_")[-1]) for v in logs])
+    max_version = os.path.join(path, f"version_{max_version}", filename)
+    if os.path.exists(max_version):
+        return max_version
+    else:
+        raise OSError(f"Could not find most recent log: {max_version}")
+    
 
 @clicommand(message='Generating hyperparameter screening configurations')
 def _hyperprep(args: Namespace) -> None:
@@ -51,37 +109,52 @@ def _train(args: Namespace) -> None:
         "ensemble_size": args.ensemble_size,
         "learning_rate": args.learning_rate,
     }
+
+    if args.checkpoint is not None:
+        modelbox = AutoModelBox.from_pretrained(args.checkpoint)
+    else:
+        if args.config is not None:
+            new_config = HyperOpt.from_file(args.config, silent=True)._ranges[args.config_index] 
+            str_config.update(new_config)
+        if any(a is None for a in (args.training, args.features, args.labels)):
+            raise ValueError("If not providing a checkpoint, --training, --features, and --labels must be set.")
+        modelbox = AutoModelBox(
+            **str_config,
+        )._instance
+
     load_data_args = {
         "filename": args.training, 
-        "features": args.features, 
-        "labels": args.labels,
+        "features": args.features or modelbox._input_cols,
+        "labels": args.labels or modelbox._label_cols, 
         "cache": args.cache,
     }
-    
-    if args.config is not None:
-        new_config = HyperOpt.from_file(args.config, silent=True)._ranges[args.config_index] 
-        str_config.update(new_config)
-
-    modelbox = AutoModelBox(
-        **str_config,
-    )._instance
-    modelbox.load_training_data(**load_data_args)
-    modelbox.model = modelbox.create_model()
+    if (
+        args.checkpoint is None 
+        or args.training is not None 
+        or modelbox.training_data is None
+    ):
+        modelbox.load_training_data(**load_data_args)
+    if args.checkpoint is None:
+        modelbox.model = modelbox.create_model()
     pprint_dict(
-        str_config, 
+        modelbox._input_configuration, 
         message=f"Model {modelbox.__class__.__name__} with {modelbox.size} parameters.",
     )
-
+    _features = load_data_args["features"]
+    _labels = load_data_args["labels"]
     save_prefix = os.path.join(
         args.prefix, 
-        f"{modelbox.__class__.__name__}_x{modelbox.size}_epochs={args.epochs}",
+        f"{modelbox.__class__.__name__}_n{modelbox.size}_x={'-'.join(_features)}_y={'-'.join(_labels)}_epochs={args.epochs}",
     )
     training_args = {
         "val_filename": args.validation,
         "epochs": args.epochs, 
         "batch_size": args.batch,
     }
-    pprint_dict(str_config, message=f">> Training {modelbox.__class__.__name__} with configuration")
+    pprint_dict(
+        modelbox._input_configuration, 
+        message=f">> Training {modelbox.__class__.__name__} with configuration",
+    )
     if args.early_stopping is not None:
         callbacks = [EarlyStopping('val_loss', patience=args.early_stopping)]
     else:
@@ -98,6 +171,16 @@ def _train(args: Namespace) -> None:
             "enable_model_summary": True,
         },
         **training_args,
+    )
+
+    # get latest CSV log
+    max_version = _get_most_recent_lightning_log(
+        os.path.join(save_prefix, "logs-csv"),
+        "metrics.csv",
+    )
+    _plot_history(
+        max_version,
+        os.path.join(save_prefix, "training-log")
     )
     checkpoint_path = os.path.join(
         save_prefix,
@@ -164,9 +247,10 @@ def main() -> None:
         help='Input file. Default: STDIN',
     )
     train_data = CLIOption(
-        'training',
+        '--training', '-1',
         type=str,
-        help='Training dataset.',
+        default=None,
+        help='Training dataset. Required if no checkpoint provided.',
     )
     val_data = CLIOption(
         '--validation', '-2',
@@ -184,15 +268,15 @@ def main() -> None:
         '--features', '-x',
         type=str,
         nargs='*',
-        required=True,
-        help='Column names from data file that contain features.',
+        default=None,
+        help='Column names from data file that contain features. Required if no checkpoint provided.',
     )
     label_cols = CLIOption(
         '--labels', '-y',
         type=str,
         nargs='*',
-        required=True,
-        help='Column names from data file that contain labels.',
+        default=None,
+        help='Column names from data file that contain labels. Required if no checkpoint provided.',
     )
     cache = CLIOption(
         '--cache',
@@ -206,6 +290,12 @@ def main() -> None:
         default=_MODEL_CLASS_DEFAULT,
         choices=list(_MODEL_CLASSES),
         help='Test dataset file.',
+    )
+    _checkpoint = CLIOption(
+        '--checkpoint',
+        type=str,
+        default=None,
+        help='Load a modelbox from this checkpoint. Default: do not use.',
     )
     n_units = CLIOption(
         '--units', '-u',
@@ -256,8 +346,8 @@ def main() -> None:
     learning_rate = CLIOption(
         '--learning-rate', '-r',
         type=float,
-        default=1e-4,
-        help='Learning rate for training.',
+        default=None,
+        help=f'Learning rate for training. Default: {_LR_DEFAULT}.',
     )
     early_stopping = CLIOption(
         '--early-stopping', '-s',
@@ -329,6 +419,7 @@ def main() -> None:
             feature_cols,
             label_cols,
             model_class,
+            _checkpoint,
             n_units,
             n_hidden,
             _2d, 

@@ -43,7 +43,7 @@ class LightningMixin(LightningModule):
     def get_loss(
         self, 
         batch: Mapping[str, ArrayLike]
-    ) -> Array:  
+    ) -> Array:
         inputs, outputs = batch['inputs'], batch['labels']
         predicted = self(inputs)
         return mse_loss(predicted, outputs)

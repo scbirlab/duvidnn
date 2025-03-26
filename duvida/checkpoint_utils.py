@@ -7,7 +7,7 @@ import json
 
 from carabiner import print_err
 from datasets import Dataset, IterableDataset, load_from_disk
-from huggingface_hub import hf_hub_download
+from huggingface_hub import hf_hub_download, snapshot_download
 import torch
 
 def _load_json(checkpoint, filename) -> Dict[str, Any]:
@@ -50,11 +50,16 @@ def load_checkpoint_file(
         obj = callback(checkpoint, filename)
     elif checkpoint.startswith("hf://"):
         checkpoint = checkpoint.split("hf://")[-1]
+        if filename.endswith(".hf"):
+            filename_pattern = [filename + '/*.arrow', filename + '/*.json']
+        else:
+            filename_pattern = filename
         with TemporaryDirectory() as tmpdirname:
             try:
-                hf_hub_download(
+                print_err(f"Looking up: {checkpoint} :: {filename}")
+                snapshot_download(
                     repo_id=checkpoint,
-                    filename=filename,
+                    allow_patterns=filename_pattern,
                     local_dir=tmpdirname,
                     *args, **kwargs
                 )
