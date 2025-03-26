@@ -5,6 +5,8 @@ from dataclasses import dataclass, field
 import importlib
 import os
 
+from carabiner import print_err
+
 DUVIDA_BACKEND = "DUVIDA_BACKEND"
 DUVIDA_PRECISION = "DUVIDA_PRECISION"
 if DUVIDA_BACKEND not in os.environ:
