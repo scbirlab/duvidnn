@@ -9,7 +9,9 @@ import pickle
 import sys
 
 from carabiner import print_err, pprint_dict
+from carabiner.mpl import grid, figsaver
 from carabiner.cliutils import clicommand, CLIOption, CLICommand, CLIApp
+# from  pandas import DataFrame
 
 from . import __version__
 from .autoclass import AutoModelBox, _MODEL_CLASS_DEFAULT, _MODEL_CLASSES
@@ -35,7 +37,7 @@ def _plot_history(
     )
 
     fig, ax = grid(aspect_ratio=1.5)
-    for _y in ('val_loss', 'loss'):
+    for _y in ('val_loss', 'loss', 'learning_rate'):
         if _y in data_to_plot:
             ax.plot(
                 'step', _y, 
@@ -71,7 +73,36 @@ def _get_most_recent_lightning_log(
         return max_version
     else:
         raise OSError(f"Could not find most recent log: {max_version}")
-    
+
+
+def _plot_prediction_scatter(
+    df,
+    filename: str,
+    x: str = "__prediction__",
+    y: str = "labels"
+) -> None:
+    fig, ax = grid()
+    ax.scatter(
+        x, y,
+        data=df,
+        s=1.,
+    )
+    ax.plot(
+        ax.get_ylim(),
+        ax.get_ylim(),
+        color='dimgrey',
+        zorder=-5,
+    )
+    ax.set(
+        xlabel=f"Predicted ({x})", 
+        ylabel=f"Observed ({y})",
+    )
+    figsaver(format="png")(
+        fig,
+        filename,
+        df=df,
+    )
+    return None
 
 @clicommand(message='Generating hyperparameter screening configurations')
 def _hyperprep(args: Namespace) -> None:
@@ -97,6 +128,7 @@ def _train(args: Namespace) -> None:
     from lightning.pytorch.callbacks import EarlyStopping
     from lightning.pytorch.loggers import CSVLogger, TensorBoardLogger
     import pandas as pd
+    import numpy as np
     import torch
 
     str_config = {
@@ -207,6 +239,7 @@ def _train(args: Namespace) -> None:
                 dataset = None  # Use cached
             predictions, metrics = modelbox.evaluate(
                 filename=dataset,
+                aggregator=lambda x: np.mean(x, axis=-1, keepdims=True),
                 metrics={
                     "RMSE": rmse, 
                     "Pearson r": pearson_r, 
@@ -215,9 +248,11 @@ def _train(args: Namespace) -> None:
             )
             with open(os.path.join(save_prefix, f"eval-metrics_{name}.json"), "w") as f:
                 json.dump(metrics, f, sort_keys=True, indent=4)
-            predictions.to_csv(
-                os.path.join(save_prefix, f"predictions_{name}.csv"),
-                index=False,
+            _plot_prediction_scatter(
+                predictions,
+                x=modelbox._prediction_key,
+                y=modelbox._out_key,
+                filename=os.path.join(save_prefix, f"predictions_{name}"),
             )
             pprint_dict(
                 metrics, 
@@ -225,7 +260,16 @@ def _train(args: Namespace) -> None:
             )
             overall_metrics["split"].append(name)
             overall_metrics["split_filename"].append(dataset or load_data_args["filename"])
-            for d in (load_data_args, modelbox._input_configuration, training_args, metrics):
+            if args.config is not None:
+                overall_metrics["config_i"].append(args.config_index)
+            overall_metrics["model_class"].append(modelbox.__class__.__name__)
+            overall_metrics["n_parameters"].append(modelbox.size)
+            for d in (
+                load_data_args, 
+                modelbox._input_configuration, 
+                training_args, 
+                metrics,
+            ):
                 for key, val in d.items():
                     if key != "trainer_opts":
                         overall_metrics[key].append(val)
@@ -281,7 +325,7 @@ def main() -> None:
     cache = CLIOption(
         '--cache',
         type=str,
-        default="~/.cache/huggingface",
+        default=".",
         help='Where to cache data.',
     )
     model_class = CLIOption(

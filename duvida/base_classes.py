@@ -16,7 +16,7 @@ from pandas import DataFrame
 from torch.utils.data import DataLoader
 
 from .aggregators import get_aggregator, AggFunction
-from .checkpoint_utils import load_checkpoint_file
+from .checkpoint_utils import load_checkpoint_file, save_json
 
 class DataMixinBase(ABC):
 
@@ -65,8 +65,7 @@ class DataMixinBase(ABC):
                     .with_format("numpy", dtype="float")
                     .save_to_disk(os.path.join(checkpoint_dir, "training-data.hf")),
                 )
-        with open(os.path.join(checkpoint_dir, "data-config.json"), "w") as f:
-            json.dump(data_config, f)
+        save_json(data_config, os.path.join(checkpoint_dir, "data-config.json"))
         return None
 
     def load_data_checkpoint(
@@ -169,7 +168,7 @@ class DataMixinBase(ABC):
     ) -> Dataset:
         self._check_data_types(features, labels, dataset, (Dataset, IterableDataset))
         columns = self._check_column_presence(features, labels, dataset)
-        return dataset.select_columns(columns)
+        return dataset.select_columns(columns)#.to_iterable_dataset()
     
     def _load_from_dataframe(
         self,
@@ -258,7 +257,7 @@ class DataMixinBase(ABC):
                     labels,
                 )
             else:
-                sep = "," if filename.endswith(".csv") else "\t"
+                sep = "," if filename.endswith((".csv", ".csv.gz")) else "\t"
                 dataset = self._load_from_dataset(
                     Dataset.from_csv(filename, cache_dir=cache, sep=sep), 
                     features, 
@@ -704,6 +703,11 @@ class ModelBoxBase(ABC):
             if len(predictions[key].shape) > 1 and predictions[key].shape[-1] == 1 
             else predictions[key].tolist()
             for key in predictions.column_names
+        }
+        predictions = {
+            key: val
+            for key, val in predictions.items()
+            if key != self._in_key
         }
         return DataFrame(predictions), metrics
 
