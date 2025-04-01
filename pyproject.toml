@@ -33,7 +33,7 @@ classifiers = [
 ]
 
 dependencies = [
-  "carabiner-tools>=0.0.4",
+  "carabiner-tools[pd,mpl]>=0.0.4",
   "datasets",
   "huggingface_hub",
   "numpy",
