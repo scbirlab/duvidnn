@@ -153,7 +153,15 @@ def _train(args: Namespace) -> None:
     else:
         if args.config is not None:
             new_config = HyperOpt.from_file(args.config, silent=True)._ranges[args.config_index] 
+            pprint_dict(
+                new_config,
+                message=f"Overriding command-line parameters from config file {args.config}",
+            )
             str_config.update(new_config)  ## override command line
+            pprint_dict(
+                str_config,
+                message=f"Initialization parameters are now",
+            )
         if any(
             a is None for a in (args.training, args.labels)
         ):
@@ -165,6 +173,10 @@ def _train(args: Namespace) -> None:
                 )
         modelbox = AutoModelBox(**str_config)._instance
 
+    pprint_dict(
+        modelbox._model_config,
+        message=f"Initialized class {modelbox.class_name}",
+    )
     load_data_args = {
         "data": args.training, 
         "features": args.features or modelbox._input_featurizers,
