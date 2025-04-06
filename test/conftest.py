@@ -4,12 +4,13 @@ import importlib
 import sys
 
 import pytest
-from duvida.stateless import hessians, hvp, information
+from duvida.stateless import config, hessians, hvp, information
 
 MODULES_TO_RELOAD = {
     "duvida.stateless.hessians": hessians,
     "duvida.stateless.hessians": hvp,
     "duvida.stateless.information": information,
+    "duvida.stateless.config": config,
 }
 
 @pytest.fixture(autouse=True)
