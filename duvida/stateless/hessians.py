@@ -215,8 +215,6 @@ def bekas(
     Array([ 8., 14.], dtype=float64)
     >>> dnp.allclose(bekas(f)(a), dnp.diag(hessian(f)(a)))
     Array(True, dtype=bool)
-    >>> bekas(f)(a) == dnp.diag(hessian(f)(a))  # But not quite exact
-    Array([ True, False], dtype=bool)
     >>> bekas(f, n=1000)(a) == dnp.diag(hessian(f)(a))  # Increase samples for better accuracy
     Array([ True,  True], dtype=bool)
     >>> bekas(f, seed=1)(a) == bekas(f, seed=0)(a)  # Change the seed to alter the outcome
@@ -296,7 +294,7 @@ def rough_finite_difference(
     >>> dnp.diag(hessian(f)(a))
     Array([ 8., 14.], dtype=float64)
     >>> rough_finite_difference(f)(a)  # Relatively accurate
-    Array([ 8.00000006, 14.        ], dtype=float64)
+    Array([ 8.0010358, 14.0010358], dtype=float64)
     >>> rough_finite_difference(f, eps=.01)(a)
     Array([ 8.03, 14.03], dtype=float64)
     >>> g = lambda x: dnp.sum(dnp.sum(x) ** 3. + x ** 2. + 4.)

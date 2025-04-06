@@ -47,7 +47,7 @@ def hvp(f: Callable,
     Array([ True,  True], dtype=bool)
     >>> g = lambda x, y: dnp.sum(x ** 2. + x ** 2. + 4. + y ** 3.)
     >>> b = dnp.array([3., 4.])
-    >>> >>> hvp(g)(dnp.ones_like(a), a, b) == hessian(g)(a, b) @ dnp.ones_like(a)
+    >>> hvp(g)(dnp.ones_like(a), a, b) == hessian(g)(a, b) @ dnp.ones_like(a)
     Array([ True,  True], dtype=bool)
     >>> hvp(g, argnums=1)(dnp.ones_like(a), a, b) == hessian(g, argnums=1)(a, b) @ dnp.ones_like(a)
     Array([ True,  True], dtype=bool)

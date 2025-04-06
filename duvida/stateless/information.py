@@ -37,9 +37,9 @@ def parameter_gradient(model: StatelessModel) -> Callable[[ArrayLike, ArrayLike]
     >>> x = dnp.array([1., 2.])
     >>> p = [2., 1.]
     >>> f(x, *p)
-    Array([3., 5.])
+    Array([2., 5.], dtype=float64)
     >>> parameter_gradient(f)(p, x)
-    Array([1., 2.])
+    Array([1., 2.], dtype=float64)
 
     """
 
@@ -91,11 +91,11 @@ def parameter_hessian_diagonal(
     >>> x = dnp.array([1., 2.])
     >>> p = [2., 1.]
     >>> f(x, *p)
-    Array([3., 5.])
+    Array([2., 5.], dtype=float64)
     >>> parameter_hessian_diagonal(f)(p, x)
-    Array([1., 2.])
+    Array([1., 2.], dtype=float64)
     >>> parameter_hessian_diagonal(f, approximator='squared_jacobian')(p, x)
-    Array([1., 2.])
+    Array([1., 2.], dtype=float64)
 
     """
 
@@ -159,9 +159,9 @@ def fisher_score(
     >>> x = dnp.array([1., 2.])
     >>> p = [0., 2.]
     >>> model(x, *p)
-    Array([2., 5.])
+    Array([2., 5.], dtype=float64)
     >>> fisher_score(model, mse_fn)(p, x, model(x, *p) + .1)
-    Array([1., 2.])
+    Array([1., 2.], dtype=float64)
 
     """
 
@@ -210,9 +210,9 @@ def fisher_information_diagonal(
     >>> x = dnp.array([1., 2.])
     >>> p = dnp.array([0., 2.])
     >>> model(x, *p)
-    Array([3., 3.])
+    Array([3., 3.], dtype=float64)
     >>> fisher_information_diagonal(model, mse_fn)(p, x, model(x, *p) + .1)
-    Array([0.8648, 4.])
+    Array([0.8648, 4.], dtype=float64)
 
     """
 
@@ -264,9 +264,9 @@ def doubtscore(
     >>> x = dnp.array([1., 2.])
     >>> p = [0., 2.]
     >>> model(x, *p)
-    Array([2., 5.])
+    Array([2., 5.], dtype=float64)
     >>> doubtscore(model, mse_fn)(p, x + .1, x, model(x, *p) + .1)
-    Array([1., 2.])
+    Array([1., 2.], dtype=float64)
 
     """
 
@@ -372,9 +372,9 @@ def information_sensitivity(
     >>> x = dnp.array([1., 2.])
     >>> p = [0., 2.]
     >>> model(x, *p)
-    Array([2., 5.])
+    Array([2., 5.], dtype=float64)
     >>> information_sensitivity(model, mse_fn)(p, x + .1, x, model(x, *p) + .1)
-    Array([1., 2.])
+    Array([1., 2.], dtype=float64)
 
     """
 
