@@ -1,4 +1,4 @@
-""""Utilities for loading and aving checkpoints."""
+""""Utilities for loading and saving checkpoints."""
 
 from typing import Any, Callable, Dict, Optional, Union
 from tempfile import TemporaryDirectory

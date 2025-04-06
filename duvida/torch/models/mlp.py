@@ -8,10 +8,8 @@ from torch.nn import BatchNorm1d, Dropout, Linear, Module, SiLU, Sequential
 
 from torch.optim import Adam, Optimizer
 
-from .ensemble import TorchEnsembleMixin
-from .lt import LightningMixin
-from ..nn import mse_loss, ModelBox
-from ...base_classes import VarianceMixin
+from .utils.ensemble import TorchEnsembleMixin
+from .utils.lt import LightningMixin
 from ...stateless.typing import Array, ArrayLike
 
 class TorchMLPBase(Module, ABC):
@@ -26,7 +24,7 @@ class TorchMLPBase(Module, ABC):
         activation: Callable = SiLU,  # Smooth activation to prevent gradient collapse
         n_out: int = 1, 
         batch_norm: bool = False,
-        *args, **kwargs
+        skip_length: Optional[int] = None
     ):
         super().__init__()
         self.n_input = n_input
@@ -37,6 +35,21 @@ class TorchMLPBase(Module, ABC):
         self.activation = activation
         self.n_out = n_out
         self.batch_norm = batch_norm
+        if skip_length is not None and (skip_length > self.n_hidden):
+            raise ValueError(
+                f"""
+                Skip length must be greater than number of hidden layers:
+                - Skip length: {skip_length}
+                - Number of hidden layers: {self.n_hidden}
+                """
+            )
+        self.skip_length = skip_length
+        self._stack_size = 2 + int(self.dropout > 0.)  + int(self.batch_norm)
+        if skip_length is not None:
+            self._stack_skip_length = self.skip_length * self._stack_size
+        else:
+            self._stack_skip_length = None
+        self.model_layers = self.create_model()
 
     def _add_layer(
         self, 
@@ -60,33 +73,44 @@ class TorchMLPBase(Module, ABC):
         layers.append(Linear(self.n_units, self.n_out))
         return Sequential(*layers)
 
-    @abstractmethod
     def forward(self, x: ArrayLike) -> Array:
-        pass
+        if self.skip_length is None:
+            return self.model_layers(x)
+        else:
+            activations = []
+            for i, layer in enumerate(self.model_layers):
+                x = layer(x)
+                activations.append(x)
+                not_input = i >= self._stack_size
+                modulo_1 = i % self._stack_skip_length == 1
+                make_skip = not_input and modulo_1
+                if make_skip:
+                    x = x + activations[i - self._stack_skip_length]
+            return x
 
 
-class TorchMLP(TorchMLPBase, LightningMixin):
+class TorchMLPLightning(TorchMLPBase, LightningMixin):
 
     def __init__(
         self, 
         learning_rate: float = .01,
         optimizer: Optimizer = Adam,
+        reduce_lr_on_plateau: bool = True,
+        reduce_lr_patience: int = 10,
         *args, **kwargs
     ):
         super().__init__(*args, **kwargs)
         self.save_hyperparameters()
-        self.model_layers = self.create_model()
         self._init_lightning(
             optimizer=optimizer, 
             learning_rate=learning_rate, 
             model_attr='model_layers',
+            reduce_lr_on_plateau=reduce_lr_on_plateau,
+            reduce_lr_patience=reduce_lr_patience,
         )
-        
-    def forward(self, x: ArrayLike) -> Array:
-        return self.model_layers(x)
 
 
-class TorchMLPEnsemble(TorchEnsembleMixin, TorchMLPBase, LightningMixin):
+class TorchMLPEnsemble(TorchEnsembleMixin, TorchMLPLightning):
 
     def __init__(
         self, 
@@ -110,23 +134,3 @@ class TorchMLPEnsemble(TorchEnsembleMixin, TorchMLPBase, LightningMixin):
 
     def create_module(self) -> Module:
         return self.create_model()
-
-    
-class MLPModelBox(ModelBox, VarianceMixin):
-    
-    def __init__(
-        self, 
-        *args, **kwargs
-    ):
-        super().__init__(
-            *args, **kwargs,
-        )
-        self._mlp_kwargs = kwargs
-
-    def create_model(self, *args, **kwargs) -> TorchMLPEnsemble:
-        return TorchMLPEnsemble(
-            n_input=self.input_shape[-1],
-            n_out=self.output_shape[-1], 
-            *args, **kwargs,
-            **self._mlp_kwargs,
-        )

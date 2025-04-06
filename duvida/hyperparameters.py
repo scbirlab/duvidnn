@@ -1,7 +1,7 @@
 """Utilities for generating hyperparameter plans."""
 
 from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 import pickle
 from io import TextIOWrapper
 from itertools import product

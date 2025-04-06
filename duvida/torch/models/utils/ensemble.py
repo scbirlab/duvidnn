@@ -7,7 +7,7 @@ from abc import ABC, abstractmethod
 from torch import concat
 from torch.nn import Module, ModuleDict
 
-from ...stateless.typing import Array, ArrayLike
+from ....stateless.typing import Array, ArrayLike
 
 class TorchEnsembleMixin(ABC):
 

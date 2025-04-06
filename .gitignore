@@ -15,6 +15,7 @@ Hello.txt
 /test/outputs/
 __pycache__/
 lightning_logs/
+*.log
 
 # virtualenv/venv directories
 /venv/
