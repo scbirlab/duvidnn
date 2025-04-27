@@ -18,6 +18,7 @@ from .training import ModelTrainerBase
 from .typing import DataLike, FeatureLike, StrOrIterableOfStr
 from ..checkpoint_utils import save_json, _load_json
 
+
 class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
 
     """Container class for models and their training datasets.
@@ -180,7 +181,7 @@ class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
             self.model = self.create_model()
         if self._trainer is None or reinitialize:
             self._trainer = self.create_trainer(
-                epochs=epochs, # number of epochs to train for
+                epochs=epochs,  # number of epochs to train for
                 callbacks=callbacks,
                 **trainer_opts,
             )
@@ -314,7 +315,7 @@ class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
 class VarianceMixin:
 
     _prediction_key: str = ModelBoxBase._prediction_key
-    _variance_key: str  = "prediction variance"
+    _variance_key: str = "prediction variance"
     
     def prediction_variance(
         self, 

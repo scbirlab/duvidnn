@@ -8,8 +8,6 @@ from ...stateless.config import config
 
 config.set_backend('torch', precision='float')
 
-from ...stateless.typing import Array
-
 class ModelTrainer(ModelTrainerBase):
 
     _trainer: Trainer = None

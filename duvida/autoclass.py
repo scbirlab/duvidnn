@@ -31,7 +31,6 @@ class AutoModelBox:
     _model_config_file: str = ModelBoxBase._model_config_filename
     _model_class_key: str = "class_name"
 
-
     def __init__(
         self,
         class_name: str = DEFAULT_MODELBOX,

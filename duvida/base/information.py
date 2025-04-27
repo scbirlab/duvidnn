@@ -214,7 +214,7 @@ class DoubtMixinBase(ABC):
             param_gradient, param_hessian = (
                 fn(data[self._in_key]) for fn in (param_grad_fn, param_hessian_fn)
             )
-        infosens =  aggregator(
+        infosens = aggregator(
             concatenate([
                 self.information_sensitivity_core(
                     fisher_score[name], 

@@ -19,8 +19,8 @@ config.set_backend('torch', precision='float')
 
 from ...stateless.typing import Array, ArrayLike
 from ..models import ChempropEnsemble, TorchMLPEnsemble
-from .data import DataMixin, TorchChemMixin
-from .information import ChempropDoubtMixin, DoubtMixin
+from .data import ChempropDataMixin, DataMixin, TorchChemMixin
+from .information import DoubtMixin
 from .training import ModelTrainer
 
 
@@ -111,7 +111,7 @@ class TorchMLPModelBox(TorchModelBoxBase, VarianceMixin):
             n_out=self.output_shape[-1], 
             *args, **self._model_config,
         )
-        
+
 
 @register_modelbox("fingerprint")
 class TorchFingerprintModelBox(TorchChemMixin, FingerprintModelBoxBase, TorchMLPModelBox):

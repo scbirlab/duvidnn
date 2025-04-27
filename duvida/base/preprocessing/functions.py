@@ -61,12 +61,14 @@ def MorganFingerprint(**kwargs) -> Callable:
         on_bits=False,
         **kwargs,
     )
+
     def _morgan_fingerprint(
         data: Mapping[str, Iterable],
         input_column: str
     ) -> np.ndarray:
         fingerprints, _ = feature_calculator(strings=data[input_column])
         return fingerprints
+        
     return _morgan_fingerprint
 
 
@@ -85,12 +87,14 @@ def Descriptors2D(
         normalized=normalized,
         histogram_normalized=histogram_normalized,
     )
+    
     def _descriptors_2d(
         data: Mapping[str, Iterable],
         input_column: str
     ) -> np.ndarray:
         desc_2d, _ = feature_calculator(strings=data[input_column])
         return desc_2d
+
     return _descriptors_2d
 
 
@@ -158,5 +162,3 @@ def ChempropData(
         return datums
 
     return _chemprop_data
-
-

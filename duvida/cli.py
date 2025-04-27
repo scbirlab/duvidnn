@@ -28,7 +28,7 @@ def _plot_history(
     filename: str
 ) -> None:
 
-    from carabiner.mpl import add_legend, colorblind_palette, grid, figsaver
+    from carabiner.mpl import add_legend, grid, figsaver
     import pandas as pd
     import numpy as np
 
@@ -160,7 +160,7 @@ def _train(args: Namespace) -> None:
             str_config.update(new_config)  # override command line
             pprint_dict(
                 str_config,
-                message=f"Initialization parameters are now",
+                message="Initialization parameters are now",
             )
         if any(
             a is None for a in (args.training, args.labels)
@@ -471,19 +471,19 @@ def main() -> None:
         action="store_true",
         help='Pickle instead of JSON output.',
     )
-    output = CLIOption(
-        '--output', '-o', 
-        type=FileType('w'),
-        default=sys.stdout,
-        help='Output file. Default: STDOUT',
-    )
-    formatting = CLIOption(
-        '--format', '-f', 
-        type=str,
-        default='TSV',
-        choices=['TSV', 'CSV', 'tsv', 'csv'],
-        help='Format of files. Default: %(default)s',
-    )
+    # output = CLIOption(
+    #     '--output', '-o', 
+    #     type=FileType('w'),
+    #     default=sys.stdout,
+    #     help='Output file. Default: STDOUT',
+    # )
+    # formatting = CLIOption(
+    #     '--format', '-f', 
+    #     type=str,
+    #     default='TSV',
+    #     choices=['TSV', 'CSV', 'tsv', 'csv'],
+    #     help='Format of files. Default: %(default)s',
+    # )
 
     hyperprep = CLICommand(
         "hyperprep",

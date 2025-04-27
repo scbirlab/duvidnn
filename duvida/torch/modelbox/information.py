@@ -76,7 +76,7 @@ class DoubtMixin(DoubtMixinBase):
         d: Mapping[str, ArrayLike]
     ) -> Dict[str, Array]:
         index = 0
-        output= {}
+        output = {}
         for name, param in d.items():
             end_index = index + param.numel()
             output[name] = p[index:end_index].view(-1, *param.shape)

@@ -62,7 +62,7 @@ class Config:
 
     @staticmethod
     def _set_precision_torch(precision: str) -> None:
-        from torch import set_default_dtype  #, set_default_device
+        from torch import set_default_dtype  # , set_default_device
         # set_default_device('cuda' if torch.cuda.is_available() else 'cpu')
         if precision == 'double':
             from torch import float64
