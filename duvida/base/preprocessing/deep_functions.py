@@ -129,6 +129,6 @@ def HfBART(
             outputs.decoder_hidden_states[-1],
             aggregators=aggregators,
         )
-        return torch.cat([enc_last, dec_last], dim=-1)
+        return np.concatenate([enc_last, dec_last], axis=-1)
 
     return _hf_bart
