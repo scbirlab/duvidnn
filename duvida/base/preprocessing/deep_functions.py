@@ -64,7 +64,11 @@ def _tokenize_for_embedding(
     tokenizer: PreTrainedTokenizerBase
 ) -> Dict[str, np.ndarray]:
 
-    inputs = [_x if _x is not None else '<unk>' for _x in cast(x, to=list)]
+    inputs = [
+        _x if _x is not None 
+        else '<unk>' 
+        for _x in cast(x, to=list)
+    ]
     tokenizer_args = {
         "return_tensors": "pt",
         "padding": True,

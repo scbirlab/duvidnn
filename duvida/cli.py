@@ -13,11 +13,8 @@ from carabiner.cliutils import clicommand, CLIOption, CLICommand, CLIApp
 # from  pandas import DataFrame
 
 from . import __version__
-from .autoclass import (
-    AutoModelBox, 
-    DEFAULT_MODELBOX, 
-    MODELBOX_NAMES
-)
+from .autoclass import AutoModelBox
+from .base.modelbox_registry import DEFAULT_MODELBOX, MODELBOX_NAMES
 from .hyperparameters import HyperOpt
 
 _LR_DEFAULT: float = .01
