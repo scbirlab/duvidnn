@@ -31,10 +31,10 @@ class Config:
 
         Examples
         --------
-        >>> config.set_backend("jax"); config
+        >>> config.set_backend("jax", precision="double"); config
         Config(backend='jax', precision='double')
-        >>> config.set_backend("torch"); config
-        Config(backend='torch', precision='double')
+        >>> config.set_backend("torch", precision="float"); config
+        Config(backend='torch', precision='float')
         
         """
         if backend is not None:

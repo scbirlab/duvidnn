@@ -1,7 +1,6 @@
 """Multi-layer perceptrons."""
 
 from typing import Callable, Iterable, List, Mapping, Optional
-from abc import ABC, abstractmethod
 
 from carabiner import cast
 from torch.nn import BatchNorm1d, Dropout, Linear, Module, SiLU, Sequential
@@ -12,7 +11,18 @@ from .utils.ensemble import TorchEnsembleMixin
 from .utils.lt import LightningMixin
 from ...stateless.typing import Array, ArrayLike
 
-class TorchMLPBase(Module, ABC):
+class TorchMLPBase(Module):
+
+    """Multilayer perceptron.
+
+    Examples
+    ========
+    >>> import torch
+    >>> net = TorchMLPBase(n_input=4, n_hidden=2, n_units=8, n_out=1)
+    >>> net(torch.randn(3, 4)).shape 
+    torch.Size([3, 1])
+
+    """
 
     def __init__(
         self, 
@@ -91,6 +101,17 @@ class TorchMLPBase(Module, ABC):
 
 class TorchMLPLightning(TorchMLPBase, LightningMixin):
 
+    """Multilayer perceptron with Lightning.
+
+    Examples
+    ========
+    >>> import torch
+    >>> net = TorchMLPLightning(n_input=4, n_hidden=2, n_units=8, n_out=1)
+    >>> net(torch.randn(3, 4)).shape 
+    torch.Size([3, 1])
+
+    """
+
     def __init__(
         self, 
         learning_rate: float = .01,
@@ -111,6 +132,24 @@ class TorchMLPLightning(TorchMLPBase, LightningMixin):
 
 
 class TorchMLPEnsemble(TorchEnsembleMixin, TorchMLPLightning):
+
+    """Multilayer perceptron ensemble with Lightning.
+
+    Examples
+    ========
+    >>> import torch
+    >>> ensemble = TorchMLPEnsemble(n_input=4, n_units=4, n_out=1, ensemble_size=2) 
+    >>> ensemble(torch.randn(5, 4)).shape 
+    torch.Size([5, 2])
+    >>> ensemble.set_model(0) # keep only the first sub-model
+    >>> ensemble(torch.randn(2, 4)).shape 
+    torch.Size([2, 1])
+    >>> ensemble.set_model("all"); len(ensemble.model_ensemble) 
+    2
+    >>> list(ensemble.model_keys) == ["ensemble_module:0", "ensemble_module:1"] 
+    True
+
+    """
 
     def __init__(
         self, 

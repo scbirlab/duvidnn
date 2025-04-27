@@ -36,9 +36,9 @@ def parameter_gradient(model: StatelessModel) -> Callable[[ArrayLike, ArrayLike]
     >>> p = dnp.array([2., 1.])
     >>> f(x, *p)
     Array([2., 5.], dtype=float64)
-    >>> parameter_gradient(f)(p, x)
-    Array([[0.       , 1.       ],
-           [2.7725887, 1.       ]], dtype=float32)
+    >>> parameter_gradient(f)(p, x)  # doctest: +NORMALIZE_WHITESPACE
+    Array([[0.        , 1.        ],
+           [2.77258872, 1.        ]], dtype=float64)
 
     """
     
@@ -50,7 +50,7 @@ def parameter_gradient(model: StatelessModel) -> Callable[[ArrayLike, ArrayLike]
     ) -> Array:
         return dnp.sum(model(x, *params))
 
-    return _f
+    return _parameter_gradient
 
 
 def parameter_hessian_diagonal(
@@ -86,18 +86,21 @@ def parameter_hessian_diagonal(
     >>> import duvida.stateless.numpy as dnp 
     >>> f = lambda x, p1, p2: x ** p1 + p2
     >>> x = dnp.array([1., 2.])
-    >>> p = [2., 1.]
+    >>> p = dnp.array([2., 1.])
     >>> f(x, *p)
     Array([2., 5.], dtype=float64)
-    >>> parameter_hessian_diagonal(f)(p, x)
-    Array([[0., 0.],
-           [1.92181206, 0.]], dtype=float64)
-    >>> parameter_hessian_diagonal(f, approximator='squared_jacobian')(p, x)
-    Array([[0., 0.],
-           [1.92181206, 0.]], dtype=float64)
-    >>> parameter_hessian_diagonal(f, approximator='bekas', n=10, seed=0)(p, x)
-    Array([[0., 0.],
-           [1.9218119, 0.]], dtype=float64)
+    >>> parameter_hessian_diagonal(f)(p, x)  # doctest: +NORMALIZE_WHITESPACE
+    Array([[0.        , 0.        ],
+           [1.92181206, 0.        ]], dtype=float64)
+    >>> parameter_hessian_diagonal(f, approximator='squared_jacobian')(p, x)  # doctest: +NORMALIZE_WHITESPACE
+    Array([[0.        , 1.        ],
+           [7.68724822, 1.        ]], dtype=float64)
+    >>> parameter_hessian_diagonal(f, approximator='rough_finite_difference')(p, x)  # doctest: +NORMALIZE_WHITESPACE
+    Array([[0.        , 0.        ],
+           [1.92204204, 0.        ]], dtype=float64)
+    >>> parameter_hessian_diagonal(f, approximator='bekas', n=3, seed=0)(p, x)  # doctest: +NORMALIZE_WHITESPACE
+    Array([[0.        , 0.        ],
+           [1.92181206, 0.        ]], dtype=float64)
 
     """
     
@@ -163,7 +166,7 @@ def fisher_score(
     >>> model(x, *p)
     Array([3., 3.], dtype=float64)
     >>> fisher_score(model, mse_fn)(p, x, model(x, *p) + .1)
-    Array([1., 2.], dtype=float64)
+    Array([-0.13862944, -0.4       ], dtype=float64)
 
     """
 
@@ -264,7 +267,8 @@ def doubtscore(
     >>> model(x, *p)
     Array([3., 3.], dtype=float64)
     >>> doubtscore(model, mse_fn)(p, x + .1, x, model(x, *p) + .1)
-    Array([1., 2.], dtype=float64)
+    Array([[-1.45450818, -0.4       ],
+           [-0.1868479 , -0.4       ]], dtype=float64)
 
     """
 
@@ -372,7 +376,8 @@ def information_sensitivity(
     >>> model(x, *p)
     Array([3., 3.], dtype=float64)
     >>> information_sensitivity(model, mse_fn)(p, x + .1, x, model(x, *p) + .1)
-    Array([1., 2.], dtype=float64)
+    Array([[9.21232363, 4.        ],
+           [1.3042473 , 4.        ]], dtype=float64)
 
     """
 

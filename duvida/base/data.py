@@ -226,7 +226,7 @@ class DataMixinBase(ABC):
     def _resolve_featurizers(
         features: FeatureLike
     ):
-        if isinstance(features, str):
+        if isinstance(features, (str, Mapping)):
             features = [features]
         resolved_featurizers = []
         for featurizer in features:

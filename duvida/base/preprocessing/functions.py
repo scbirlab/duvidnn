@@ -115,7 +115,10 @@ def ChempropData(
         else: 
             array = [np.asarray(data[col]) for col in columns]
             array = [a if a.ndim > 1 else a[..., np.newaxis] for a in array]
-            array = np.concatenate(array, axis=-1).astype(np.float32) 
+            if len(array) > 0:
+                array = np.concatenate(array, axis=-1).astype(np.float32) 
+            else:
+                array = [None] * nrows
         return array
 
     

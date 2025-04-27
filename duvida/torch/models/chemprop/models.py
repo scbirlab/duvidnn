@@ -5,7 +5,12 @@ from abc import ABC, abstractmethod
 from carabiner import print_err
 from chemprop.data import MolGraph, TrainingBatch
 from chemprop.models import MPNN
-from chemprop.nn import BondMessagePassing, EvidentialFFN, NormAggregation, RegressionFFN
+from chemprop.nn import (
+    BondMessagePassing, 
+    EvidentialFFN, 
+    NormAggregation, 
+    RegressionFFN
+)
 import numpy as np
 import torch
 from torch.nn import Module

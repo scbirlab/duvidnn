@@ -3,10 +3,9 @@
 from typing import Callable, Iterable, Union
 from functools import partial
 
-from .config import Config
+from .config import config
 from .typing import Array, ArrayLike
 
-config = Config()
 __backend__ = config.backend
 
 if config.backend == 'jax':
@@ -14,6 +13,16 @@ if config.backend == 'jax':
     from jax.flatten_util import ravel_pytree
 
     def random_normal(seed: int, device=None) -> Callable:
+        """Generate a sample from the Normal distribution.
+
+        Examples
+        ========
+        >>> gen = random_normal(seed=0)
+        >>> a, b = gen((3,)), gen((3,))
+        >>> (a == b).all()
+        Array(True, dtype=bool)
+
+        """
         key = random.key(seed)
         def _normal(shape, *args, **kwargs):
             return random.normal(
@@ -24,9 +33,10 @@ if config.backend == 'jax':
         return _normal
 
 elif config.backend == 'torch':
-    from torch import compile, normal, zeros, Generator
+    from torch import concat as concatenate, compile, normal, zeros, Generator, split
     from torch.random import manual_seed
     from torch.func import jvp, grad, hessian, vmap as vmap_torch
+    from torch.utils._pytree import tree_flatten, tree_unflatten
 
     def vmap(
         f: Callable, 
@@ -34,6 +44,16 @@ elif config.backend == 'torch':
         out_axes: Union[int, Iterable[int]] = 0, 
         *args, **kwargs
     ) -> Callable:
+        """Vectorizes function over axis of its arguments.
+
+        Examples
+        ========
+        >>> import duvida.stateless.numpy as dnp
+        >>> double = lambda z: z * 2
+        >>> vmap(double)(dnp.array([1., 2., 3.])).tolist()
+        [2.0, 4.0, 6.0]
+
+        """
         return vmap_torch(f, in_dims=in_axes, out_dims=out_axes, 
                           randomness='different',
                           *args, **kwargs)
@@ -41,7 +61,20 @@ elif config.backend == 'torch':
     jit = partial(compile, fullgraph=True)
 
     def random_normal(seed: int, device='cpu') -> Callable:
-        generator = Generator(device=device).manual_seed(seed)
+        """Generate a sample from the Normal distribution.
+
+        Examples
+        ========
+        >>> gen = random_normal(seed=0)
+        >>> a, b = gen((3,)), gen((3,))
+        >>> a, b
+        [1], [2]
+        >>> (a == b).all()
+        tensor(True)
+
+        """
+        generator = Generator(device=device)
+        generator.manual_seed(seed)
         def _normal(shape, *args, **kwargs):
             return normal(
                 generator=generator, 
@@ -61,24 +94,24 @@ elif config.backend == 'torch':
 
         Examples
         --------
-        >>> import duvida.numpy as dnp
-        >>> flat, unravel = _flatten([dnp.ones((2,)), dnp.zeros((3,))])
+        >>> import duvida.stateless.numpy as dnp
+        >>> flat, unravel = ravel_pytree([dnp.ones((2,)), dnp.zeros((3,))])
         >>> flat.shape
         (5,)
         >>> (unravel(flat)[0] == 1.).all()
         True
         """
-        leaves, spec = torch.utils._pytree.tree_flatten(params)  # 
+        leaves, spec = tree_flatten(params)  # 
         sizes = [p.numel() for p in leaves]
-        flat = torch.cat([p.flatten() for p in leaves])
+        flat = concatenate([p.flatten() for p in leaves])
 
         def unravel(vec):
-            chunks = torch.split(vec, sizes)
+            chunks = split(vec, sizes)
             rebuilt = [
                 chunk.reshape_as(p) 
                 for chunk, p in zip(chunks, leaves)
             ]
-            return torch.utils._pytree.tree_unflatten(spec, rebuilt)
+            return tree_unflatten(spec, rebuilt)
 
         return flat, unravel
 else:

@@ -35,7 +35,7 @@ class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
         self.model = None
         self._trainer = None
         self._init_kwargs = kwargs
-        self._model_config = None
+        self._model_config = {}
         self._special_args = None
 
     def save_checkpoint(
@@ -352,6 +352,9 @@ class FingerprintModelBoxBase(ChemMixinBase, ModelBoxBase):
         super().__init__(*args, **kwargs)
         self.use_fp = use_fp
         self.use_2d = use_2d
+        if extra_featurizers is not None:
+            if isinstance(extra_featurizers, (str, Mapping)):
+                extra_featurizers = [extra_featurizers]
         self.extra_featurizers = extra_featurizers
         self._default_preprocessing_args = {
             "structure_column": None,
@@ -379,7 +382,7 @@ class FingerprintModelBoxBase(ChemMixinBase, ModelBoxBase):
         else:
             featurizer = []
         if features is not None:
-            featurizer += features
+            featurizer += self._resolve_featurizers(features)
         return super().load_training_data(
             features=self._resolve_featurizers(featurizer),
             **kwargs,

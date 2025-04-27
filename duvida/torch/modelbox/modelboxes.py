@@ -90,6 +90,18 @@ class TorchModelBoxBase(ModelBoxBase, DataMixin, DoubtMixin):
 @register_modelbox("mlp")
 class TorchMLPModelBox(TorchModelBoxBase, VarianceMixin):
 
+    """ModelBox for pytorch multilayer perceptron ensemble.
+
+    Examples
+    ========
+    >>> mb = TorchMLPModelBox(ensemble_size=3) 
+    >>> mb.input_shape, mb.output_shape = (4,), (1,) # usually set by .load_training_data() 
+    >>> mb.model = mb.create_model() 
+    >>> mb.model.n_input, mb.model.n_out 
+    (4, 1)
+
+    """
+
     def create_model(self, *args, **kwargs) -> TorchMLPEnsemble:
         self._model_config.update(kwargs)
         return TorchMLPEnsemble(

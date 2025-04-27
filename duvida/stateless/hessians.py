@@ -214,17 +214,17 @@ def bekas(
     Array([ 8., 14.], dtype=float64)
     >>> dnp.allclose(bekas(f)(a), dnp.diag(hessian(f)(a)))
     Array(True, dtype=bool)
-    >>> bekas(f, n=10_000)(a) == dnp.diag(hessian(f)(a))  # Increase samples for better accuracy
-    Array([ True,  True], dtype=bool)
+    >>> bekas(f, n=100_000, seed=1)(a)  # Increase samples for better accuracy
+    Array([ 8., 14.], dtype=float64)
     >>> bekas(f, seed=1)(a) == bekas(f, seed=0)(a)  # Change the seed to alter the outcome
     Array([ True, False], dtype=bool)
     >>> g = lambda x: dnp.sum(dnp.sum(x) ** 3. + x ** 2. + 4.)
     >>> dnp.diag(hessian(g)(a))
     Array([38., 38.], dtype=float64)
     >>> bekas(g, n=1000, seed=0)(a)  # Less accurate when parameters interact
-    Array([38.52438307, 38.49679655], dtype=float64)
+    Array([39.50905509, 39.81868951], dtype=float64)
     >>> bekas(g, n=1000, seed=1)(a)  # Change the seed to alter the outcome
-    Array([39.07878869, 38.97796601], dtype=float64)
+    Array([37.25647008, 37.29415901], dtype=float64)
     
     """
     random_normal_fn = random_normal(seed, device=device)
@@ -271,7 +271,7 @@ def rough_finite_difference(
     argnums : int, optional
         Which argument number to take the second derivative for. Default: 0.
     eps : float, optional
-        The
+        The small number to add to prevent instability.
     
     Returns
     -------
@@ -300,7 +300,7 @@ def rough_finite_difference(
     >>> dnp.diag(hessian(g)(a))
     Array([38., 38.], dtype=float64)
     >>> rough_finite_difference(g)(a)  # Less accurate when parameters interact
-    Array([74.00828641, 74.00828641], dtype=float64
+    Array([74.00828641, 74.00828641], dtype=float64)
     
     """
     _jacobian = grad(f, argnums=argnums, *args, **kwargs)
