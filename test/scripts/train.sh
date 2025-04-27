@@ -14,7 +14,7 @@ do
         -1 hf://scbirlab/fang-2023-biogen-adme@scaffold-split:train \
         -2 hf://scbirlab/fang-2023-biogen-adme@scaffold-split:test \
         -S smiles \
-        -x "transformers://scbirlab/lchemme-base-zinc22-lteq300:clean_smiles~mean" \
+        -x "transformer://scbirlab/lchemme-base-zinc22-lteq300:clean_smiles~mean" \
         -y clogp \
         -c test/outputs/hyperopt.json \
         -k "$class" \

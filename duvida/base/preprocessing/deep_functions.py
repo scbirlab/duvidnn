@@ -100,10 +100,12 @@ def HfBART(
             data[input_column],
             tokenizer=tokenizer,
         )
-        outputs = model(
-            **tokenized_inputs, 
-            decoder_input_ids=tokenized_inputs['input_ids'],
-        )
+        model.eval()
+        with torch.no_grad():
+            outputs = model(
+                **tokenized_inputs, 
+                decoder_input_ids=tokenized_inputs['input_ids'],
+            )
         encoder_last_hidden_state = outputs['encoder_last_hidden_state'].detach()
         embedding = _aggregated_embedding(
             encoder_last_hidden_state,
