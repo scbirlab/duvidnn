@@ -1,6 +1,6 @@
 """Preprocessing functions from deep embeddings."""
 
-from typing import Callable, Dict, Iterable, Mapping, Tuple
+from typing import TYPE_CHECKING, Any, Callable, Dict, Iterable, Mapping, Tuple
 from functools import partial
 
 from carabiner import cast, print_err
@@ -8,18 +8,27 @@ import numpy as np
 from numpy.typing import ArrayLike
 import torch
 
+if TYPE_CHECKING:
+    from transformers import PreTrainedTokenizerBase, PreTrainedModel
+else:
+    PreTrainedTokenizerBase, PreTrainedModel = Any, Any
+
 from .registry import register_function
 from ..typing import StrOrIterableOfStr
 
 _DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+
 def _index_into(x: ArrayLike, i: int):
     return x[:,i,:]
 
+
 def _get_value_from_tuple(f: Callable, **kwargs):
     partial_f = partial(f, **kwargs)
+
     def _f(*args, **fkwargs):
         return partial_f(*args, **fkwargs).values
+
     return _f
 
 
@@ -33,6 +42,7 @@ EMBEDDING_AGGREGATORS = {
 }
 DEFAULT_AGGREGATOR = EMBEDDING_AGGREGATORS["mean"]
 
+
 def _aggregated_embedding(
     x: torch.Tensor, 
     aggregators: Iterable[Callable] = (DEFAULT_AGGREGATOR, )
@@ -44,15 +54,14 @@ def _aggregated_embedding(
     return np.concatenate(aggregated, axis=-1)
 
 
-def _resolve_bart_model(ref: str) -> Tuple['PreTrainedTokenizerBase', 'PreTrainedModel']:
-
+def _resolve_bart_model(ref: str) -> Tuple[PreTrainedTokenizerBase, PreTrainedModel]:
     from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
     return AutoTokenizer.from_pretrained(ref), AutoModelForSeq2SeqLM.from_pretrained(ref).to(_DEVICE)
 
 
 def _tokenize_for_embedding(
     x: Iterable[str],
-    tokenizer: 'PreTrainedTokenizerBase'
+    tokenizer: PreTrainedTokenizerBase
 ) -> Dict[str, np.ndarray]:
 
     inputs = [_x if _x is not None else '<unk>' for _x in cast(x, to=list)]
@@ -114,4 +123,3 @@ def HfBART(
         return embedding
 
     return _hf_bart
-

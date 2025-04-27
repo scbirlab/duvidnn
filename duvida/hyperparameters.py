@@ -1,6 +1,6 @@
 """Utilities for generating hyperparameter plans."""
 
-from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
+from typing import Any, Dict, Iterator, Optional, Union
 from dataclasses import dataclass
 import pickle
 from io import TextIOWrapper
@@ -9,6 +9,7 @@ import json
 
 from carabiner import cast, print_err
 import numpy as np
+
 
 @dataclass
 class HyperRange:
@@ -111,7 +112,6 @@ class HyperRange:
     def __str__(self) -> str:
         return str(self)
         
-
     @property
     def min(self) -> Union[float, int, bool]:
         """Get minimum value.

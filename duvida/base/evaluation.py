@@ -3,6 +3,7 @@
 import numpy as np
 import scipy
 
+
 def rmse(x, y):
     return np.mean(np.abs(np.mean(x, axis=-1, keepdims=True) - y))
 

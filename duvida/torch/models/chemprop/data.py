@@ -3,9 +3,10 @@
 from typing import Iterable, Mapping, Optional, Union
 from dataclasses import dataclass, field, InitVar
 
-from chemprop.data import BatchMolGraph, Datum, MolGraph, TrainingBatch
+from chemprop.data import Datum, MolGraph, TrainingBatch
 import numpy as np
 import torch
+
 
 @dataclass(repr=False, eq=False, slots=True)
 class DuvidaBatchMolGraph:
@@ -56,7 +57,7 @@ class DuvidaBatchMolGraph:
         self.V = torch.concat(Vs)
         try:
             self.E = torch.concat(Es)
-        except TypeError as e:
+        except TypeError:
             Es = [
                 E for E in Es if not isinstance(E, list)
             ]

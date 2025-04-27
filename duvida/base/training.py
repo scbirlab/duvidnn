@@ -2,6 +2,7 @@
 
 from abc import abstractmethod, ABC
 
+
 class ModelTrainerBase(ABC):
 
     def __init__(

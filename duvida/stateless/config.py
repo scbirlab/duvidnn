@@ -11,6 +11,7 @@ _PRECISION_FLAG: str = "DUVIDA_PRECISION"
 
 log = logging.getLogger("duvida.config")
 
+
 @dataclass
 class Config:
     backend: Optional[str] = field(default=None)
@@ -61,7 +62,7 @@ class Config:
 
     @staticmethod
     def _set_precision_torch(precision: str) -> None:
-        from torch import set_default_dtype #, set_default_device
+        from torch import set_default_dtype  #, set_default_device
         # set_default_device('cuda' if torch.cuda.is_available() else 'cpu')
         if precision == 'double':
             from torch import float64
@@ -111,5 +112,6 @@ class Config:
             )
         os.environ[_BACKEND_FLAG] = self.backend
         return None
+
 
 config = Config()

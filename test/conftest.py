@@ -1,10 +1,8 @@
 """Pytest configuration."""
 
-import importlib
 import sys
-
-import duvida
 import pytest
+
 
 @pytest.fixture(autouse=True)
 def reload_package():

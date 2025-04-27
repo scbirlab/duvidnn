@@ -16,6 +16,7 @@ from ..checkpoint_utils import load_checkpoint_file, save_json
 from .preprocessing import Preprocessor
 from .typing import DataLike, FeatureLike, StrOrIterableOfStr
 
+
 class DataMixinBase(ABC):
 
     """Add data-loading capability to models.
@@ -57,11 +58,11 @@ class DataMixinBase(ABC):
         }
         if not os.path.exists(checkpoint_dir):
             os.makedirs(checkpoint_dir)
-        if not self._input_training_data is None:
+        if self._input_training_data is not None:
             self._input_training_data.save_to_disk(
                 os.path.join(os.path.join(checkpoint_dir, "input-data.hf")),
             )
-            if not self.training_data is None:
+            if self.training_data is not None:
                 (
                     self.training_data
                     .with_format("numpy", dtype="float")
@@ -98,7 +99,7 @@ class DataMixinBase(ABC):
             none_on_error=True,
             cache_dir=cache_dir,
         )
-        if not training_data is None:
+        if training_data is not None:
             self.training_data = training_data.with_format(
                 self._format, 
                 **self._format_kwargs,
@@ -154,7 +155,6 @@ class DataMixinBase(ABC):
         out_column = preprocessor.output_column
         return out_column, out_column in x.column_names
 
-
     @staticmethod
     def _featurize(
         x: Mapping[str, ArrayLike],
@@ -177,9 +177,14 @@ class DataMixinBase(ABC):
     ) -> Iterable[str]:
         columns = cast(features, to=list) + cast(labels, to=list)
         data_cols = data.column_names
-        absent_columns = [col for col in columns if not col in data_cols]
+        absent_columns = [col for col in columns if col not in data_cols]
         if len(absent_columns) > 0:
-            raise ValueError(f"Requested columns ({', '.join(columns)}) not present in {type(data)}: {', '.join(absent_columns)}.")
+            raise ValueError(
+                f"""
+                Requested columns ({', '.join(columns)}) not present in 
+                {type(data)}: {', '.join(absent_columns)}.
+                """
+            )
         return columns
     
     def _load_from_csv(
@@ -201,10 +206,8 @@ class DataMixinBase(ABC):
         if cache is None:
             cache = self._default_cache
             print_err(f"Defaulting to cache: {cache}")
-        if isinstance(dataframe, Mapping):
-            dataframe = DataFrame({
-                col: dataframe[col] for col in columns
-            })
+        if not isinstance(dataframe, DataFrame) and isinstance(dataframe, Mapping):
+            dataframe = DataFrame(dataframe)
 
         hash_name = Hasher.hash(dataframe)
         df_temp_file = os.path.join(cache, "df-load", f"{hash_name}.csv")
@@ -385,7 +388,7 @@ class DataMixinBase(ABC):
             featurizer.input_column for featurizer in featurizers
         ]))
         if len(input_columns) == 0:
-            raise AttributeError(f"No input columns generated for model.")
+            raise AttributeError("No input columns generated for model.")
         labels = cast(labels, to=list)
         input_dataset = (
             dataset
@@ -397,7 +400,7 @@ class DataMixinBase(ABC):
                 desc="Preprocessing",
             )
         )
-        columns = self._check_column_presence(input_columns, labels, input_dataset)
+        self._check_column_presence(input_columns, labels, input_dataset)
         input_dataset = (
             input_dataset
             .select_columns(input_columns + labels)
@@ -563,14 +566,15 @@ class ChemMixinBase(DataMixinBase):
     def _get_nn_tanimoto(
         x: Mapping[str, ArrayLike],
         refs_data: Mapping[str, ArrayLike],
+        results_column: str,
         _in_key: str,
-        _sim_fn: Callable[[ArrayLike, ArrayLike], float]
+        _sim_fn: Callable[[ArrayLike, ArrayLike], float],
     ) -> Dict[str, np.ndarray]:
-        query_fps = queries[_in_key]
+        query_fps = x[_in_key]
         refs = refs_data[_in_key]
         results = [_sim_fn(q, r) for q, r in zip(query_fps, refs)]
         results = np.stack(results, axis=0)
-        x[self.tanimoto_column] = results
+        x[results_column] = results
         return x
 
     def tanimoto_nn(
@@ -601,6 +605,7 @@ class ChemMixinBase(DataMixinBase):
                 "featurizers": [fp_preprocessor]
             }
         }
+        query_fp_col = fp_preprocessor.output_column
         queries = (
             query_dataset
             .map(
@@ -616,7 +621,7 @@ class ChemMixinBase(DataMixinBase):
                 **common_map_opts,
                 desc="Calculating query fingerprints",
             )
-            .rename_column(ref_fp_col, self.common_fp_column)
+            .rename_column(query_fp_col, self.common_fp_column)
             .select_columns([self.smiles_column, self.common_fp_column])
             .with_format(
                 self._format, 
@@ -657,6 +662,7 @@ class ChemMixinBase(DataMixinBase):
             self._get_nn_tanimoto,
             fn_kwargs={
                 "refs_data": refs,
+                "results_column": self.tanimoto_column,
                 "_in_key": self.common_fp_column, 
                 "_sim_fn": self._get_max_sim,
             },

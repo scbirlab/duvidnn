@@ -6,10 +6,11 @@ from functools import partial, reduce
 
 from carabiner import cast
 from datasets import Dataset
-from numpy import concatenate, mean, ndarray
+from numpy import concatenate, ndarray
 from numpy.typing import ArrayLike
 
 from .aggregators import get_aggregator, AggFunction
+
 
 class DoubtMixinBase(ABC):
 
@@ -106,7 +107,12 @@ class DoubtMixinBase(ABC):
     
     @staticmethod
     @abstractmethod
-    def information_sensitivity_core(fisher_score, fisher_information_diagonal, parameter_gradient, parameter_hessian_diagonal):
+    def information_sensitivity_core(
+        fisher_score, 
+        fisher_information_diagonal, 
+        parameter_gradient, 
+        parameter_hessian_diagonal
+    ):
         pass
     
     @staticmethod
@@ -134,12 +140,7 @@ class DoubtMixinBase(ABC):
         **kwargs
     ) -> Dataset:
         if dataset is None:  
-            if isinstance(self, ModelBoxBase):
-                dataset = self._check_training_data()
-            else:
-                raise ValueError(f"Training data not provided!")
-        
-        results = []
+            dataset = self._check_training_data()
         fn = (self.fisher_score,)
         if hessian:
             fn += (partial(
@@ -306,7 +307,7 @@ class DoubtMixinBase(ABC):
         if training_dataset is None:  
             dataset = self._check_training_data()
 
-        if isinstance(self, ModelBoxBase):
+        if hasattr(self, "_prepare_data"):
             candidates = self._prepare_data(
                 features=candidate_features,
                 labels=candidate_labels,

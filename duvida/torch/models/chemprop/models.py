@@ -3,7 +3,6 @@
 from abc import ABC, abstractmethod
 
 from carabiner import print_err
-from chemprop.data import MolGraph, TrainingBatch
 from chemprop.models import MPNN
 from chemprop.nn import (
     BondMessagePassing, 
@@ -11,7 +10,6 @@ from chemprop.nn import (
     NormAggregation, 
     RegressionFFN
 )
-import numpy as np
 import torch
 from torch.nn import Module
 from torch.optim import Adam, Optimizer
@@ -22,6 +20,7 @@ from .data import (
 )
 from ..utils.ensemble import TorchEnsembleMixin
 from ..utils.lt import LightningMixin
+
 
 class ChempropBase(Module, ABC):
 

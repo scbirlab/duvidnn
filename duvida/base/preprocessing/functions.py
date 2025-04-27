@@ -9,10 +9,10 @@ from chemprop.data import (
     MolGraph
 )
 import numpy as np
-from numpy.typing import ArrayLike
 from schemist.features import calculate_feature
 
 from .registry import register_function
+
 
 @register_function("identity")
 def Identity() -> Callable:
@@ -36,6 +36,7 @@ def OneHot(
     
     """
     prepend = [1] if intercept else []
+
     def _one_hot(
         data: Mapping[str, Iterable],
         input_column: str
@@ -44,6 +45,7 @@ def OneHot(
             prepend + [1 if x == cat else 0 for cat in categories] 
             for x in data[input_column]
         ])
+
     return _one_hot
     
 
@@ -120,7 +122,6 @@ def ChempropData(
             else:
                 array = [None] * nrows
         return array
-
     
     def _chemprop_data(
         data: Mapping[str, Iterable],

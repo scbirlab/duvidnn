@@ -1,12 +1,13 @@
 """Implementation of information sensitivity metrics for stateless model frameworks."""
 
-from typing import Callable, Iterable, Optional, Union
+from typing import Callable, Union
 from functools import partial
 
 from .hessians import _DEFAULT_APPROXIMATOR, get_approximators
 from .numpy import numpy as dnp
 from .typing import Array, ArrayLike, LossFunction, StatelessModel
-from .utils import reciprocal, ravel_pytree, grad, jit, vmap
+from .utils import reciprocal, grad, jit, vmap
+
 
 def parameter_gradient(model: StatelessModel) -> Callable[[ArrayLike, ArrayLike], Array]:
 
@@ -113,6 +114,48 @@ def parameter_hessian_diagonal(
         return dnp.sum(f(x, *params))      
 
     return _scalar_f
+
+
+def parameter_gradient_unrolled(
+    model: StatelessModel
+) -> Callable[[ArrayLike, ArrayLike], Array]:
+
+    @grad
+    def _f0(
+        params: ArrayLike, 
+        x: ArrayLike
+    ) -> Array:
+        return dnp.sum(model(x, *params))
+
+    def _f(
+        params: ArrayLike, 
+        x: ArrayLike
+    ) -> Array:
+        return [_f0(params, [d]) for d in x]
+
+    return _f
+
+
+def parameter_hessian_diagonal_unrolled(
+    model: StatelessModel, 
+    approximator: str = _DEFAULT_APPROXIMATOR, 
+    *args, **kwargs
+) -> Callable[[ArrayLike, ArrayLike], Array]:
+
+    @get_approximators(approximator, *args, **kwargs)
+    def _f0(
+        params: ArrayLike, 
+        x: ArrayLike
+    ) -> Array:
+        return dnp.sum(model(x, *params))
+
+    def _f(
+        params: ArrayLike, 
+        x: ArrayLike
+    ) -> Array:
+        return [_f0(params, [d]) for d in x]
+
+    return _f
 
 
 def _model_loss(

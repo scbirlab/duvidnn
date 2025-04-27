@@ -9,6 +9,7 @@ from torch.nn import Module, ModuleDict
 
 from ....stateless.typing import Array, ArrayLike
 
+
 class TorchEnsembleMixin(ABC):
 
     _module_prefix: str = "ensemble_module"

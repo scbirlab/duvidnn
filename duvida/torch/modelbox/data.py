@@ -5,6 +5,7 @@ from functools import partial
 
 from datasets import Dataset, IterableDataset
 import torch
+from torch.func import vmap
 from torch.utils.data import DataLoader
 
 from ...base.data import ChemMixinBase, DataMixinBase
@@ -16,6 +17,7 @@ from ...stateless.typing import Array, ArrayLike
 from ..models.chemprop.data import _collate_training_batch_for_forward
 
 _DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 
 class DataMixin(DataMixinBase):
 
@@ -55,15 +57,16 @@ class TorchChemMixin(ChemMixinBase, DataMixin):
 
     @staticmethod
     def _get_nn_tanimoto(
-        queries: Mapping[str, ArrayLike],
+        x: Mapping[str, ArrayLike],
         refs_data: Mapping[str, ArrayLike],
+        results_column: str,
         _in_key: str,
         _sim_fn: Callable[[ArrayLike, ArrayLike], float]
     ) -> Dict[str, Array]:
-        query_fps = queries[_in_key]
+        query_fps = x[_in_key]
         refs = refs_data[_in_key]
         results = vmap(_sim_fn, in_axes=(0, None))(query_fps, refs)
-        x[self.tanimoto_column] = results
+        x[results_column] = results
         return x
 
 

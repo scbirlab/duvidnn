@@ -6,11 +6,7 @@ from carabiner import print_err
 
 from .checkpoint_utils import load_checkpoint_file
 try:
-    from .torch import (
-        TorchMLPModelBox,
-        TorchFingerprintModelBox,
-        ChempropModelBox
-    )
+    from .torch import TorchMLPModelBox
 except ImportError as e:
     print_err(e)
     raise ImportError(
@@ -27,13 +23,14 @@ except ImportError as e:
     )
 else:
     from .base.modelboxes import ModelBoxBase
-    from .base.modelbox_registry import DEFAULT_MODELBOX, MODELBOX_REGISTRY, MODELBOX_NAMES
+    from .base.modelbox_registry import DEFAULT_MODELBOX, MODELBOX_REGISTRY
 
 class AutoModelBox:
 
     _init_kwargs_file: str = ModelBoxBase._init_kwargs_filename
     _model_config_file: str = ModelBoxBase._model_config_filename
     _model_class_key: str = "class_name"
+
 
     def __init__(
         self,

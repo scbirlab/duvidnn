@@ -7,7 +7,6 @@ import os
 from carabiner import print_err
 from datasets import Dataset
 from numpy import ndarray
-from numpy.typing import ArrayLike
 from pandas import DataFrame
 
 from .aggregators import get_aggregator, AggFunction
@@ -73,7 +72,6 @@ class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
     @abstractmethod
     def save_weights(self, checkpoint: str):
         pass
-    
 
     @abstractmethod
     def load_weights(self, checkpoint: str):
@@ -179,7 +177,7 @@ class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
         if trainer_opts is None:
             trainer_opts = {}
         if self.model is None or reinitialize:
-            self.model = self.create_model(*args, **kwargs)
+            self.model = self.create_model()
         if self._trainer is None or reinitialize:
             self._trainer = self.create_trainer(
                 epochs=epochs, # number of epochs to train for
@@ -234,12 +232,14 @@ class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
         )
         if aggregator is not None:
             aggregator = get_aggregator(aggregator, **kwargs)
+
             def _predict(x):
                 x = self._predict(x)
                 x[self._prediction_key] = aggregator(
                     self.detach_tensor(x[self._prediction_key]), 
                 )
                 return x
+
         else:
             _predict = self._predict
 

@@ -10,6 +10,7 @@ MODELBOX_REGISTRY_INVERTED: Dict[ModelBoxBase, str] = {}
 MODELBOX_NAMES: List[str] = []
 DEFAULT_MODELBOX: str = "mlp"
 
+
 def register_modelbox(name: str) -> Callable:
     """Decorator to register a function in the function registry.
     

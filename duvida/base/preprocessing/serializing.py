@@ -1,12 +1,13 @@
 """Classes to enable JSON serialization of preprocessing functions."""
 
-from typing import Any, Callable, Dict, Iterable, Mapping, Union
+from typing import Any, Dict, Iterable, Mapping, Union
 from dataclasses import asdict, dataclass, field
 
 import numpy as np
 
 from .registry import FUNCTION_REGISTRY
 from ...checkpoint_utils import save_json, _load_json
+
 
 @dataclass
 class Preprocessor:

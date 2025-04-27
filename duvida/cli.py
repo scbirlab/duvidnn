@@ -5,10 +5,9 @@ from collections import defaultdict
 from glob import glob
 import json
 import os
-import pickle
 import sys
 
-from carabiner.utils import print_err, pprint_dict
+from carabiner.utils import pprint_dict
 from carabiner.mpl import grid, figsaver
 from carabiner.cliutils import clicommand, CLIOption, CLICommand, CLIApp
 # from  pandas import DataFrame
@@ -22,6 +21,7 @@ from .autoclass import (
 from .hyperparameters import HyperOpt
 
 _LR_DEFAULT: float = .01
+
 
 def _plot_history(
     lightning_csv, 
@@ -125,6 +125,7 @@ def _hyperprep(args: Namespace) -> None:
         
     return None
 
+
 @clicommand(message='Training a Pytorch model')
 def _train(args: Namespace) -> None:
 
@@ -133,7 +134,6 @@ def _train(args: Namespace) -> None:
     from lightning.pytorch.loggers import CSVLogger, TensorBoardLogger
     import pandas as pd
     import numpy as np
-    import torch
 
     from .checkpoint_utils import save_json
 
@@ -157,7 +157,7 @@ def _train(args: Namespace) -> None:
                 new_config,
                 message=f"Overriding command-line parameters from config file {args.config}",
             )
-            str_config.update(new_config)  ## override command line
+            str_config.update(new_config)  # override command line
             pprint_dict(
                 str_config,
                 message=f"Initialization parameters are now",
@@ -183,7 +183,7 @@ def _train(args: Namespace) -> None:
         "labels": args.labels or modelbox._label_cols, 
         "cache": args.cache,
     }
-    if not modelbox.class_name in ("mlp", ):
+    if modelbox.class_name not in ("mlp", ):
         load_data_args["structure_column"] = args.structure or modelbox.structure_column
     if (
         args.checkpoint is None 
@@ -197,7 +197,6 @@ def _train(args: Namespace) -> None:
         modelbox._model_config, 
         message=f"Model {modelbox.class_name} with {modelbox.size} parameters",
     )
-    _features = load_data_args["features"]
     _featurizers = modelbox._input_featurizers
     _labels = load_data_args["labels"]
     save_prefix = os.path.join(
@@ -297,7 +296,7 @@ def _train(args: Namespace) -> None:
                         keys_added.append(key)
     try:
         pd.DataFrame(overall_metrics).to_csv(
-            os.path.join(save_prefix, f"metrics.csv"),
+            os.path.join(save_prefix, "metrics.csv"),
             index=False,
         )
     except ValueError as e:  # not all columns same length; should never happen
@@ -347,7 +346,10 @@ def main() -> None:
         '--structure', '-S',
         type=str,
         default=None,
-        help='Column names from data file that contains a string representation of chemical structure. Required for chemical model classes.',
+        help="""
+        Column names from data file that contains a string representation 
+        of chemical structure. Required for chemical model classes.
+        """,
     )
     structure_representation = CLIOption(
         '--input-representation', '-R',

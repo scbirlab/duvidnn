@@ -17,8 +17,9 @@ AGGREGATORS = {
     "rms": partial(norm, ord=2, keepdims=False),
 }
 
+
 def slice_at_axis(
-    a: ArrayLike, 
+    a: ArrayLike,
     i: int, 
     axis: int = -1
 ):

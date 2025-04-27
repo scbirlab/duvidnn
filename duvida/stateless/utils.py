@@ -54,9 +54,13 @@ elif config.backend == 'torch':
         [2.0, 4.0, 6.0]
 
         """
-        return vmap_torch(f, in_dims=in_axes, out_dims=out_axes, 
-                          randomness='different',
-                          *args, **kwargs)
+        return vmap_torch(
+            f, 
+            in_dims=in_axes, 
+            out_dims=out_axes, 
+            randomness='different',
+            *args, **kwargs
+        )
 
     jit = partial(compile, fullgraph=True)
 
@@ -75,6 +79,7 @@ elif config.backend == 'torch':
         """
         generator = Generator(device=device)
         generator.manual_seed(seed)
+
         def _normal(shape, *args, **kwargs):
             return normal(
                 generator=generator, 
@@ -82,6 +87,7 @@ elif config.backend == 'torch':
                 std=1.,
                 *args, **kwargs
             )
+
         return _normal
 
     def ravel_pytree(params):
@@ -116,7 +122,6 @@ elif config.backend == 'torch':
         return flat, unravel
 else:
     raise ValueError(f"Invalid backed: {config.backend}")
-
     
 
 def reciprocal(f: Callable[[ArrayLike], Array]) -> Callable[[ArrayLike], Array]:
@@ -157,8 +162,14 @@ def get_eps():
     
     if config.backend == 'jax':
         from jax.numpy import asarray, finfo
-        def converter(x): return asarray(x)
+
+        def converter(x): 
+            return asarray(x)
+
     else:
         from torch import as_tensor, finfo, float64
-        def converter(x): return as_tensor(x)
+
+        def converter(x): 
+            return as_tensor(x)
+            
     return converter(finfo(converter(1.).dtype).eps)

@@ -1,6 +1,6 @@
 """Containers for models and their training data."""
 
-from typing import Dict, Tuple, Optional
+from typing import Tuple, Optional
 import os
 
 import torch
@@ -19,9 +19,10 @@ config.set_backend('torch', precision='float')
 
 from ...stateless.typing import Array, ArrayLike
 from ..models import ChempropEnsemble, TorchMLPEnsemble
-from .data import ChempropDataMixin, DataMixin, TorchChemMixin
+from .data import DataMixin, TorchChemMixin
 from .information import ChempropDoubtMixin, DoubtMixin
 from .training import ModelTrainer
+
 
 class TorchModelBoxBase(ModelBoxBase, DataMixin, DoubtMixin):
 
@@ -77,7 +78,8 @@ class TorchModelBoxBase(ModelBoxBase, DataMixin, DoubtMixin):
     ) -> ModelTrainer:
         trainer_opts = {
             "logger": True,
-            "enable_checkpointing": False, # Use `True` if you want to save model checkpoints. The checkpoints will be saved in the `checkpoints` folder.
+            # Use `True` if you want to save model checkpoints. The checkpoints will be saved in the `checkpoints` folder.
+            "enable_checkpointing": False,
             "enable_progress_bar": True,
             "enable_model_summary": True,
             "accelerator": "auto",
@@ -109,6 +111,7 @@ class TorchMLPModelBox(TorchModelBoxBase, VarianceMixin):
             n_out=self.output_shape[-1], 
             *args, **self._model_config,
         )
+        
 
 @register_modelbox("fingerprint")
 class TorchFingerprintModelBox(TorchChemMixin, FingerprintModelBoxBase, TorchMLPModelBox):

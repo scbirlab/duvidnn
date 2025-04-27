@@ -6,11 +6,12 @@ from functools import partial
 
 from .hvp import hvp
 from .numpy import numpy as dnp
-from .typing import Approximator, Array, ArrayLike
-from .utils import jvp, grad, random_normal, vmap, get_eps
+from .typing import Approximator, Array
+from .utils import grad, random_normal, vmap, get_eps
 
 _EPS = get_eps() ** .5
 _DEFAULT_APPROXIMATOR = 'exact_diagonal'
+
 
 def get_approximators(
     key: Optional[Union[str, Callable]] = None,
@@ -50,8 +51,10 @@ def get_approximators(
     elif isinstance(key, str):
         try:
             return partial(APPROXIMATORS[key], *args, **kwargs)
-        except KeyError as e:
-            NotImplementedError(f"Approximator called '{key}' is not implemented. Choose from {', '.join(sorted(APPROXIMATORS))}")
+        except KeyError:
+            NotImplementedError(
+                f"Approximator called '{key}' is not implemented. Choose from {', '.join(sorted(APPROXIMATORS))}"
+            )
     elif isinstance(key, Callable):
         return key
     else:
@@ -312,5 +315,5 @@ def rough_finite_difference(
     return _approx_hessian_diagonal
 
 
-if not _DEFAULT_APPROXIMATOR in get_approximators():  # Should never happen
+if _DEFAULT_APPROXIMATOR not in get_approximators():  # Should never happen
     raise KeyError(f"Default approximator {_DEFAULT_APPROXIMATOR} not in approximator dictionary!")  

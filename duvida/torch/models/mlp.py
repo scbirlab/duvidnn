@@ -1,6 +1,6 @@
 """Multi-layer perceptrons."""
 
-from typing import Callable, Iterable, List, Mapping, Optional
+from typing import Callable, Iterable, List, Optional
 
 from carabiner import cast
 from torch.nn import BatchNorm1d, Dropout, Linear, Module, SiLU, Sequential
@@ -10,6 +10,7 @@ from torch.optim import Adam, Optimizer
 from .utils.ensemble import TorchEnsembleMixin
 from .utils.lt import LightningMixin
 from ...stateless.typing import Array, ArrayLike
+
 
 class TorchMLPBase(Module):
 
@@ -54,7 +55,7 @@ class TorchMLPBase(Module):
                 """
             )
         self.skip_length = skip_length
-        self._stack_size = 2 + int(self.dropout > 0.)  + int(self.batch_norm)
+        self._stack_size = 2 + int(self.dropout > 0.) + int(self.batch_norm)
         if skip_length is not None:
             self._stack_skip_length = self.skip_length * self._stack_size
         else:

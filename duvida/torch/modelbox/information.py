@@ -3,9 +3,7 @@
 from typing import Callable, Dict, Mapping, Tuple, Optional, Union
 from functools import partial
 
-from datasets import Dataset
 import torch
-from torch import as_tensor
 from torch.func import functional_call, replace_all_batch_norm_modules_
 from torch.nn import Module, Parameter
 
@@ -16,61 +14,20 @@ config.set_backend('torch', precision='float')
 
 from ...stateless.hessians import _DEFAULT_APPROXIMATOR
 from ...stateless.information import (
-    doubtscore, 
     fisher_score, 
     fisher_information_diagonal, 
-    information_sensitivity,
     parameter_gradient, 
-    parameter_hessian_diagonal
+    parameter_hessian_diagonal,
+    parameter_gradient_unrolled, 
+    parameter_hessian_diagonal_unrolled
 )
 from ...stateless.typing import Array, ArrayLike, LossFunction, StatelessModel
-from ...stateless.utils import get_eps, grad, vmap
+from ...stateless.utils import get_eps, vmap
 from ..functions import mse_loss
 from ..models.utils.ensemble import TorchEnsembleMixin
 
 _EPS = get_eps()
 _DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-def parameter_gradient_unrolled(
-    model: StatelessModel
-) -> Callable[[ArrayLike, ArrayLike], Array]:
-
-    @grad
-    def _f0(
-        params: ArrayLike, 
-        x: ArrayLike
-    ) -> Array:
-        return dnp.sum(model(x, *params))
-
-    def _f(
-        params: ArrayLike, 
-        x: ArrayLike
-    ) -> Array:
-        return [_f0(params, [d]) for d in x]
-
-    return _f
-
-
-def parameter_hessian_diagonal_unrolled(
-    model, 
-    approximator: str = _DEFAULT_APPROXIMATOR, 
-    *args, **kwargs
-) -> Callable[[ArrayLike, ArrayLike], Array]:
-
-    @partial(get_approximators(approximator), *args, **kwargs)
-    def _f0(
-        params: ArrayLike, 
-        x: ArrayLike
-    ) -> Array:
-        return dnp.sum(model(x, *params))
-
-    def _f(
-        params: ArrayLike, 
-        x: ArrayLike
-    ) -> Array:
-        return [_f0(params, [d]) for d in x]
-
-    return _f
 
 
 class DoubtMixin(DoubtMixinBase):
