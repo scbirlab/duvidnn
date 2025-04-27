@@ -46,7 +46,7 @@ def get_aggregator(
     >>> rms(a)
     array([5.])
     >>> rms(a) == norm2(a)
-    True
+    array([ True])
     >>> slicer_0 = get_aggregator(0, axis=-1) 
     >>> slicer_0(np.array([[1., 2.], [3., 4.]])) 
     array([1., 3.])
