@@ -45,7 +45,7 @@ dependencies = [
 jax = ["duvida", "jax>=0.5.3"]
 jax_cuda12 = ["duvida", "jax[cuda12]>=0.5.3"]
 jax_cuda12_local = ["duvida", "jax[cuda12_local]>=0.5.3"]
-torch = ["duvida", "torch", "torchvision", "lightning"]
+torch = ["duvida", "torch", "torchvision", "lightning", "tensorboard"]
 transformers = ["duvida", "transformers"]
 chem = ["duvida[torch]", "chemprop>=2.1.0", "schemist>=0.0.4.post1"]
 
