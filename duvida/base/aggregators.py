@@ -26,7 +26,7 @@ def slice_at_axis(
     # if axis < 0:
     #     axis = n_dims + axis
     # slicer = tuple([] if j == axis else [i] for j in range(n_dims))
-    return take(a, asarray(i).dtype(int), axis=axis)
+    return take(a, asarray(i).astype(int), axis=axis)
     
 
 def get_aggregator(
