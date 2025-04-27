@@ -1,4 +1,4 @@
-""""Utilities for loading and aving checkpoints."""
+""""Utilities for loading and saving checkpoints."""
 
 from typing import Any, Callable, Dict, Optional, Union
 from tempfile import TemporaryDirectory
@@ -10,18 +10,22 @@ from datasets import Dataset, IterableDataset, load_from_disk
 from huggingface_hub import snapshot_download
 import torch
 
+
 def _load_json(checkpoint: str, filename: str) -> Dict[str, Any]:
     with open(os.path.join(checkpoint, filename), "r") as f:
             obj = json.load(f)
     return obj
+   
 
 def save_json(obj, filename: str) -> None:
     with open(filename, "w") as f:
         json.dump(obj, f, sort_keys=True, indent=4)
     return None
 
+
 def _load_hf_dataset(checkpoint, filename) -> Union[Dataset, IterableDataset]:
     return load_from_disk(os.path.join(checkpoint, filename))
+
 
 def _load_torch_weights(checkpoint, filename):
     return torch.load(
@@ -29,11 +33,13 @@ def _load_torch_weights(checkpoint, filename):
         weights_only=True,
     )
 
+
 FILE_LOADING_CALLBACKS = {
     "json": _load_json,
     "hf-dataset": _load_hf_dataset, 
     "pt": _load_torch_weights,
 }
+
 
 def load_checkpoint_file(
     checkpoint: str,

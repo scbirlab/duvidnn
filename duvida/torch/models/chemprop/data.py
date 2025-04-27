@@ -1,23 +1,11 @@
-"""Chemprop message-passing neural network."""
+"""Data structures for using chemprop."""
 
-from typing import Callable, Iterable, List, Mapping, Optional, Union
-from abc import ABC, abstractmethod
+from typing import Iterable, Mapping, Optional, Union
 from dataclasses import dataclass, field, InitVar
 
-from carabiner import print_err
-from chemprop.data import BatchMolGraph, Datum, MolGraph, TrainingBatch
-from chemprop.models import MPNN
-from chemprop.nn import BondMessagePassing, EvidentialFFN, NormAggregation, RegressionFFN
+from chemprop.data import Datum, MolGraph, TrainingBatch
 import numpy as np
 import torch
-from torch.nn import Module
-from torch.optim import Adam, Optimizer
-
-from .ensemble import TorchEnsembleMixin
-from .lt import LightningMixin
-from ..nn import mse_loss, ModelBox
-from ...base_classes import VarianceMixin
-from ...stateless.typing import Array, ArrayLike
 
 
 @dataclass(repr=False, eq=False, slots=True)
@@ -69,7 +57,7 @@ class DuvidaBatchMolGraph:
         self.V = torch.concat(Vs)
         try:
             self.E = torch.concat(Es)
-        except TypeError as e:
+        except TypeError:
             Es = [
                 E for E in Es if not isinstance(E, list)
             ]
@@ -155,110 +143,3 @@ def _collate_training_batch_for_forward(
         }
     else:
         return collated
-
-
-class ChempropBase(Module, ABC):
-
-    def __init__(
-        self, 
-        n_input: int, 
-        n_hidden: int = 1,
-        n_units: int = 16, 
-        mp_units: int = 300,
-        mp_hidden: int = 3,
-        mp_activation: str = "relu",
-        learning_rate: float = .01,
-        dropout: float = 0., 
-        activation: str = "ELU",  # Smooth activation to prevent gradient collapse
-        n_out: int = 1, 
-        batch_norm: bool = False,
-        evidential: bool = False,
-        warmup_epochs: int = 2,
-        *args, **kwargs
-    ):
-        super().__init__(*args, **kwargs)
-        self.n_input = n_input
-        self.n_hidden = n_hidden
-        self.n_units = n_units
-        self.mp_units = mp_units
-        self.mp_hidden = mp_hidden
-        self.mp_activation = mp_activation
-        self.learning_rate = learning_rate
-        self.dropout = dropout
-        self.activation = activation
-        self.n_out = n_out
-        self.batch_norm = batch_norm
-        self.evidential = evidential
-        self.warmup_epochs = warmup_epochs
-        self.n_mp_units: int = None
-
-        if self.batch_norm:
-            print_err("Warning: using batch norm, which will not allow calculation of doubtscore or information sensitivity.")
-
-    def create_model(self) -> Module:
-        message_passing_layer = BondMessagePassing(
-            d_h=self.mp_units,        
-            depth=self.mp_hidden,
-            activation=self.mp_activation, 
-        )
-        self.n_mp_units = message_passing_layer.output_dim
-        aggregation_layer = NormAggregation()
-        predictor_kwargs = {
-            "n_tasks": self.n_out,
-            "input_dim": self.n_input + self.n_mp_units,
-            "hidden_dim": self.n_units,
-            "n_layers": self.n_hidden,
-            "dropout": self.dropout,
-            "activation": self.activation,
-        }
-        predictor_layer = EvidentialFFN(**predictor_kwargs) if self.evidential else RegressionFFN(**predictor_kwargs)
-        return MPNN(
-            message_passing_layer, 
-            aggregation_layer, 
-            predictor_layer, 
-            warmup_epochs=self.warmup_epochs,
-            batch_norm=self.batch_norm,
-            init_lr=self.learning_rate, 
-            max_lr=self.learning_rate * 10., 
-            final_lr=self.learning_rate,
-        )
-
-    @abstractmethod
-    def forward(self, x: ArrayLike) -> Array:
-        pass
-
-
-class ChempropEnsemble(ChempropBase, TorchEnsembleMixin, LightningMixin):
-
-    def __init__(
-        self, 
-        ensemble_size: int = 1,
-        learning_rate: float = 1e-4,
-        optimizer: Optimizer = Adam,
-        reduce_lr_on_plateau: bool = False,
-        reduce_lr_patience: int = 10,
-        *args, **kwargs
-    ):
-        super().__init__(*args, **kwargs)
-        self._init_ensemble(ensemble_size)
-        self._init_lightning(
-            optimizer=optimizer, 
-            learning_rate=learning_rate, 
-            model_attr='_model_ensemble',
-            reduce_lr_on_plateau=reduce_lr_on_plateau,
-            reduce_lr_patience=reduce_lr_patience,
-        )
-
-    def create_module(self):
-        return self.create_model()
-
-    def forward(self, x: ArrayLike) -> Array:
-        if not isinstance(x, DuvidaTrainingBatch):
-            for p in self.parameters():
-                dev = p.device
-                break
-            x = _collate_training_batch_for_forward(x, device=dev)
-        x = (x.bmg, x.V_d, x.X_d)
-        return torch.concat([
-            module(*x) for _, module in self.model_ensemble.items()
-        ], dim=-1)

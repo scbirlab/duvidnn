@@ -3,6 +3,8 @@
 from ..config import config
 from ..typing import Array, ArrayLike
 
+__backend__ = config.backend
+
 if config.backend == 'jax':
     from jax.numpy import (
         float64, int64, 
@@ -18,16 +20,16 @@ if config.backend == 'jax':
         return jax_arange(start, stop, step)
 
     def get_array_size(a: ArrayLike) -> int:
-        return a.size
+        return asarray(a).size
 
     def set_array_element(a: ArrayLike, i: int, x: ArrayLike) -> Array:
-        return a.at[i].set(x)
+        return asarray(a).at[i].set(x)
 
     def unsqueeze(a: ArrayLike, axis: int) -> Array:
-        return expand_dims(a, axis)
+        return expand_dims(asarray(a), axis)
 
     def dtype_like(a: ArrayLike, b: ArrayLike) -> Array:
-        return a.astype(asarray(b).dtype)
+        return asarray(a).astype(asarray(b).dtype)
 
     def one_hot(tensor: ArrayLike, num_classes: int = -1, device: str = 'cpu') -> Array:
         return dtype_like(jax_one_hot(tensor, num_classes), 1.)
@@ -48,7 +50,7 @@ else:
     from torch.nn.functional import one_hot as torch_one_hot
 
     def get_array_size(a: ArrayLike):
-        return numel(a)
+        return numel(asarray(a))
 
     def set_array_element(a: ArrayLike, i: int, x: ArrayLike) -> Array:
         a_copy = a.detach().clone()
@@ -56,10 +58,10 @@ else:
         return a_copy
 
     def unsqueeze(a: ArrayLike, axis: int) -> Array:
-        return a.unsqueeze(axis)
+        return asarray(a).unsqueeze(axis)
     
     def dtype_like(a: ArrayLike, b: ArrayLike) -> Array:
-        return a.to(asarray(b).dtype)
+        return asarray(a).to(asarray(b).dtype)
 
     def one_hot(tensor: ArrayLike, num_classes: int = -1, device: str = 'cpu') -> Array:
         return dtype_like(torch_one_hot(tensor, num_classes), 1.).to(device)

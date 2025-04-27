@@ -2,42 +2,41 @@
 
 from typing import Optional
 
-import json
-import os
-
 from carabiner import print_err
-from huggingface_hub import hf_hub_download
 
-from .base_classes import ModelBoxBase
 from .checkpoint_utils import load_checkpoint_file
 try:
-    from .torch.models import _MODEL_CLASS_DEFAULT, _MODEL_CLASSES
+    from .torch import TorchMLPModelBox
 except ImportError as e:
     print_err(e)
     raise ImportError(
         """
         Modelling is not installed. Try reinstalling duvida with:
 
-        $ pip install duvida[torch]
+            $ pip install duvida[torch]
 
         or to use chemistry ML/AI:
 
-        $ pip install duvida[chem]
+            $ pip install duvida[chem]
 
         """
     )
+else:
+    from .base.modelboxes import ModelBoxBase
+    from .base.modelbox_registry import DEFAULT_MODELBOX, MODELBOX_REGISTRY
 
 class AutoModelBox:
 
-    _config_file: str = "modelbox-config.json"
-    _model_class_key: str = "model_class"
+    _init_kwargs_file: str = ModelBoxBase._init_kwargs_filename
+    _model_config_file: str = ModelBoxBase._model_config_filename
+    _model_class_key: str = "class_name"
 
     def __init__(
         self,
-        model_class: str = _MODEL_CLASS_DEFAULT,
+        class_name: str = DEFAULT_MODELBOX,
         **kwargs
     ):  
-        self._class = _MODEL_CLASSES[model_class]
+        self._class = MODELBOX_REGISTRY[class_name]
         self._instance = self._class(**{
             key: val for key, val in kwargs.items() 
             if key != self._model_class_key
@@ -50,7 +49,7 @@ class AutoModelBox:
         cache_dir: Optional[str] = None,
         **kwargs
     ) -> ModelBoxBase:
-        config_file = cls._config_file
+        config_file = cls._init_kwargs_file
         config = load_checkpoint_file(
             checkpoint=checkpoint,
             filename=config_file,
@@ -63,3 +62,6 @@ class AutoModelBox:
         modelbox._default_cache = cache_dir
         return modelbox
 
+    @classmethod
+    def show(cls):
+        return tuple(MODELBOX_REGISTRY)

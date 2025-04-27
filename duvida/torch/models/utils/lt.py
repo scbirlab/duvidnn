@@ -6,8 +6,9 @@ from lightning import LightningModule
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import ReduceLROnPlateau 
 
-from ..nn import mse_loss
-from ...stateless.typing import Array, ArrayLike
+from ...functions import mse_loss
+from ....stateless.typing import Array, ArrayLike
+
 
 class LightningMixin(LightningModule):
 

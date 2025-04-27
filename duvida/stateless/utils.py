@@ -6,19 +6,37 @@ from functools import partial
 from .config import config
 from .typing import Array, ArrayLike
 
+__backend__ = config.backend
+
 if config.backend == 'jax':
     from jax import jit, jvp, grad, hessian, random, vmap
+    from jax.flatten_util import ravel_pytree
 
-    def random_normal(seed: int, device=None):
+    def random_normal(seed: int, device=None) -> Callable:
+        """Generate a sample from the Normal distribution.
+
+        Examples
+        ========
+        >>> gen = random_normal(seed=0)
+        >>> a, b = gen((3,)), gen((3,))
+        >>> (a == b).all()
+        Array(True, dtype=bool)
+
+        """
         key = random.key(seed)
         def _normal(shape, *args, **kwargs):
-            return random.normal(key, shape=shape, *args, **kwargs)
+            return random.normal(
+                key, 
+                shape=shape, 
+                *args, **kwargs
+            )
         return _normal
 
-else:
-    from torch import compile, normal, zeros, Generator
+elif config.backend == 'torch':
+    from torch import concat as concatenate, compile, normal, zeros, Generator, split
     from torch.random import manual_seed
     from torch.func import jvp, grad, hessian, vmap as vmap_torch
+    from torch.utils._pytree import tree_flatten, tree_unflatten
 
     def vmap(
         f: Callable, 
@@ -26,20 +44,85 @@ else:
         out_axes: Union[int, Iterable[int]] = 0, 
         *args, **kwargs
     ) -> Callable:
-        return vmap_torch(f, in_dims=in_axes, out_dims=out_axes, 
-                          randomness='different',
-                          *args, **kwargs)
+        """Vectorizes function over axis of its arguments.
+
+        Examples
+        ========
+        >>> import duvida.stateless.numpy as dnp
+        >>> double = lambda z: z * 2
+        >>> vmap(double)(dnp.array([1., 2., 3.])).tolist()
+        [2.0, 4.0, 6.0]
+
+        """
+        return vmap_torch(
+            f, 
+            in_dims=in_axes, 
+            out_dims=out_axes, 
+            randomness='different',
+            *args, **kwargs
+        )
 
     jit = partial(compile, fullgraph=True)
 
-    def random_normal(seed: int, device='cpu'):
-        generator = Generator(device=device).manual_seed(seed)
+    def random_normal(seed: int, device='cpu') -> Callable:
+        """Generate a sample from the Normal distribution.
+
+        Examples
+        ========
+        >>> gen = random_normal(seed=0)
+        >>> a, b = gen((3,)), gen((3,))
+        >>> a, b
+        [1], [2]
+        >>> (a == b).all()
+        tensor(True)
+
+        """
+        generator = Generator(device=device)
+        generator.manual_seed(seed)
+
         def _normal(shape, *args, **kwargs):
-            return normal(generator=generator, 
-                          mean=zeros(shape, device=device), 
-                          std=1.,
-                          *args, **kwargs)
+            return normal(
+                generator=generator, 
+                mean=zeros(shape, device=device), 
+                std=1.,
+                *args, **kwargs
+            )
+
         return _normal
+
+    def ravel_pytree(params):
+        """Torch pytree flattener.
+
+        Returns
+        -------
+        flat : 1-D ndarray / Tensor
+        unflatten : Callable[[1-D ndarray], original-shaped pytree]
+
+        Examples
+        --------
+        >>> import duvida.stateless.numpy as dnp
+        >>> flat, unravel = ravel_pytree([dnp.ones((2,)), dnp.zeros((3,))])
+        >>> flat.shape
+        (5,)
+        >>> (unravel(flat)[0] == 1.).all()
+        True
+        """
+        leaves, spec = tree_flatten(params)  # 
+        sizes = [p.numel() for p in leaves]
+        flat = concatenate([p.flatten() for p in leaves])
+
+        def unravel(vec):
+            chunks = split(vec, sizes)
+            rebuilt = [
+                chunk.reshape_as(p) 
+                for chunk, p in zip(chunks, leaves)
+            ]
+            return tree_unflatten(spec, rebuilt)
+
+        return flat, unravel
+else:
+    raise ValueError(f"Invalid backed: {config.backend}")
+    
 
 def reciprocal(f: Callable[[ArrayLike], Array]) -> Callable[[ArrayLike], Array]:
 
@@ -79,8 +162,14 @@ def get_eps():
     
     if config.backend == 'jax':
         from jax.numpy import asarray, finfo
-        def converter(x): return asarray(x)
+
+        def converter(x): 
+            return asarray(x)
+
     else:
         from torch import as_tensor, finfo, float64
-        def converter(x): return as_tensor(x)
+
+        def converter(x): 
+            return as_tensor(x)
+            
     return converter(finfo(converter(1.).dtype).eps)

@@ -5,27 +5,26 @@ from collections import defaultdict
 from glob import glob
 import json
 import os
-import pickle
 import sys
 
-from carabiner import print_err, pprint_dict
+from carabiner.utils import pprint_dict
 from carabiner.mpl import grid, figsaver
 from carabiner.cliutils import clicommand, CLIOption, CLICommand, CLIApp
-# from  pandas import DataFrame
 
 from . import __version__
-from .autoclass import AutoModelBox, _MODEL_CLASS_DEFAULT, _MODEL_CLASSES
+from .autoclass import AutoModelBox
+from .base.modelbox_registry import DEFAULT_MODELBOX, MODELBOX_NAMES
 from .hyperparameters import HyperOpt
-from .evaluation import rmse, pearson_r, spearman_r
 
 _LR_DEFAULT: float = .01
+
 
 def _plot_history(
     lightning_csv, 
     filename: str
 ) -> None:
 
-    from carabiner.mpl import add_legend, colorblind_palette, grid, figsaver
+    from carabiner.mpl import add_legend, grid, figsaver
     import pandas as pd
     import numpy as np
 
@@ -122,17 +121,20 @@ def _hyperprep(args: Namespace) -> None:
         
     return None
 
+
 @clicommand(message='Training a Pytorch model')
 def _train(args: Namespace) -> None:
 
+    from datasets.fingerprint import Hasher
     from lightning.pytorch.callbacks import EarlyStopping
     from lightning.pytorch.loggers import CSVLogger, TensorBoardLogger
     import pandas as pd
     import numpy as np
-    import torch
+
+    from .checkpoint_utils import save_json
 
     str_config = {
-        "model_class": args.model_class.casefold(),
+        "class_name": args.model_class.casefold(),
         "use_2d": args.descriptors,
         "use_fp": args.fp,
         "n_hidden": args.hidden,
@@ -143,23 +145,42 @@ def _train(args: Namespace) -> None:
     }
 
     if args.checkpoint is not None:
-        modelbox = AutoModelBox.from_pretrained(args.checkpoint)
+        modelbox = AutoModelBox.from_pretrained(args.checkpoint, cache=args.cache)
     else:
         if args.config is not None:
             new_config = HyperOpt.from_file(args.config, silent=True)._ranges[args.config_index] 
-            str_config.update(new_config)
-        if any(a is None for a in (args.training, args.features, args.labels)):
-            raise ValueError("If not providing a checkpoint, --training, --features, and --labels must be set.")
-        modelbox = AutoModelBox(
-            **str_config,
-        )._instance
+            pprint_dict(
+                new_config,
+                message=f"Overriding command-line parameters from config file {args.config}",
+            )
+            str_config.update(new_config)  # override command line
+            pprint_dict(
+                str_config,
+                message="Initialization parameters are now",
+            )
+        if any(
+            a is None for a in (args.training, args.labels)
+        ):
+            if all([args.structure is None, args.features is None]):
+                raise ValueError(
+                    """If not providing a checkpoint, --training and --labels, 
+                    and either --features or --structure must be set.
+                    """
+                )
+        modelbox = AutoModelBox(**str_config)._instance
 
+    pprint_dict(
+        modelbox._model_config,
+        message=f"Initialized class {modelbox.class_name}",
+    )
     load_data_args = {
-        "filename": args.training, 
-        "features": args.features or modelbox._input_cols,
+        "data": args.training, 
+        "features": args.features or modelbox._input_featurizers,
         "labels": args.labels or modelbox._label_cols, 
         "cache": args.cache,
     }
+    if modelbox.class_name not in ("mlp", ):
+        load_data_args["structure_column"] = args.structure or modelbox.structure_column
     if (
         args.checkpoint is None 
         or args.training is not None 
@@ -169,23 +190,25 @@ def _train(args: Namespace) -> None:
     if args.checkpoint is None:
         modelbox.model = modelbox.create_model()
     pprint_dict(
-        modelbox._input_configuration, 
-        message=f"Model {modelbox.__class__.__name__} with {modelbox.size} parameters.",
+        modelbox._model_config, 
+        message=f"Model {modelbox.class_name} with {modelbox.size} parameters",
     )
-    _features = load_data_args["features"]
+    _featurizers = modelbox._input_featurizers
     _labels = load_data_args["labels"]
     save_prefix = os.path.join(
         args.prefix, 
-        f"{modelbox.__class__.__name__}_n{modelbox.size}_x={'-'.join(_features)}_y={'-'.join(_labels)}_epochs={args.epochs}",
+        f"{modelbox.class_name}_n{modelbox.size}_y={'-'.join(_labels)}_h={Hasher.hash(_featurizers)}",
     )
     training_args = {
-        "val_filename": args.validation,
+        "val_data": args.validation,
         "epochs": args.epochs, 
         "batch_size": args.batch,
     }
+    # if not modelbox.class_name in ("mlp", ):
+    #     training_args["structure_column"] = load_data_args["structure_column"]
     pprint_dict(
-        modelbox._input_configuration, 
-        message=f">> Training {modelbox.__class__.__name__} with configuration",
+        modelbox._model_config, 
+        message=f">> Training {modelbox.class_name} with configuration",
     )
     if args.early_stopping is not None:
         callbacks = [EarlyStopping('val_loss', patience=args.early_stopping)]
@@ -194,7 +217,6 @@ def _train(args: Namespace) -> None:
     modelbox.train(
         callbacks=callbacks,
         trainer_opts={  # passed to lightning.Trainer()
-            # "logger": True, 
             "logger": [
                 CSVLogger(save_dir=os.path.join(save_prefix, "logs-csv")),
                 TensorBoardLogger(save_dir=os.path.join(save_prefix, "logs")),
@@ -223,28 +245,20 @@ def _train(args: Namespace) -> None:
         ("data-load-args", "training-args"),
         (load_data_args, training_args),
     ):
-        with open(os.path.join(checkpoint_path, f"{filename}.json"), "w") as f:
-            json.dump(obj, f, sort_keys=True, indent=4)
+        save_json(obj, os.path.join(checkpoint_path, f"{filename}.json"))
 
     # Check it loads
     # modelbox.load_checkpoint(checkpoint_path)
     modelbox = AutoModelBox.from_pretrained(checkpoint_path)
     overall_metrics = defaultdict(list)
-    for name, dataset in zip(
-        ("train", "validation", "test"),
-        (args.training, args.validation, args.test),
-    ):
+    for name in ("training", "validation", "test"):
+        dataset = getattr(args, name)
         if dataset is not None:
-            if name == "train":
+            if name == "training":
                 dataset = None  # Use cached
             predictions, metrics = modelbox.evaluate(
-                filename=dataset,
+                data=dataset,
                 aggregator=lambda x: np.mean(x, axis=-1, keepdims=True),
-                metrics={
-                    "RMSE": rmse, 
-                    "Pearson r": pearson_r, 
-                    "Spearman rho": spearman_r,
-                },
             )
             with open(os.path.join(save_prefix, f"eval-metrics_{name}.json"), "w") as f:
                 json.dump(metrics, f, sort_keys=True, indent=4)
@@ -259,25 +273,34 @@ def _train(args: Namespace) -> None:
                 message=f"Evaluation: {name}",
             )
             overall_metrics["split"].append(name)
-            overall_metrics["split_filename"].append(dataset or load_data_args["filename"])
+            overall_metrics["split_filename"].append(dataset or load_data_args["data"])
             if args.config is not None:
                 overall_metrics["config_i"].append(args.config_index)
-            overall_metrics["model_class"].append(modelbox.__class__.__name__)
+            overall_metrics["model_class"].append(modelbox.class_name)
             overall_metrics["n_parameters"].append(modelbox.size)
+            keys_added = []
             for d in (
                 load_data_args, 
-                modelbox._input_configuration, 
+                modelbox._init_kwargs, 
+                modelbox._model_config, 
                 training_args, 
                 metrics,
             ):
                 for key, val in d.items():
-                    if key != "trainer_opts":
+                    if key != "trainer_opts" and key not in keys_added:
                         overall_metrics[key].append(val)
-                
-    pd.DataFrame(overall_metrics).to_csv(
-        os.path.join(save_prefix, f"metrics.csv"),
-        index=False,
-    )
+                        keys_added.append(key)
+    try:
+        pd.DataFrame(overall_metrics).to_csv(
+            os.path.join(save_prefix, "metrics.csv"),
+            index=False,
+        )
+    except ValueError as e:  # not all columns same length; should never happen
+        pprint_dict(
+            {key: len(val) for key, val in overall_metrics.items()},
+            message="Metrics table column lengths"
+        )
+        raise e
     return None
     
 
@@ -315,6 +338,22 @@ def main() -> None:
         default=None,
         help='Column names from data file that contain features. Required if no checkpoint provided.',
     )
+    structure_col = CLIOption(
+        '--structure', '-S',
+        type=str,
+        default=None,
+        help="""
+        Column names from data file that contains a string representation 
+        of chemical structure. Required for chemical model classes.
+        """,
+    )
+    structure_representation = CLIOption(
+        '--input-representation', '-R',
+        type=str,
+        default="smiles",
+        choices=["smiles", "selfies", "inchi", "aa_seq"],
+        help='Type of chemical structure string.',
+    )
     label_cols = CLIOption(
         '--labels', '-y',
         type=str,
@@ -331,8 +370,8 @@ def main() -> None:
     model_class = CLIOption(
         '--model-class', '-k',
         type=str,
-        default=_MODEL_CLASS_DEFAULT,
-        choices=list(_MODEL_CLASSES),
+        default=DEFAULT_MODELBOX,
+        choices=MODELBOX_NAMES,
         help='Test dataset file.',
     )
     _checkpoint = CLIOption(
@@ -428,19 +467,19 @@ def main() -> None:
         action="store_true",
         help='Pickle instead of JSON output.',
     )
-    output = CLIOption(
-        '--output', '-o', 
-        type=FileType('w'),
-        default=sys.stdout,
-        help='Output file. Default: STDOUT',
-    )
-    formatting = CLIOption(
-        '--format', '-f', 
-        type=str,
-        default='TSV',
-        choices=['TSV', 'CSV', 'tsv', 'csv'],
-        help='Format of files. Default: %(default)s',
-    )
+    # output = CLIOption(
+    #     '--output', '-o', 
+    #     type=FileType('w'),
+    #     default=sys.stdout,
+    #     help='Output file. Default: STDOUT',
+    # )
+    # formatting = CLIOption(
+    #     '--format', '-f', 
+    #     type=str,
+    #     default='TSV',
+    #     choices=['TSV', 'CSV', 'tsv', 'csv'],
+    #     help='Format of files. Default: %(default)s',
+    # )
 
     hyperprep = CLICommand(
         "hyperprep",
@@ -461,6 +500,8 @@ def main() -> None:
             val_data,
             test_data,
             feature_cols,
+            structure_col,
+            structure_representation,
             label_cols,
             model_class,
             _checkpoint,

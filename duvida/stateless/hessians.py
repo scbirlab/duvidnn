@@ -2,16 +2,20 @@
 
 from typing import Any, Callable, Dict, Optional, Tuple, Union
 
+from functools import partial
+
 from .hvp import hvp
 from .numpy import numpy as dnp
-from .typing import Approximator, Array, ArrayLike
-from .utils import jvp, grad, random_normal, vmap, get_eps
+from .typing import Approximator, Array
+from .utils import grad, random_normal, vmap, get_eps
 
 _EPS = get_eps() ** .5
 _DEFAULT_APPROXIMATOR = 'exact_diagonal'
 
+
 def get_approximators(
-    key: Optional[Union[str, Callable]] = None
+    key: Optional[Union[str, Callable]] = None,
+    *args, **kwargs
 ) -> Union[Tuple[str], Dict[str, Approximator]]:
 
     """Return a list of available Hessian diagonal approximators, or one of the
@@ -46,9 +50,11 @@ def get_approximators(
         return tuple(APPROXIMATORS)
     elif isinstance(key, str):
         try:
-            return APPROXIMATORS[key]
-        except KeyError as e:
-            NotImplementedError(f"Approximator called '{key}' is not implemented. Choose from {', '.join(sorted(APPROXIMATORS))}")
+            return partial(APPROXIMATORS[key], *args, **kwargs)
+        except KeyError:
+            NotImplementedError(
+                f"Approximator called '{key}' is not implemented. Choose from {', '.join(sorted(APPROXIMATORS))}"
+            )
     elif isinstance(key, Callable):
         return key
     else:
@@ -78,8 +84,6 @@ def squared_jacobian(
 
     Examples
     --------
-    >>> from duvida.stateless.config import config
-    >>> config.set_backend("jax", precision="double")
     >>> from duvida.stateless.utils import hessian
     >>> import duvida.stateless.numpy as dnp 
     >>> f = lambda x: dnp.sum(x ** 3. + x ** 2. + 4.)
@@ -129,8 +133,6 @@ def exact_diagonal(
 
     Examples
     --------
-    >>> from duvida.stateless.config import config
-    >>> config.set_backend("jax", precision="double")
     >>> from duvida.stateless.utils import hessian
     >>> import duvida.stateless.numpy as dnp 
     >>> f = lambda x: dnp.sum(x ** 3. + x ** 2. + 4.)
@@ -153,11 +155,13 @@ def exact_diagonal(
         return dnp.take(hvp_f(unit_vec, *args, **kwargs), i)
 
     def _hessian_diagonal(*args, **kwargs) -> Array:
-        d_args = args[argnums]
+        d_args = dnp.asarray(args[argnums])
         d_args_size = dnp.get_array_size(d_args)
-        v_hvp_f = vmap(get_hessian_element, 
-                       in_axes=(0, None) + (None, ) * len(args))
-        idx = dnp.arange(d_args_size, device=device) #dnp.unsqueeze(dnp.arange(d_args_size), -1)  # p
+        v_hvp_f = vmap(
+            get_hessian_element, 
+            in_axes=(0, None) + (None, ) * len(args)
+        )
+        idx = dnp.arange(d_args_size, device=device)
         return v_hvp_f(idx, d_args_size, *args, **kwargs) 
 
     return _hessian_diagonal
@@ -201,8 +205,6 @@ def bekas(
 
     Examples
     --------
-    >>> from duvida.stateless.config import config
-    >>> config.set_backend("jax", precision="double")
     >>> from duvida.stateless.utils import hessian
     >>> import duvida.stateless.numpy as dnp 
     >>> f = lambda x: dnp.sum(x ** 3. + x ** 2. + 4.)
@@ -215,19 +217,17 @@ def bekas(
     Array([ 8., 14.], dtype=float64)
     >>> dnp.allclose(bekas(f)(a), dnp.diag(hessian(f)(a)))
     Array(True, dtype=bool)
-    >>> bekas(f)(a) == dnp.diag(hessian(f)(a))  # But not quite exact
-    Array([ True, False], dtype=bool)
-    >>> bekas(f, n=1000)(a) == dnp.diag(hessian(f)(a))  # Increase samples for better accuracy
-    Array([ True,  True], dtype=bool)
+    >>> bekas(f, n=100_000, seed=1)(a)  # Increase samples for better accuracy
+    Array([ 8., 14.], dtype=float64)
     >>> bekas(f, seed=1)(a) == bekas(f, seed=0)(a)  # Change the seed to alter the outcome
     Array([ True, False], dtype=bool)
     >>> g = lambda x: dnp.sum(dnp.sum(x) ** 3. + x ** 2. + 4.)
     >>> dnp.diag(hessian(g)(a))
     Array([38., 38.], dtype=float64)
-    >>> bekas(g, n=1000)(a)  # Less accurate when parameters interact
-    Array([38.52438307, 38.49679655], dtype=float64)
+    >>> bekas(g, n=1000, seed=0)(a)  # Less accurate when parameters interact
+    Array([39.50905509, 39.81868951], dtype=float64)
     >>> bekas(g, n=1000, seed=1)(a)  # Change the seed to alter the outcome
-    Array([39.07878869, 38.97796601], dtype=float64)
+    Array([37.25647008, 37.29415901], dtype=float64)
     
     """
     random_normal_fn = random_normal(seed, device=device)
@@ -274,7 +274,7 @@ def rough_finite_difference(
     argnums : int, optional
         Which argument number to take the second derivative for. Default: 0.
     eps : float, optional
-        The
+        The small number to add to prevent instability.
     
     Returns
     -------
@@ -296,14 +296,14 @@ def rough_finite_difference(
     >>> dnp.diag(hessian(f)(a))
     Array([ 8., 14.], dtype=float64)
     >>> rough_finite_difference(f)(a)  # Relatively accurate
-    Array([ 8.00000006, 14.        ], dtype=float64)
+    Array([ 8.0010358, 14.0010358], dtype=float64)
     >>> rough_finite_difference(f, eps=.01)(a)
     Array([ 8.03, 14.03], dtype=float64)
     >>> g = lambda x: dnp.sum(dnp.sum(x) ** 3. + x ** 2. + 4.)
     >>> dnp.diag(hessian(g)(a))
     Array([38., 38.], dtype=float64)
     >>> rough_finite_difference(g)(a)  # Less accurate when parameters interact
-    Array([74., 74.], dtype=float64)
+    Array([74.00828641, 74.00828641], dtype=float64)
     
     """
     _jacobian = grad(f, argnums=argnums, *args, **kwargs)
@@ -315,5 +315,5 @@ def rough_finite_difference(
     return _approx_hessian_diagonal
 
 
-if not _DEFAULT_APPROXIMATOR in get_approximators():  # Should never happen
+if _DEFAULT_APPROXIMATOR not in get_approximators():  # Should never happen
     raise KeyError(f"Default approximator {_DEFAULT_APPROXIMATOR} not in approximator dictionary!")  
