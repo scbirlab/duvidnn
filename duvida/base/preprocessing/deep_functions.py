@@ -115,7 +115,6 @@ def HfBART(
         )
         model.eval()
         with torch.no_grad():
-            outputs = model.get_encoder(**tokenized_inputs)
             outputs = model(
                 **tokenized_inputs, 
                 decoder_input_ids=tokenized_inputs['input_ids'],
