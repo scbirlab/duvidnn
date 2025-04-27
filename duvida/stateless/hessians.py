@@ -2,6 +2,8 @@
 
 from typing import Any, Callable, Dict, Optional, Tuple, Union
 
+from functools import partial
+
 from .hvp import hvp
 from .numpy import numpy as dnp
 from .typing import Approximator, Array, ArrayLike
@@ -11,7 +13,8 @@ _EPS = get_eps() ** .5
 _DEFAULT_APPROXIMATOR = 'exact_diagonal'
 
 def get_approximators(
-    key: Optional[Union[str, Callable]] = None
+    key: Optional[Union[str, Callable]] = None,
+    *args, **kwargs
 ) -> Union[Tuple[str], Dict[str, Approximator]]:
 
     """Return a list of available Hessian diagonal approximators, or one of the
@@ -46,7 +49,7 @@ def get_approximators(
         return tuple(APPROXIMATORS)
     elif isinstance(key, str):
         try:
-            return APPROXIMATORS[key]
+            return partial(APPROXIMATORS[key], *args, **kwargs)
         except KeyError as e:
             NotImplementedError(f"Approximator called '{key}' is not implemented. Choose from {', '.join(sorted(APPROXIMATORS))}")
     elif isinstance(key, Callable):
@@ -78,8 +81,6 @@ def squared_jacobian(
 
     Examples
     --------
-    >>> from duvida.stateless.config import config
-    >>> config.set_backend("jax", precision="double")
     >>> from duvida.stateless.utils import hessian
     >>> import duvida.stateless.numpy as dnp 
     >>> f = lambda x: dnp.sum(x ** 3. + x ** 2. + 4.)
@@ -129,8 +130,6 @@ def exact_diagonal(
 
     Examples
     --------
-    >>> from duvida.stateless.config import config
-    >>> config.set_backend("jax", precision="double")
     >>> from duvida.stateless.utils import hessian
     >>> import duvida.stateless.numpy as dnp 
     >>> f = lambda x: dnp.sum(x ** 3. + x ** 2. + 4.)
@@ -153,11 +152,13 @@ def exact_diagonal(
         return dnp.take(hvp_f(unit_vec, *args, **kwargs), i)
 
     def _hessian_diagonal(*args, **kwargs) -> Array:
-        d_args = args[argnums]
+        d_args = dnp.asarray(args[argnums])
         d_args_size = dnp.get_array_size(d_args)
-        v_hvp_f = vmap(get_hessian_element, 
-                       in_axes=(0, None) + (None, ) * len(args))
-        idx = dnp.arange(d_args_size, device=device) #dnp.unsqueeze(dnp.arange(d_args_size), -1)  # p
+        v_hvp_f = vmap(
+            get_hessian_element, 
+            in_axes=(0, None) + (None, ) * len(args)
+        )
+        idx = dnp.arange(d_args_size, device=device)
         return v_hvp_f(idx, d_args_size, *args, **kwargs) 
 
     return _hessian_diagonal
@@ -201,8 +202,6 @@ def bekas(
 
     Examples
     --------
-    >>> from duvida.stateless.config import config
-    >>> config.set_backend("jax", precision="double")
     >>> from duvida.stateless.utils import hessian
     >>> import duvida.stateless.numpy as dnp 
     >>> f = lambda x: dnp.sum(x ** 3. + x ** 2. + 4.)
@@ -222,7 +221,7 @@ def bekas(
     >>> g = lambda x: dnp.sum(dnp.sum(x) ** 3. + x ** 2. + 4.)
     >>> dnp.diag(hessian(g)(a))
     Array([38., 38.], dtype=float64)
-    >>> bekas(g, n=1000)(a)  # Less accurate when parameters interact
+    >>> bekas(g, n=1000, seed=0)(a)  # Less accurate when parameters interact
     Array([38.52438307, 38.49679655], dtype=float64)
     >>> bekas(g, n=1000, seed=1)(a)  # Change the seed to alter the outcome
     Array([39.07878869, 38.97796601], dtype=float64)

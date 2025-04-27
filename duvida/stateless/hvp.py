@@ -3,12 +3,15 @@
 from typing import Callable
 from functools import partial
 
+from .numpy import numpy as dnp
 from .typing import Array, ArrayLike
 from .utils import grad, jvp
 
-def hvp(f: Callable, 
-        argnums: int = 0, 
-        *args, **kwargs) -> Callable:
+def hvp(
+    f: Callable, 
+    argnums: int = 0, 
+    *args, **kwargs
+) -> Callable:
 
     """Forward-over-reverse Hessian vector product transform for scalar-output functions.
 
@@ -57,7 +60,7 @@ def hvp(f: Callable,
     grad_fn = partial(grad, *args, **kwargs)
 
     def _hvp(v: ArrayLike, *f_args, **f_kwargs) -> Array:
-        d_args = f_args[argnums]
+        d_args = dnp.asarray(f_args[argnums])
         pre_d_args = [arg for i, arg in enumerate(f_args) if i < argnums]
         post_d_args = [arg for i, arg in enumerate(f_args) if i > argnums]
         

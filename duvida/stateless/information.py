@@ -6,7 +6,7 @@ from functools import partial
 from .hessians import _DEFAULT_APPROXIMATOR, get_approximators
 from .numpy import numpy as dnp
 from .typing import Array, ArrayLike, LossFunction, StatelessModel
-from .utils import reciprocal, grad, jit, vmap
+from .utils import reciprocal, ravel_pytree, grad, jit, vmap
 
 def parameter_gradient(model: StatelessModel) -> Callable[[ArrayLike, ArrayLike], Array]:
 
@@ -30,8 +30,6 @@ def parameter_gradient(model: StatelessModel) -> Callable[[ArrayLike, ArrayLike]
 
     Examples
     --------    
-    >>> from duvida.stateless.config import config
-    >>> config.set_backend("jax", precision="double")
     >>> import duvida.stateless.numpy as dnp
     >>> f = lambda x, p1, p2: x ** p1 + p2
     >>> x = dnp.array([1., 2.])
@@ -39,13 +37,14 @@ def parameter_gradient(model: StatelessModel) -> Callable[[ArrayLike, ArrayLike]
     >>> f(x, *p)
     Array([2., 5.], dtype=float64)
     >>> parameter_gradient(f)(p, x)
-    Array([1., 2.], dtype=float64)
+    Array([[0.       , 1.       ],
+           [2.7725887, 1.       ]], dtype=float32)
 
     """
-
+    
     @partial(vmap, in_axes=(None, 0))
     @grad
-    def _f(
+    def _parameter_gradient(
         params: ArrayLike, 
         x: ArrayLike
     ) -> Array:
@@ -84,30 +83,33 @@ def parameter_hessian_diagonal(
 
     Examples
     --------    
-    >>> from duvida.stateless.config import config
-    >>> config.set_backend("jax", precision="double")
     >>> import duvida.stateless.numpy as dnp 
     >>> f = lambda x, p1, p2: x ** p1 + p2
     >>> x = dnp.array([1., 2.])
-    >>> p = dnp.array([2., 1.])
+    >>> p = [2., 1.]
     >>> f(x, *p)
     Array([2., 5.], dtype=float64)
     >>> parameter_hessian_diagonal(f)(p, x)
-    Array([1., 2.], dtype=float64)
+    Array([[0., 0.],
+           [1.92181206, 0.]], dtype=float64)
     >>> parameter_hessian_diagonal(f, approximator='squared_jacobian')(p, x)
-    Array([1., 2.], dtype=float64)
+    Array([[0., 0.],
+           [1.92181206, 0.]], dtype=float64)
+    >>> parameter_hessian_diagonal(f, approximator='bekas', n=10, seed=0)(p, x)
+    Array([[0., 0.],
+           [1.9218119, 0.]], dtype=float64)
 
     """
-
+    
     @partial(vmap, in_axes=(None, 0))
-    @partial(get_approximators(approximator), *args, **kwargs)
-    def _f(
+    @get_approximators(approximator, *args, **kwargs)
+    def _scalar_f(
         params: ArrayLike, 
         x: ArrayLike
     ) -> Array:
-        return dnp.sum(f(x, *params))
+        return dnp.sum(f(x, *params))      
 
-    return _f
+    return _scalar_f
 
 
 def _model_loss(
@@ -115,9 +117,11 @@ def _model_loss(
     loss: LossFunction
 ) -> Callable[[ArrayLike, ArrayLike, ArrayLike], float]:
     
-    def _loss(params: ArrayLike, 
-              x_true: ArrayLike, 
-              y_true: ArrayLike) -> Array:
+    def _loss(
+        params: ArrayLike, 
+        x_true: ArrayLike, 
+        y_true: ArrayLike
+    ) -> Array:
         return loss(model(x_true, *params), y_true)
 
     return _loss
@@ -151,13 +155,11 @@ def fisher_score(
 
     Examples
     --------   
-    >>> from duvida.stateless.config import config
-    >>> config.set_backend("jax", precision="double")
     >>> import duvida.stateless.numpy as dnp  
     >>> model = lambda x, p1, p2: x ** p1 + p2
     >>> mse_fn = lambda ypred, ytrue: dnp.sum(dnp.square(ypred - ytrue))
     >>> x = dnp.array([1., 2.])
-    >>> p = [0., 2.]
+    >>> p = dnp.array([0., 2.])
     >>> model(x, *p)
     Array([3., 3.], dtype=float64)
     >>> fisher_score(model, mse_fn)(p, x, model(x, *p) + .1)
@@ -202,8 +204,6 @@ def fisher_information_diagonal(
 
     Examples
     --------    
-    >>> from duvida.stateless.config import config
-    >>> config.set_backend("jax", precision="double")
     >>> import duvida.stateless.numpy as dnp  
     >>> model = lambda x, p1, p2: x ** p1 + p2
     >>> mse_fn = lambda ypred, ytrue: dnp.sum(dnp.square(ypred - ytrue))
@@ -256,13 +256,11 @@ def doubtscore(
 
     Examples
     --------   
-    >>> from duvida.stateless.config import config
-    >>> config.set_backend("jax", precision="double")
     >>> import duvida.stateless.numpy as dnp   
     >>> model = lambda x, p1, p2: x ** p1 + p2
     >>> mse_fn = lambda ypred, ytrue: dnp.sum(dnp.square(ypred - ytrue))
     >>> x = dnp.array([1., 2.])
-    >>> p = [0., 2.]
+    >>> p = dnp.array([0., 2.])
     >>> model(x, *p)
     Array([3., 3.], dtype=float64)
     >>> doubtscore(model, mse_fn)(p, x + .1, x, model(x, *p) + .1)
@@ -275,8 +273,10 @@ def doubtscore(
 
     def _doubtscore(params: ArrayLike, x: ArrayLike, 
                     x_true: ArrayLike, y_true: ArrayLike) -> Array:
-        return (fisher_score_fn(params, x_true, y_true) 
-                / param_grad_fn(params, x))
+        return (
+            fisher_score_fn(params, x_true, y_true) 
+            / param_grad_fn(params, x)
+        )
 
     if use_reciprocal:
         return jit(reciprocal(_doubtscore))
@@ -365,12 +365,10 @@ def information_sensitivity(
     Examples
     --------    
     >>> from duvida.stateless.config import config
-    >>> config.set_backend("jax", precision="double")
-    >>> import duvida.stateless.numpy as dnp  
     >>> model = lambda x, p1, p2: x ** p1 + p2
     >>> mse_fn = lambda ypred, ytrue: dnp.sum(dnp.square(ypred - ytrue))
     >>> x = dnp.array([1., 2.])
-    >>> p = [0., 2.]
+    >>> p = dnp.array([0., 2.])
     >>> model(x, *p)
     Array([3., 3.], dtype=float64)
     >>> information_sensitivity(model, mse_fn)(p, x + .1, x, model(x, *p) + .1)
