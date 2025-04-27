@@ -10,7 +10,6 @@ import sys
 from carabiner.utils import pprint_dict
 from carabiner.mpl import grid, figsaver
 from carabiner.cliutils import clicommand, CLIOption, CLICommand, CLIApp
-# from  pandas import DataFrame
 
 from . import __version__
 from .autoclass import AutoModelBox

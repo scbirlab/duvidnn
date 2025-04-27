@@ -56,7 +56,7 @@ def _aggregated_embedding(
 
 def _resolve_bart_model(ref: str) -> Tuple[PreTrainedTokenizerBase, PreTrainedModel]:
     from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
-    return AutoTokenizer.from_pretrained(ref), AutoModelForSeq2SeqLM.from_pretrained(ref).to(_DEVICE)
+    return AutoTokenizer.from_pretrained(ref,), AutoModelForSeq2SeqLM.from_pretrained(ref).to(_DEVICE)
 
 
 def _tokenize_for_embedding(
@@ -115,15 +115,21 @@ def HfBART(
         )
         model.eval()
         with torch.no_grad():
+            outputs = model.get_encoder(**tokenized_inputs)
             outputs = model(
                 **tokenized_inputs, 
                 decoder_input_ids=tokenized_inputs['input_ids'],
+                output_hidden_states=True,
+                return_dict=True,
             )
-        encoder_last_hidden_state = outputs['encoder_last_hidden_state'].detach()
-        embedding = _aggregated_embedding(
-            encoder_last_hidden_state,
+        enc_last = _aggregated_embedding(
+            outputs.encoder_hidden_states[-1],
             aggregators=aggregators,
         )
-        return embedding
+        dec_last = _aggregated_embedding(
+            outputs.decoder_hidden_states[-1],
+            aggregators=aggregators,
+        )
+        return torch.cat([enc_last, dec_last], dim=-1)
 
     return _hf_bart
