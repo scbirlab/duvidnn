@@ -1,6 +1,7 @@
 """Mixins for training."""
 
 from lightning import LightningModule, Trainer
+from lightning.pytorch.plugins.environments import LightningEnvironment
 from torch.utils.data import DataLoader
 
 from ...base.training import ModelTrainerBase
@@ -13,9 +14,10 @@ class ModelTrainer(ModelTrainerBase):
     _trainer: Trainer = None
 
     def create_trainer(self) -> None:
+        kwargs = {"plugins": LightningEnvironment()} | self._kwargs
         self._trainer = Trainer(
             max_epochs=self.epochs,
-            **self._kwargs,
+            **kwargs,
         )
         return None
 
