@@ -46,7 +46,7 @@ class ChempropBase(Module, ABC):
         warmup_epochs: int = 2,
         *args, **kwargs
     ):
-        super().__init__(*args, **kwargs)
+        super().__init__()
         self.n_input = n_input
         self.n_hidden = n_hidden
         self.n_units = n_units
