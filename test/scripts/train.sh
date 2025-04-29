@@ -22,10 +22,29 @@ do
             -k "$class" \
             -i $i \
             --prefix test/outputs/models \
+            --output "$class-$i"
             --cache test/outputs/cache \
             --epochs 2 \
             --learning-rate 1e-5 \
             --descriptors \
             --fp
-        done
+        duvida predict \
+            --test hf://scbirlab/fang-2023-biogen-adme@scaffold-split:train \
+            --checkpoint "$class-$i" \
+            --start 10 \
+            --end 2_000 \
+            --tanimoto \
+            --variance \
+            --doubtscore \
+            --information-sensitivity \
+            -y clogp \
+            --output test/outputs/predictions/"$class-$i".csv.gz
+        if [ ! "$(zcat "$class-$i".csv.gz | wc -l)" -eq "1990" ]
+        then
+            echo "Predictions have wrong number of rows: $(zcat "$class-$i".csv.gz | wc -l)"
+            exit 1
+        else
+            zcat "$class-$i".csv.gz | tr , $'\t' | head -n50
+        fi
+    done
 done
