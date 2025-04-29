@@ -56,7 +56,8 @@ def _aggregated_embedding(
 
 def _resolve_bart_model(ref: str) -> Tuple[PreTrainedTokenizerBase, PreTrainedModel]:
     from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
-    return AutoTokenizer.from_pretrained(ref,), AutoModelForSeq2SeqLM.from_pretrained(ref).to(_DEVICE)
+    model = AutoModelForSeq2SeqLM.from_pretrained(ref)
+    return AutoTokenizer.from_pretrained(ref), torch.compile(model, fullgraph=True).to(_DEVICE)
 
 
 def _tokenize_for_embedding(
