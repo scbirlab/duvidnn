@@ -11,7 +11,7 @@ from .utils.ensemble import TorchEnsembleMixin
 from .utils.lt import LightningMixin
 from ...stateless.typing import Array, ArrayLike
 
-_DEFAULT_ACTIVATION Callable[..., Module] = SiLU  # Smooth activation to prevent gradient collapse
+_DEFAULT_ACTIVATION: Callable[..., Module] = SiLU  # Smooth activation to prevent gradient collapse
 _DEFAULT_N_UNITS: int = 16
 
 class LinearStack(Module):
