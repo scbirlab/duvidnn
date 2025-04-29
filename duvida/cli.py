@@ -65,7 +65,8 @@ def _overwrite_config(
             new_config,
             message=f"Overriding command-line parameters from config file {config_file}",
         )
-        new_config.update(config)  # command line takes precedent
+        # new_config.update({key: val in config.items() if val is not None})  # command line takes precedent
+        config.update(new_config)  # config takes precedent
         pprint_dict(
             config,
             message="Initialization parameters are now",
