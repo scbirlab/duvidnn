@@ -20,7 +20,7 @@ from .data import (
 )
 from ..utils.ensemble import TorchEnsembleMixin
 from ..utils.lt import LightningMixin
-from ...stateless.utils import jit
+from ....stateless.utils import jit
 
 
 class ChempropBase(Module, ABC):
