@@ -428,7 +428,7 @@ def _save_dataset(
 def _predict(args: Namespace) -> None:
 
     output = os.path.join(args.prefix, args.output)
-    out_dir = os.dirname(output)
+    out_dir = os.path.dirname(output)
     if not os.path.exists(out_dir):
         os.makedirs(out_dir)
     preprocessing_args = {
