@@ -9,6 +9,10 @@ from torch.optim import Adam, Optimizer
 
 from .utils.ensemble import TorchEnsembleMixin
 from .utils.lt import LightningMixin
+from ...stateless.config import config
+
+config.set_backend('torch', precision='float')
+
 from ...stateless.typing import Array, ArrayLike
 from ...stateless.utils import jit
 

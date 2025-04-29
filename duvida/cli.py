@@ -266,6 +266,8 @@ def _dict_to_pandas(
 @clicommand(message='Training a Pytorch model')
 def _train(args: Namespace) -> None:
 
+    from .autoclass import AutoModelBox
+
     cli_config = {
         "class_name": args.model_class.casefold(),
         "use_2d": args.descriptors,

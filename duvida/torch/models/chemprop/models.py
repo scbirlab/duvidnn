@@ -20,6 +20,10 @@ from .data import (
 )
 from ..utils.ensemble import TorchEnsembleMixin
 from ..utils.lt import LightningMixin
+from ....stateless.config import config
+
+config.set_backend('torch', precision='float')
+
 from ....stateless.utils import jit
 
 
