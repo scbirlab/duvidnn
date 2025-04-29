@@ -43,6 +43,7 @@ elif config.backend == 'torch':
     from torch._dynamo import config as dynamo_config
     dynamo_config.suppress_errors = True
     dynamo_config.capture_scalar_outputs = True
+    dynamo_config.recompile_limit = 100
 
     _COMPILE_WARNINGS = set()
 
@@ -78,10 +79,10 @@ elif config.backend == 'torch':
                 mode="max-autotune",
             )
         except RuntimeError as e:
-            warning = f"[torch.compile] Compiling `{fn}` failed; running eagerly" + "\n" + str(e)
+            warning = f"[torch.compile] Compiling `{fn}` failed; running eagerly"
             if warning not in _COMPILE_WARNINGS:
                 _COMPILE_WARNINGS.add(warning)
-                print_err(warning)
+                print_err(warning + "\n" + str(e))
             return fn
 
         @wraps(fn)
@@ -89,9 +90,9 @@ elif config.backend == 'torch':
             try:
                 return compiled(*args, **kwargs)
             except Exception as e:
-                warning = f"[torch.compile] Running compiled `{fn}` failed; falling back" + "\n" + str(e)
+                warning = f"[torch.compile] Running compiled `{fn}` failed; falling back"
                 if warning not in _COMPILE_WARNINGS:
-                    _COMPILE_WARNINGS.add(warning)
+                    _COMPILE_WARNINGS.add(warning + "\n" + str(e))
                     print_err(warning)
                 return fn(*args, **kwargs)
         return wrapped
