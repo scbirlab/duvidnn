@@ -21,7 +21,8 @@ modelbox_name_file = os.path.join(_data_root, "modelbox-names.json")
 if not os.path.exists(modelbox_name_file):
     from .autoclass import AutoModelBox
     from .base.modelbox_registry import DEFAULT_MODELBOX, MODELBOX_NAMES
-    os.makedirs(_data_root)
+    if not os.path.exists(_data_root):
+        os.makedirs(_data_root)
     save_json([DEFAULT_MODELBOX, MODELBOX_NAMES], modelbox_name_file)
 else:
     DEFAULT_MODELBOX, MODELBOX_NAMES = _load_json(_data_root, "modelbox-names.json")
@@ -82,6 +83,7 @@ def _init_modelbox(
     cache: Optional[str] = None,
     **overrides
 ):
+    from .autoclass import AutoModelBox
     if checkpoint is None:
         if any(
             overrides.get(key) is None for key in ("training", "labels")

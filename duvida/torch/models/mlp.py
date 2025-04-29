@@ -11,7 +11,8 @@ from .utils.ensemble import TorchEnsembleMixin
 from .utils.lt import LightningMixin
 from ...stateless.typing import Array, ArrayLike
 
-_DEFAULT_ACTIVATION = SiLU  # Smooth activation to prevent gradient collapse
+_DEFAULT_ACTIVATION Callable[..., Module] = SiLU  # Smooth activation to prevent gradient collapse
+_DEFAULT_N_UNITS: int = 16
 
 class LinearStack(Module):
 
@@ -41,9 +42,9 @@ class LinearStack(Module):
     def build_model(
         self, 
         n_input: int,
-        n_hidden: int,
-        n_units: int,
-        n_out: int,
+        n_out: int = 1,
+        n_hidden: int = 1,
+        n_units: int =_DEFAULT_N_UNITS,
         batch_norm: bool = False,
         dropout: float = 0.,
         activation: Callable[..., Module] = _DEFAULT_ACTIVATION,
@@ -81,7 +82,7 @@ class TorchResidualBlock(LinearStack):
     Examples
     ========
     >>> import torch
-    >>> net = TorchResidualBlock(n_input=4, n_hidden=2, n_units=8, n_out=1)
+    >>> net = TorchResidualBlock(n_input=4, residual_depth=2, n_units=8, n_out=1)
     >>> net(torch.randn(3, 4)).shape 
     torch.Size([3, 1])
 
@@ -90,11 +91,11 @@ class TorchResidualBlock(LinearStack):
     def __init__(
         self, 
         n_input: int, 
+        n_out: int, 
         residual_depth: int = 1,
-        n_units: int = 16, 
+        n_units: int =_DEFAULT_N_UNITS, 
         dropout: float = 0., 
         activation: Callable = _DEFAULT_ACTIVATION,  
-        n_out: int = 1, 
         batch_norm: bool = False
     ):
         super().__init__()
@@ -107,9 +108,9 @@ class TorchResidualBlock(LinearStack):
         self.batch_norm = batch_norm
         self.residual_block = self.build_model(
             n_input=n_input,
+            n_out=n_out,
             n_hidden=residual_depth,
             n_units=n_units,
-            n_out=n_out,
             batch_norm=batch_norm,
             dropout=dropout,
             activation=activation,
@@ -136,6 +137,9 @@ class TorchMLPBase(LinearStack):
     >>> net = TorchMLPBase(n_input=4, n_hidden=2, n_units=8, n_out=1)
     >>> net(torch.randn(3, 4)).shape 
     torch.Size([3, 1])
+    >>> resnet = TorchMLPBase(n_input=4, n_hidden=4, n_units=8, n_out=1, residual_depth=2)
+    >>> resnet(torch.randn(3, 4)).shape 
+    torch.Size([3, 1])
 
     """
 
@@ -143,7 +147,7 @@ class TorchMLPBase(LinearStack):
         self, 
         n_input: int, 
         n_hidden: int = 1,
-        n_units: int = 16, 
+        n_units: int = _DEFAULT_N_UNITS, 
         dropout: float = 0., 
         activation: Callable = _DEFAULT_ACTIVATION,
         n_out: int = 1, 
@@ -176,13 +180,13 @@ class TorchMLPBase(LinearStack):
             self._layer_class = Linear
             self._layer_kwargs = {}
         self.model_layers = self.build_model(
+            n_input=self.n_input,
+            n_out=self.n_out, 
             layer_class=self._layer_class,
             n_hidden=self.n_hidden // (self.residual_depth or 1),
-            n_input=self.n_input,
             n_units=self.n_units, 
             dropout=self.dropout, 
             activation=self.activation,  
-            n_out=self.n_out, 
             batch_norm=self.batch_norm,
             **self._layer_kwargs,
         )
