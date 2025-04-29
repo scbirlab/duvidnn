@@ -18,6 +18,7 @@ from ...stateless.config import config
 config.set_backend('torch', precision='float')
 
 from ...stateless.typing import Array, ArrayLike
+from ...stateless.utils import jit
 from ..models import ChempropEnsemble, TorchMLPEnsemble
 from .data import ChempropDataMixin, DataMixin, TorchChemMixin
 from .information import DoubtMixin
@@ -106,11 +107,11 @@ class TorchMLPModelBox(TorchModelBoxBase, VarianceMixin):
 
     def create_model(self, *args, **kwargs) -> TorchMLPEnsemble:
         self._model_config.update(kwargs)
-        return TorchMLPEnsemble(
+        return jit(TorchMLPEnsemble(
             n_input=self.input_shape[-1],
             n_out=self.output_shape[-1], 
             *args, **self._model_config,
-        )
+        ))
 
 
 @register_modelbox("fingerprint")

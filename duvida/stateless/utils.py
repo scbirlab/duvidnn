@@ -33,10 +33,13 @@ if config.backend == 'jax':
         return _normal
 
 elif config.backend == 'torch':
+    from functools import wraps
     from torch import concat as concatenate, compile, normal, zeros, Generator, split
     from torch.random import manual_seed
     from torch.func import jvp, grad, hessian, vmap as vmap_torch
     from torch.utils._pytree import tree_flatten, tree_unflatten
+    import torch._dynamo
+    torch._dynamo.config.suppress_errors = True
 
     def vmap(
         f: Callable, 
@@ -62,7 +65,26 @@ elif config.backend == 'torch':
             *args, **kwargs
         )
 
-    jit = partial(compile, fullgraph=True)
+    def jit(fn):
+        try:
+            compiled = compile(
+                fn,
+                fullgraph=True,
+                mode="max-autotune",
+            )
+        except RuntimeError as e:
+            print_err(f"[torch.compile] compilation failed ({e}); running eagerly")
+            return fn
+
+        @wraps(fn)
+        def wrapped(*args, **kwargs):
+            try:
+                return compiled(*args, **kwargs)
+            except Exception as e:
+                print_err(f"[torch.compile] runtime graph error ({e}); falling back")
+                return fn(*args, **kwargs)
+        return wrapped
+
 
     def random_normal(seed: int, device='cpu') -> Callable:
         """Generate a sample from the Normal distribution.
@@ -167,7 +189,7 @@ def get_eps():
             return asarray(x)
 
     else:
-        from torch import as_tensor, finfo, float64
+        from torch import as_tensor, finfo
 
         def converter(x): 
             return as_tensor(x)
