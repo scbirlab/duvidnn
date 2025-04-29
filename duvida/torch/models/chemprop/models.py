@@ -20,11 +20,6 @@ from .data import (
 )
 from ..utils.ensemble import TorchEnsembleMixin
 from ..utils.lt import LightningMixin
-from ....stateless.config import config
-
-config.set_backend('torch', precision='float')
-
-from ....stateless.utils import jit
 
 
 class ChempropBase(Module, ABC):
@@ -129,7 +124,6 @@ class ChempropEnsemble(TorchEnsembleMixin, ChempropBase, LightningMixin):
     def create_module(self):
         return self.build_model()
 
-    @jit
     def forward(self, x: DuvidaTrainingBatch) -> torch.Tensor:
         if not isinstance(x, DuvidaTrainingBatch):
             for p in self.parameters():
