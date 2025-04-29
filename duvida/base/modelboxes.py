@@ -35,7 +35,7 @@ class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
         self.model = None
         self._trainer = None
         self._init_kwargs = kwargs
-        self._model_config = {}
+        self._model_config = kwargs
         self._special_args = None
 
     def save_checkpoint(
@@ -185,7 +185,6 @@ class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
                 callbacks=callbacks,
                 **trainer_opts,
             )
-        print_err(training_data)
         self.model = self._trainer.train(
             model=self.model, 
             train_dataloader=training_data, 
