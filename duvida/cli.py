@@ -274,7 +274,7 @@ def _train(args: Namespace) -> None:
         "use_2d": args.descriptors,
         "use_fp": args.fp,
         "n_hidden": args.hidden,
-        "residual_depth": ags.residual,
+        "residual_depth": args.residual,
         "n_units": args.units,
         "dropout": args.dropout,
         "ensemble_size": args.ensemble_size,
