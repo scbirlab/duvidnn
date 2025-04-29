@@ -296,24 +296,28 @@ class DoubtMixinBase(ABC):
         self, 
         score_type: str,
         candidates: Union[ArrayLike, Dataset],
-        candidate_features: Optional[str] = None,
-        candidate_labels: Optional[str] = None,
+        features: Optional[str] = None,
+        labels: Optional[str] = None,
         training_dataset: Optional[Dataset] = None,
         batch_size: int = 16,
+        preprocessing_args: Optional[Mapping] = None,
         cache: Optional[str] = None,
-        *args, **kwargs
+        **info_score_kwargs
     ) -> Dataset:
         self.release_memory()
+        if preprocessing_args is None:
+            preprocessing_args = {}
         if training_dataset is None:  
             dataset = self._check_training_data()
 
         if hasattr(self, "_prepare_data"):
             candidates = self._prepare_data(
-                features=candidate_features,
-                labels=candidate_labels,
                 data=candidates,
+                features=features,
+                labels=labels,
                 batch_size=batch_size,
                 cache=cache,
+                **preprocessing_args
             )
             
         return self._get_info_score(
@@ -321,10 +325,14 @@ class DoubtMixinBase(ABC):
             candidates=candidates,
             dataset=dataset, 
             batch_size=batch_size,
-            *args, **kwargs,
+            **info_score_kwargs,
         )
 
-    def doubtscore(self, *args, **kwargs) -> Dataset:
+    def doubtscore(
+        self, 
+        preprocessing_args: Optional[Mapping] = None,
+        **info_score_kwargs
+    ) -> Dataset:
 
         """Calculate doubtscore.
         
@@ -332,10 +340,15 @@ class DoubtMixinBase(ABC):
 
         return self._info_score_entrypoint(
             score_type="doubtscore",
-            *args, **kwargs
+            preprocessing_args=preprocessing_args,
+            **info_score_kwargs
         )
 
-    def information_sensitivity(self, *args, **kwargs) -> Dataset:
+    def information_sensitivity(
+        self, 
+        preprocessing_args: Optional[Mapping] = None,
+        **info_score_kwargs
+    ) -> Dataset:
 
         """Calculate information sensitivity.
         
@@ -343,5 +356,6 @@ class DoubtMixinBase(ABC):
 
         return self._info_score_entrypoint(
             score_type="information sensitivity",
-            *args, **kwargs
+            preprocessing_args=preprocessing_args,
+            **info_score_kwargs
         )

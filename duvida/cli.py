@@ -431,6 +431,15 @@ def _predict(args: Namespace) -> None:
     out_dir = os.dirname(output)
     if not os.path.exists(out_dir):
         os.makedirs(out_dir)
+    preprocessing_args = {
+        "features": args.features,
+        "structure_column": args.structure,
+        "structure_representation": args.input_representation,
+    }
+    common_args = {
+        "batch_size": args.batch,
+        "cache": args.cache,
+    }
 
     candidates_ds = _resolve_and_slice_data(
         args.test,
@@ -444,25 +453,23 @@ def _predict(args: Namespace) -> None:
     )
     candidates_ds = modelbox.predict(
         data=candidates_ds,
-        features=args.features,
-        structure_column=args.structure,
-        structure_representation=args.input_representation,
         aggregator="mean",
-        cache=args.cache,
+        **preprocessing_args,
+        **common_args,
     )
     if args.variance:
         candidates_ds = modelbox.variance(
             candidates=candidates_ds,
-            cache=args.cache,
+            **preprocessing_args,
+            **common_args,
         )
     if args.tanimoto:
         if hasattr(modelbox, "tanimoto_nn"):
             candidates_ds = modelbox.tanimoto_nn(
                 data=candidates_ds,
-                cache=args.cache,
                 query_structure_column=args.structure,
                 query_structure_representation=args.input_representation,
-                batch_size=args.batch_size,
+                **common_args,
             )
         else:
             print_err(f"Cannot calculate Tanimoto for non-chemical modelbox from {args.checkpoint}")
@@ -470,7 +477,8 @@ def _predict(args: Namespace) -> None:
         modelbox.model.set_model(0)
         candidates_ds = modelbox.doubtscore(
             candidates=candidates_ds,
-            cache=args.cache,
+            preprocessing_args=preprocessing_args,
+            **common_args,
         )
     if args.information_sensitivity:
         modelbox.model.set_model(0)
@@ -482,7 +490,8 @@ def _predict(args: Namespace) -> None:
             candidates=candidates_ds,
             approximator=args.approx,
             optimality_approximation=args.optimality,
-            cache=args.cache,
+            preprocessing_args=preprocessing_args,
+            **common_args,
             **extra_args,
         )
 
@@ -495,10 +504,7 @@ def _predict(args: Namespace) -> None:
         metrics = _evaluate_modelbox_and_save_metrics(
             modelbox,
             dataset=candidates_ds,
-            labels=args.labels,
-            features=args.features,
-            structure_column=args.structure,
-            structure_representation=args.input_representation,
+            **preprocessing_args,
             metric_filename=metric_filename,
             plot_filename=plot_filename,
         )
@@ -706,6 +712,20 @@ def main() -> None:
     #     help='Format of files. Default: %(default)s',
     # )
 
+    # slice dataset
+    slice_start = CLIOption(
+        '--start', 
+        type=int,
+        default=0,
+        help='First row of dataset to process.',
+    )
+    slice_end = CLIOption(
+        '--end', 
+        type=int,
+        default=None,
+        help='Last row of dataset to process. Default: end of dataset.',
+    )
+
     # Information metrics
     variance = CLIOption(
         '--variance', 
@@ -795,6 +815,8 @@ def main() -> None:
         description="Make predictions and calculate uncertainty using a duvida checkpoint.",
         options=[
             test_data, 
+            slice_start,
+            slice_end,
             feature_cols,
             label_cols,
             structure_col,
@@ -810,6 +832,7 @@ def main() -> None:
             optimality,
             hess_approx,
             bekas_n,
+            batch_size,
         ],
         main=_predict,
     )
