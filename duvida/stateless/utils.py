@@ -40,8 +40,11 @@ elif config.backend == 'torch':
     from torch.random import manual_seed
     from torch.func import jvp, grad, hessian, vmap as vmap_torch
     from torch.utils._pytree import tree_flatten, tree_unflatten
-    import torch._dynamo
-    torch._dynamo.config.suppress_errors = True
+    import torch._dynamo import config as dynamo_config
+    dynamo_config.suppress_errors = True
+    dynamo_config.capture_scalar_outputs = True
+
+    _COMPILE_WARNINGS = set()
 
     def vmap(
         f: Callable, 
@@ -75,7 +78,10 @@ elif config.backend == 'torch':
                 mode="max-autotune",
             )
         except RuntimeError as e:
-            print_err(f"[torch.compile] compilation failed ({e}); running eagerly")
+            warning = f"[torch.compile] Compiling `{fn}` failed; running eagerly" + "\n" + str(e)
+            if warning not in _COMPILE_WARNINGS:
+                _COMPILE_WARNINGS.add(warning)
+                print_err(warning)
             return fn
 
         @wraps(fn)
@@ -83,7 +89,10 @@ elif config.backend == 'torch':
             try:
                 return compiled(*args, **kwargs)
             except Exception as e:
-                print_err(f"[torch.compile] runtime graph error ({e}); falling back")
+                warning = f"[torch.compile] Running compiled `{fn}` failed; falling back" + "\n" + str(e)
+                if warning not in _COMPILE_WARNINGS:
+                    _COMPILE_WARNINGS.add(warning)
+                    print_err(warning)
                 return fn(*args, **kwargs)
         return wrapped
 
