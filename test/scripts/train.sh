@@ -22,7 +22,7 @@ do
             -k "$class" \
             -i $i \
             --prefix test/outputs/models \
-            --output "$class-$i"
+            --output "$class-$i" \
             --cache test/outputs/cache \
             --epochs 2 \
             --learning-rate 1e-5 \
