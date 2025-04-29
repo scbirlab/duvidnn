@@ -10,6 +10,7 @@ from torch.optim import Adam, Optimizer
 from .utils.ensemble import TorchEnsembleMixin
 from .utils.lt import LightningMixin
 from ...stateless.typing import Array, ArrayLike
+from ...stateless.utils import jit
 
 _DEFAULT_ACTIVATION: Callable[..., Module] = SiLU  # Smooth activation to prevent gradient collapse
 _DEFAULT_N_UNITS: int = 16
@@ -66,6 +67,7 @@ class LinearStack(Module):
         for _ in range(1, n_hidden):
             layers = self._add_layer(
                 in_features=n_units,
+                layers=layers,
                 **common_kwargs,
                 **layer_kwargs,
             )
@@ -124,6 +126,7 @@ class TorchResidualBlock(LinearStack):
             layer_class=Linear,
         )
 
+    @jit
     def forward(self, x: ArrayLike) -> Array:
         residual = self.model_layers(x)
         projection = self.projection(x)
@@ -196,7 +199,8 @@ class TorchMLPBase(LinearStack):
             batch_norm=self.batch_norm,
             **self._layer_kwargs,
         )
-
+        
+    @jit
     def forward(self, x: ArrayLike) -> Array:
         return self.model_layers(x)
 
