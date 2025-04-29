@@ -47,6 +47,8 @@ class ChempropBase(Module, ABC):
         *args, **kwargs
     ):
         super().__init__()
+        self._extra_args = args
+        self._extra_kwargs = kwargs
         self.n_input = n_input
         self.n_hidden = n_hidden
         self.n_units = n_units
