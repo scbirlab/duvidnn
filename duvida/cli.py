@@ -21,9 +21,10 @@ modelbox_name_file = os.path.join(_data_root, "modelbox-names.json")
 if not os.path.exists(modelbox_name_file):
     from .autoclass import AutoModelBox
     from .base.modelbox_registry import DEFAULT_MODELBOX, MODELBOX_NAMES
+    os.makedirs(_data_root)
     save_json([DEFAULT_MODELBOX, MODELBOX_NAMES], modelbox_name_file)
 else:
-    DEFAULT_MODELBOX, MODELBOX_NAMES = _load_json(data_root, "modelbox-names.json")
+    DEFAULT_MODELBOX, MODELBOX_NAMES = _load_json(_data_root, "modelbox-names.json")
 
 _LR_DEFAULT: float = .01
 
@@ -310,8 +311,8 @@ def _train(args: Namespace) -> None:
         batch_size=args.batch,
         val_data=args.validation,
     )
-    save_json(training_args, os.path.join(checkpoint_path, f"training-args.json"))
-    save_json(load_data_args, os.path.join(checkpoint_path, f"load-data-args.json"))
+    save_json(training_args, os.path.join(checkpoint_path, "training-args.json"))
+    save_json(load_data_args, os.path.join(checkpoint_path, "load-data-args.json"))
 
     # Reload - built-in test that the checkpointing works!
     modelbox = AutoModelBox.from_pretrained(

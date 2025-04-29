@@ -3,6 +3,8 @@
 from typing import Callable, Iterable, Union
 from functools import partial
 
+from carabiner import print_err
+
 from .config import config
 from .typing import Array, ArrayLike
 
