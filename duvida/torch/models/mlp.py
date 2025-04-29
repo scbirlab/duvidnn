@@ -186,23 +186,42 @@ class TorchMLPBase(LinearStack):
             self._layer_kwargs = {
                 "residual_depth": self.residual_depth,
             }
+            self._n_residual_blocks = self.n_hidden // (self.residual_depth or 1)
+            self._n_extra_linear = self.n_hidden % (self.residual_depth or 1)
         else:
             self._layer_class = Linear
             self._layer_kwargs = {}
+            self._n_residual_blocks = 0
+            self._n_extra_linear = 0
         self.model_layers = self.build_model()
 
     def build_model(self):
-        return super().build_model(
+        layers = super().build_model(
             n_input=self.n_input,
-            n_out=self.n_out, 
+            n_out=(self.n_out if self._n_extra_linear == 0 else self.n_units), 
             layer_class=self._layer_class,
-            n_hidden=self.n_hidden // (self.residual_depth or 1),
+            n_hidden=(self._n_residual_blocks if self.residual_depth is not None else self.n_hidden),
             n_units=self.n_units, 
             dropout=self.dropout, 
             activation=self.activation,  
             batch_norm=self.batch_norm,
             **self._layer_kwargs,
         )
+        if self._n_extra_linear > 0:
+            extra_layers = super().build_model(
+                n_input=self.n_units,
+                n_out=self.n_out, 
+                layer_class=Linear,
+                n_hidden=self._n_extra_linear,
+                n_units=self.n_units, 
+                dropout=self.dropout, 
+                activation=self.activation,  
+                batch_norm=self.batch_norm,
+                **self._layer_kwargs,
+            )
+            layers = Sequential(layers, extra_layers)
+
+        return layers
         
     @jit
     def forward(self, x: ArrayLike) -> Array:
