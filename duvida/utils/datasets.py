@@ -19,11 +19,12 @@ from tqdm.auto import tqdm
 def to_dataset(
     ds: IterableDataset,
     batch_size: int = 1024,
-    ds_rows: Optional[int] = None
+    nrows: Optional[int] = None
 ) -> Dataset:
     from datasets import Dataset, concatenate_datasets
     new_ds = None
-    for record in tqdm(ds.batch(batch_size=batch_size), total=np.ceil(ds_rows // batch_size).astype(int)):
+    total_iter = np.ceil(nrows // batch_size).astype(int) if nrows is not None else None
+    for record in tqdm(ds.batch(batch_size=batch_size), total=total_iter):
         # print(record)
         if new_ds is not None:
             new_ds = concatenate_datasets([new_ds, Dataset.from_dict(record)])

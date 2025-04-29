@@ -378,19 +378,23 @@ def _train(args: Namespace) -> None:
 def _resolve_and_slice_data(
     data: str,
     start: Optional[int] = None,
-    end: Optional[int] = None
+    end: Optional[int] = None,
+    batch_size: int = 1024
 ):
     from .base.data import DataMixinBase
     from .utils.datasets import to_dataset
 
     candidates_ds = DataMixinBase._resolve_data(data)
+    nrows = candidates_ds.num_rows
     skip = start or 0
-    take = (end or candidates_ds.num_rows) - skip
+    take = (end or nrows) - skip
     return to_dataset(
         candidates_ds
         .to_iterable_dataset()
         .skip(skip)
-        .take(take)
+        .take(take),
+        batch_size=batch_size,
+        nrows=nrows,
     )
 
 
