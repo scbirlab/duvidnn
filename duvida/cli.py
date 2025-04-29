@@ -170,6 +170,7 @@ def _train_and_save_modelbox(
     modelbox,
     early_stopping: Optional[int] = None,
     prefix: str = ".",
+    output_name: Optional[str] = None,
     **training_args
 ):
     from datasets.fingerprint import Hasher
@@ -183,12 +184,19 @@ def _train_and_save_modelbox(
         callbacks = [EarlyStopping('val_loss', patience=early_stopping)]
     else:
         callbacks = None
-    checkpoint_path = os.path.join(
-        prefix, 
-        f"{modelbox.class_name}_n{modelbox.size}_"
-        f"y={'-'.join(modelbox._label_cols)}_"
-        f"h={Hasher.hash(modelbox._input_featurizers)}",
-    )
+
+    if output_name is None:
+        checkpoint_path = os.path.join(
+            prefix, 
+            f"{modelbox.class_name}_n{modelbox.size}_"
+            f"y={'-'.join(modelbox._label_cols)}_"
+            f"h={Hasher.hash(modelbox._input_featurizers)}",
+        )
+    else:
+        checkpoint_path = os.path.join(
+            prefix, 
+            output_name,
+        )
     modelbox.train(
         callbacks=callbacks,
         trainer_opts={  # passed to lightning.Trainer()
@@ -290,6 +298,7 @@ def _train(args: Namespace) -> None:
         # overrides:
         training=args.training,
         structure=args.structure,
+        structure_representation=args.input_representation,
         labels=args.labels,
         features=args.features,
     )
@@ -317,8 +326,8 @@ def _train(args: Namespace) -> None:
         batch_size=args.batch,
         val_data=args.validation,
     )
-    save_json(training_args, os.path.join(checkpoint_path, "training-args.json"))
-    save_json(load_data_args, os.path.join(checkpoint_path, "load-data-args.json"))
+    for obj, f in zip((training_args, "training-args.json"), (load_data_args, "load-data-args.json")):
+        save_json(obj, os.path.join(checkpoint_path, f))
 
     # Reload - built-in test that the checkpointing works!
     modelbox = AutoModelBox.from_pretrained(
@@ -364,39 +373,102 @@ def _train(args: Namespace) -> None:
     return None
 
 
+def _resolve_and_slice_data(
+    data: str,
+    start: Optional[int] = None,
+    end: Optional[int] = None
+):
+    from .base.data import DataMixinBase
+    from .utils.datasets import to_dataset
+
+    candidates_ds = DataMixinBase._resolve_data(args.test)
+    skip = args.start or 0
+    take = (args.end or candidates_ds.num_rows) - skip
+    return to_dataset(
+        candidates_ds
+        .to_iterable_dataset()
+        .skip(skip)
+        .take(take)
+    )
+
+
 @clicommand("Predicting with the following parameters")
 def _predict(args: Namespace) -> None:
+
+    out_dir = os.dirname(args.output)
+    if not os.path.exists(out_dir):
+        os.makedirs(out_dir)
+
+    candidates_ds = _resolve_and_slice_data(
+        args.test,
+        start=args.start,
+        end=args.end,
+    )
 
     modelbox = AutoModelBox.from_pretrained(
         args.checkpoint, 
         cache=args.cache,
     )
-    prediction = modelbox.predict(
-        data=args.test,
+    candidates_ds = modelbox.predict(
+        data=candidates_ds,
+        structure_column=args.structure,
+        structure_representation=args.input_representation,
         aggregator="mean",
+        cache=args.cache,
     )
     if args.variance:
-        variance_ds = modelbox.variance(
-            candidates=args.test,
+        candidates_ds = modelbox.variance(
+            candidates=candidates_ds,
+            cache=args.cache,
         )
+    if args.tanimoto:
+        if hasattr(modelbox, "tanimoto_nn"):
+            candidates_ds = modelbox.tanimoto_nn(
+                data=candidates_ds,
+                cache=args.cache,
+                query_structure_column=args.structure,
+                query_structure_representation=args.input_representation,
+                batch_size=args.batch_size,
+            )
+        else:
+            print_err(f"Cannot calculate Tanimoto for non-chemical modelbox from {args.checkpoint}")
     if args.doubtscore:
-        doubtscore_ds = modelbox.doubtscore(
-            candidates=args.test,
-        )
-    if args.tanimoto and hasattr(modelbox, "tanimoto_nn"):
-        tanimoto = modelbox.tanimoto_nn(
-            candidates=args.test,
+        modelbox.model.set_model(0)
+        candidates_ds = modelbox.doubtscore(
+            candidates=candidates_ds,
+            cache=args.cache,
         )
     if args.information_sensitivity:
-        info_sens_ds = modelbox.information_sensitivity(
-            candidates=args.test,
+        modelbox.model.set_model(0)
+        if args.approx == "bekas":
+            extra_args = {"n": args.bekas_n}
+        else:
+            extra_args = {}
+        candidates_ds = modelbox.information_sensitivity(
+            candidates=candidates_ds,
             approximator=args.approx,
             optimality_approximation=args.optimality,
-            n=args.bekas_n,
+            cache=args.cache,
+            **extra_args,
         )
-    # if args.csv:
 
-    
+    if args.output.endswith((".csv", ".csv.gz", ".tsv", ".tsv.gz", ".txt", ".txt.gz")):
+        candidates_ds.to_csv(
+            args.output, 
+            sep="," if args.output.endswith((".csv", ".csv.gz")) else "\t",
+        )
+    elif args.output.endswith(".json"):
+        candidates_ds.to_json(args.output)
+    elif args.output.endswith(".parquet"):
+        candidates_ds.to_parquet(args.output)
+    elif args.output.endswith(".sql"):
+        candidates_ds.to_sql(args.output)
+    elif args.output.endswith(".hf"):
+        candidates_ds.save_to_disk(args.output)
+    else:
+        print_err(f"WARNING: Unsure what format to save as for filename {args.output}. Defaulting to HF dataset.")
+        candidates_ds.save_to_disk(args.output + ".hf")
+
 #     if args.label_cols is not None:
 #         overall_metrics = defaultdict(list)
 #         _plot_prediction_scatter(
@@ -474,9 +546,9 @@ def main() -> None:
     structure_representation = CLIOption(
         '--input-representation', '-R',
         type=str,
-        default="smiles",
+        default=None,
         choices=["smiles", "selfies", "inchi", "aa_seq"],
-        help='Type of chemical structure string.',
+        help='Type of chemical structure string. Default: SMILES if training; for prediction, use same as training data.',
     )
     label_cols = CLIOption(
         '--labels', '-y',
@@ -502,7 +574,7 @@ def main() -> None:
         '--checkpoint',
         type=str,
         default=None,
-        help='Load a modelbox from this checkpoint. Default: do not use.',
+        help='Load a modelbox from this checkpoint. Default: do not use, make a new modelbox.',
     )
     n_units = CLIOption(
         '--units', '-u',
@@ -611,6 +683,46 @@ def main() -> None:
     #     help='Format of files. Default: %(default)s',
     # )
 
+    # Information metrics
+    variance = CLIOption(
+        '--variance', 
+        action="store_true",
+        help='Calculate ensemble variance.',
+    )
+    tanimoto = CLIOption(
+        '--tanimoto', 
+        action="store_true",
+        help='Calculate Tanimoto distance to nearest neighbor in training data.',
+    )
+    doubtscore = CLIOption(
+        '--doubtscore', 
+        action="store_true",
+        help='Calculate doubtscore.',
+    )
+    info_sens = CLIOption(
+        '--information-sensitivity', 
+        action="store_true",
+        help='Calculate information senstivity.',
+    )
+    optimality = CLIOption(
+        '--optimality', 
+        action="store_true",
+        help='Whether to make the computationally faster assumption that the model parameters were trained to gradient 0.',
+    )
+    hess_approx = CLIOption(
+        '--approx', 
+        type=str,
+        default="bekas",
+        choices=["exact", "squared_jacobian", "rough_finite_difference", "bekas"],
+        help='What type of Hessian approximation to perform.',
+    )
+    bekas_n = CLIOption(
+        '--bekas-n', 
+        type=int,
+        default=1,
+        help='Number of stochastic samples for Hessian approximation.',
+    )
+
     hyperprep = CLICommand(
         "hyperprep",
         description="Prepare inputs for hyperparameter search.",
@@ -649,6 +761,7 @@ def main() -> None:
             model_config,
             config_i,
             save_prefix,
+            output_name,
             cache,
         ],
         main=_train,
@@ -666,6 +779,7 @@ def main() -> None:
             _checkpoint,
             save_prefix,
             cache,
+            output_name,
         ],
         main=_predict,
     )
