@@ -431,6 +431,8 @@ def _save_dataset(
 @clicommand("Predicting with the following parameters")
 def _predict(args: Namespace) -> None:
 
+    from .autoclass import AutoModelBox
+
     output = os.path.join(args.prefix, args.output)
     out_dir = os.path.dirname(output)
     if not os.path.exists(out_dir):
