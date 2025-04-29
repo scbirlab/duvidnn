@@ -228,7 +228,8 @@ def _evaluate_modelbox_and_save_metrics(
     modelbox,
     metric_filename: str,
     plot_filename: str,
-    dataset: Optional = None
+    dataset: Optional = None,
+    **kwargs
 ):
     import numpy as np
 
@@ -237,6 +238,7 @@ def _evaluate_modelbox_and_save_metrics(
     predictions, metrics = modelbox.evaluate(
         data=dataset,
         aggregator=lambda x: np.mean(x, axis=-1, keepdims=True),
+        **kwargs,
     )
     save_json(
         metrics, 
@@ -326,7 +328,7 @@ def _train(args: Namespace) -> None:
         batch_size=args.batch,
         val_data=args.validation,
     )
-    for obj, f in zip((training_args, "training-args.json"), (load_data_args, "load-data-args.json")):
+    for obj, f in zip((training_args, load_data_args), ("training-args.json", "load-data-args.json")):
         save_json(obj, os.path.join(checkpoint_path, f))
 
     # Reload - built-in test that the checkpointing works!
@@ -392,10 +394,41 @@ def _resolve_and_slice_data(
     )
 
 
+def _save_dataset(
+    dataset,
+    output: str
+) -> None:
+    print_err("INFO: Saving dataset:\n" + str(dataset) + "\n" + f"at {output} as", end=" ")
+    if output.endswith((".csv", ".csv.gz", ".tsv", ".tsv.gz", ".txt", ".txt.gz")):
+        print_err("CSV.")
+        dataset.to_csv(
+            output, 
+            sep="," if output.endswith((".csv", ".csv.gz")) else "\t",
+        )
+    elif output.endswith(".json"):
+        print_err("JSON.")
+        dataset.to_json(output)
+    elif output.endswith(".parquet"):
+        print_err("Parquet.")
+        dataset.to_parquet(output)
+    elif output.endswith(".sql"):
+        print_err("SQL.")
+        dataset.to_sql(output)
+    elif output.endswith(".hf"):
+        print_err("Hugging Face dataset.")
+        dataset.save_to_disk(output)
+    else:
+        print_err("Hugging Face dataset.")
+        dataset.save_to_disk(output + ".hf")
+        print_err(f"WARNING: Unsure what format to save as for filename {output}. Defaulted to Hugging Face dataset.")
+    return None
+
+
 @clicommand("Predicting with the following parameters")
 def _predict(args: Namespace) -> None:
 
-    out_dir = os.dirname(args.output)
+    output = os.path.join(args.prefix, args.output)
+    out_dir = os.dirname(output)
     if not os.path.exists(out_dir):
         os.makedirs(out_dir)
 
@@ -411,6 +444,7 @@ def _predict(args: Namespace) -> None:
     )
     candidates_ds = modelbox.predict(
         data=candidates_ds,
+        features=args.features,
         structure_column=args.structure,
         structure_representation=args.input_representation,
         aggregator="mean",
@@ -452,50 +486,39 @@ def _predict(args: Namespace) -> None:
             **extra_args,
         )
 
-    if args.output.endswith((".csv", ".csv.gz", ".tsv", ".tsv.gz", ".txt", ".txt.gz")):
-        candidates_ds.to_csv(
-            args.output, 
-            sep="," if args.output.endswith((".csv", ".csv.gz")) else "\t",
-        )
-    elif args.output.endswith(".json"):
-        candidates_ds.to_json(args.output)
-    elif args.output.endswith(".parquet"):
-        candidates_ds.to_parquet(args.output)
-    elif args.output.endswith(".sql"):
-        candidates_ds.to_sql(args.output)
-    elif args.output.endswith(".hf"):
-        candidates_ds.save_to_disk(args.output)
-    else:
-        print_err(f"WARNING: Unsure what format to save as for filename {args.output}. Defaulting to HF dataset.")
-        candidates_ds.save_to_disk(args.output + ".hf")
+    _save_dataset(candidates_ds, output)
 
-#     if args.label_cols is not None:
-#         overall_metrics = defaultdict(list)
-#         _plot_prediction_scatter(
-#             predictions,
-#             x=modelbox._prediction_key,
-#             y=modelbox._out_key,
-#             filename=os.path.join(args.prefix, f"predictions_{name}"),
-#         )
-#         pprint_dict(
-#             metrics, 
-#             message=f"Evaluation",
-#         )
-#         overall_metrics["model_class"].append(modelbox.class_name)
-#         overall_metrics["n_parameters"].append(modelbox.size)
-#         keys_added = []
-#         for d in (
-#             load_data_args, 
-#             modelbox._init_kwargs, 
-#             modelbox._model_config, 
-#             training_args, 
-#             metrics,
-#         ):
-#             for key, val in d.items():
-#                 if key != "trainer_opts" and key not in keys_added:
-#                     overall_metrics[key].append(val)
-#                     keys_added.append(key)
-#     _dict_to_pandas(overall_metrics, os.path.join(save_prefix, "metrics.csv"))
+    if args.labels is not None:
+        overall_metrics = defaultdict(list)
+        metric_filename = os.path.join(args.prefix, "predict-eval-metrics.csv")
+        plot_filename = os.path.join(args.prefix, "predict-eval-metrics.png")
+        metrics = _evaluate_modelbox_and_save_metrics(
+            modelbox,
+            dataset=candidates_ds,
+            labels=args.labels,
+            features=args.features,
+            structure_column=args.structure,
+            structure_representation=args.input_representation,
+            metric_filename=metric_filename,
+            plot_filename=plot_filename,
+        )
+        pprint_dict(
+            metrics, 
+            message=f"Evaluation",
+        )
+        overall_metrics["model_class"].append(modelbox.class_name)
+        overall_metrics["n_parameters"].append(modelbox.size)
+        keys_added = []
+        for d in (
+            modelbox._init_kwargs, 
+            modelbox._model_config, 
+            metrics,
+        ):
+            for key, val in d.items():
+                if key != "trainer_opts" and key not in keys_added:
+                    overall_metrics[key].append(val)
+                    keys_added.append(key)
+        _dict_to_pandas(overall_metrics, os.path.join(args.prefix, "metrics.csv"))
 
     return None
 
