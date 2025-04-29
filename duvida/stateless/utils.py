@@ -40,7 +40,7 @@ elif config.backend == 'torch':
     from torch.random import manual_seed
     from torch.func import jvp, grad, hessian, vmap as vmap_torch
     from torch.utils._pytree import tree_flatten, tree_unflatten
-    import torch._dynamo import config as dynamo_config
+    from torch._dynamo import config as dynamo_config
     dynamo_config.suppress_errors = True
     dynamo_config.capture_scalar_outputs = True
 
