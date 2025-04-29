@@ -7,7 +7,7 @@ from collections import defaultdict
 import os
 import sys
 
-from carabiner.utils import pprint_dict
+from carabiner.utils import pprint_dict, print_err
 from carabiner.cliutils import clicommand, CLIOption, CLICommand, CLIApp
 
 from . import __version__
@@ -381,9 +381,9 @@ def _resolve_and_slice_data(
     from .base.data import DataMixinBase
     from .utils.datasets import to_dataset
 
-    candidates_ds = DataMixinBase._resolve_data(args.test)
-    skip = args.start or 0
-    take = (args.end or candidates_ds.num_rows) - skip
+    candidates_ds = DataMixinBase._resolve_data(data)
+    skip = start or 0
+    take = (end or candidates_ds.num_rows) - skip
     return to_dataset(
         candidates_ds
         .to_iterable_dataset()
@@ -785,7 +785,7 @@ def main() -> None:
             doubtscore,
             info_sens,
             optimality,
-            approx,
+            hess_approx,
             bekas_n,
         ],
         main=_predict,
