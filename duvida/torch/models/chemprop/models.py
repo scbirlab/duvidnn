@@ -36,7 +36,7 @@ class ChempropBase(Module, ABC):
         n_units: int = 16, 
         mp_units: int = 300,
         mp_hidden: int = 3,
-        mp_activation: str = "relu",
+        mp_activation: str = "elu",
         learning_rate: float = .01,
         dropout: float = 0., 
         activation: str = "ELU",  # Smooth activation to prevent gradient collapse
@@ -66,7 +66,7 @@ class ChempropBase(Module, ABC):
             # TODO: fix this issue.
             print_err("Warning: using batch norm, which will not allow calculation of doubtscore or information sensitivity.")
 
-    def create_model(self) -> Module:
+    def build_model(self) -> Module:
         message_passing_layer = BondMessagePassing(
             d_h=self.mp_units,        
             depth=self.mp_hidden,
@@ -125,7 +125,7 @@ class ChempropEnsemble(TorchEnsembleMixin, ChempropBase, LightningMixin):
         )
 
     def create_module(self):
-        return self.create_model()
+        return self.build_model()
 
     @jit
     def forward(self, x: DuvidaTrainingBatch) -> torch.Tensor:
@@ -135,6 +135,11 @@ class ChempropEnsemble(TorchEnsembleMixin, ChempropBase, LightningMixin):
                 break
             x = _collate_training_batch_for_forward(x, device=device)
         x = (x.bmg, x.V_d, x.X_d)
-        return torch.concat([
+        # Stack outputs to shape [batch, n_out, ensemble_size]
+        out = stack([
             module(*x) for _, module in self.model_ensemble.items()
         ], dim=-1)
+        # If n_out == 1 (scalar), squeeze the middle axis to get [batch, ensemble_size]
+        if out.size(-2) == 1:
+            out = out.squeeze(-2)
+        return out
