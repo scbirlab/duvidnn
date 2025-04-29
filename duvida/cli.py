@@ -274,6 +274,7 @@ def _train(args: Namespace) -> None:
         "use_2d": args.descriptors,
         "use_fp": args.fp,
         "n_hidden": args.hidden,
+        "residual_depth": ags.residual,
         "n_units": args.units,
         "dropout": args.dropout,
         "ensemble_size": args.ensemble_size,
@@ -366,7 +367,10 @@ def _train(args: Namespace) -> None:
 @clicommand("Predicting with the following parameters")
 def _predict(args: Namespace) -> None:
 
-    modelbox = AutoModelBox.from_pretrained(args.checkpoint, cache=args.cache)
+    modelbox = AutoModelBox.from_pretrained(
+        args.checkpoint, 
+        cache=args.cache,
+    )
     prediction = modelbox.predict(
         data=args.test,
         aggregator="mean",
@@ -390,6 +394,8 @@ def _predict(args: Namespace) -> None:
             optimality_approximation=args.optimality,
             n=args.bekas_n,
         )
+    # if args.csv:
+
     
 #     if args.label_cols is not None:
 #         overall_metrics = defaultdict(list)
@@ -510,6 +516,12 @@ def main() -> None:
         default=1,
         help='Number of hidden layers.',
     )
+    residual_depth = CLIOption(
+        '--residual',
+        type=int,
+        default=None,
+        help='Depth of residual blocks. Default: Do not use residual blocks.',
+    )
     _2d = CLIOption(
         '--descriptors', 
         action="store_true",
@@ -625,6 +637,7 @@ def main() -> None:
             _checkpoint,
             n_units,
             n_hidden,
+            residual_depth,
             _2d, 
             _fp,
             dropout,

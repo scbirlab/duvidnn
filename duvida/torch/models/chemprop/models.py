@@ -138,7 +138,7 @@ class ChempropEnsemble(TorchEnsembleMixin, ChempropBase, LightningMixin):
             x = _collate_training_batch_for_forward(x, device=device)
         x = (x.bmg, x.V_d, x.X_d)
         # Stack outputs to shape [batch, n_out, ensemble_size]
-        out = stack([
+        out = torch.stack([
             module(*x) for _, module in self.model_ensemble.items()
         ], dim=-1)
         # If n_out == 1 (scalar), squeeze the middle axis to get [batch, ensemble_size]
