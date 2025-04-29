@@ -205,7 +205,7 @@ class DataMixinBase(ABC):
         cache: Optional[str] = None
     ) -> Dataset:
         if cache is None:
-            cache = self._default_cache
+            cache = cls._default_cache
             print_err(f"Defaulting to cache: {cache}")
         if not isinstance(dataframe, DataFrame) and isinstance(dataframe, Mapping):
             dataframe = DataFrame(dataframe)
@@ -230,6 +230,7 @@ class DataMixinBase(ABC):
     def _resolve_featurizers(
         features: FeatureLike
     ):
+        transformer_prefix = "transformer://"
         if isinstance(features, (str, Mapping)):
             features = [features]
         resolved_featurizers = []
@@ -237,15 +238,15 @@ class DataMixinBase(ABC):
             if isinstance(featurizer, str):
                 if featurizer.endswith(".json"):
                     featurizer = Preprocessor.from_file(featurizer)
-                elif featurizer.startswith("transformer://"):
-                    ref = featurizer.split("transformer://")[-1]
+                elif featurizer.startswith(transformer_prefix):
+                    ref = featurizer.split(transformer_prefix)[-1]
                     try:
                         ref, col = ref.split(":")
                     except ValueError:
                         raise ValueError(
                             f"""
                             Transformers models should be provided in the format 
-                            transformer://<ref>:<input-column>[~agg1,agg2]
+                            {transformer_prefix}<ref>:<input-column>[~agg1,agg2]
 
                             But got: "{featurizer}"
                             """
@@ -581,8 +582,8 @@ class ChemMixinBase(DataMixinBase):
     def tanimoto_nn(
         self, 
         data: DataLike,
-        query_structure_column: str,
-        query_input_representation: str = "smiles",
+        query_structure_column: Optional[str] = None,
+        query_input_representation: Optional[str] = None,
         batch_size: int = 16,
         cache: Optional[str] = None,
         **kwargs
@@ -590,6 +591,10 @@ class ChemMixinBase(DataMixinBase):
         """Get Tanimoto similarity of nearest training set data.
     
         """
+        if query_structure_column is None:
+            query_structure_column = self._default_preprocessing_args["structure_column"]
+        if query_input_representation is None:
+            query_input_representation = self._default_preprocessing_args["input_representation"]
         fp_preprocessor = Preprocessor(
             name="morgan-fingerprint",
             input_column=self.smiles_column,
