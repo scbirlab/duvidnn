@@ -780,6 +780,13 @@ def main() -> None:
             save_prefix,
             cache,
             output_name,
+            variance,
+            tanimoto,
+            doubtscore,
+            info_sens,
+            optimality,
+            approx,
+            bekas_n,
         ],
         main=_predict,
     )

@@ -37,6 +37,7 @@ do
             --variance \
             --doubtscore \
             --information-sensitivity \
+            --optimality \
             -y clogp \
             --output test/outputs/predictions/"$class-$i".csv.gz
         if [ ! "$(zcat "$class-$i".csv.gz | wc -l)" -eq "1990" ]
