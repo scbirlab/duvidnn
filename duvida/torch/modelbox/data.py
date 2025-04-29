@@ -2,6 +2,7 @@
 
 from typing import Callable, Dict, Mapping, Union
 from functools import partial
+from multiprocessing import cpu_count
 
 from datasets import Dataset, IterableDataset
 import torch
@@ -29,11 +30,12 @@ class DataMixin(DataMixinBase):
 
     @staticmethod
     def make_dataloader(
-        dataset: Union[Dataset, IterableDataset], 
+        dataset: Union[Dataset, IterableDataset],
         batch_size: int = 16, 
         shuffle: bool = False,
         **kwargs
     ) -> DataLoader:
+        kwargs = {"num_workers": max(1, cpu_count() - 1)} | kwargs
         return DataLoader(
             dataset, 
             batch_size=batch_size, 
