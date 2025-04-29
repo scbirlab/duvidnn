@@ -187,8 +187,8 @@ class DataMixinBase(ABC):
             )
         return columns
     
+    @staticmethod
     def _load_from_csv(
-        self, 
         filename: str,
         cache: Optional[str] = None
     ) -> Dataset:
@@ -198,8 +198,9 @@ class DataMixinBase(ABC):
             sep="," if filename.endswith((".csv", ".csv.gz")) else "\t",
         )
 
+    @classmethod
     def _load_from_dataframe(
-        self,
+        cls,
         dataframe: Union[DataFrame, Mapping[str, ArrayLike]],
         cache: Optional[str] = None
     ) -> Dataset:
@@ -220,7 +221,7 @@ class DataMixinBase(ABC):
             dataframe.to_csv(df_temp_file, index=False)
 
         print_err(f"Reloading dataframe from {df_temp_file}")
-        return self._load_from_csv(
+        return cls._load_from_csv(
             df_temp_file, 
             cache=cache,
         )
@@ -310,27 +311,27 @@ class DataMixinBase(ABC):
             ds_config, ds_split = hf_ref_full.split("@")[-1], "train"
         return load_dataset(hf_ref, ds_config, split=ds_split, cache_dir=cache)
 
-
+    @classmethod
     def _resolve_data(
-        self, 
+        cls, 
         data: DataLike, 
         cache: Optional[str] = None
     ) -> Union[Dataset, IterableDataset]:
         if isinstance(data, (Dataset, IterableDataset)):
             dataset = data
         elif isinstance(data, (DataFrame, Mapping)):
-            dataset = self._load_from_dataframe(
+            dataset = cls._load_from_dataframe(
                 data, 
                 cache=cache,
             )
         elif isinstance(data, str):
             if data.startswith("hf://"):
-                dataset = self._resolve_hf_hub_dataset(
+                dataset = cls._resolve_hf_hub_dataset(
                     data,
                     cache=cache,
                 )
             else:
-                dataset = self._load_from_csv(
+                dataset = cls._load_from_csv(
                     data, 
                     cache=cache,
                 )

@@ -327,14 +327,14 @@ class VarianceMixin:
         """Make predictions on new data.
     
         """
-        if isinstance(self, ModelBoxBase):
+        if hasattr(self, ModelBoxBase):
             predictions = self.predict(
                 data=candidates, 
                 aggregator="var", 
                 keepdims=False,
                 cache=cache,
                 **kwargs
-            ).select_columns([self._prediction_key])
+            )#.select_columns([self._prediction_key])
             return predictions.rename_column(self._prediction_key, self._variance_key)
         else:
             raise ValueError("VarianceMixin can only be used with ModelBox!")

@@ -280,13 +280,13 @@ class DoubtMixinBase(ABC):
             batched=True, 
             batch_size=batch_size,
             desc=f"Calculating parameter gradients{' and Hessians' if use_hessian and not optimality_approximation else ''}",
-        ).select_columns(['score'])
+        )#.select_columns(['score'])
         return score.rename_column('score', score_type)
 
     def _check_training_data(self):
         if hasattr(self, "training_data"):
             if getattr(self, "training_data") is None:
-                raise ValueError("Training data is not provided. Run .load_training_data() first!")
+                raise AttributeError("Training data is not provided. Run .load_training_data() first!")
             else:
                 return self.training_data
         else:
