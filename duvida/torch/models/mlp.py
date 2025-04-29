@@ -106,23 +106,26 @@ class TorchResidualBlock(LinearStack):
         self.activation = activation
         self.n_out = n_out
         self.batch_norm = batch_norm
-        self.residual_block = self.build_model(
-            n_input=n_input,
-            n_out=n_out,
-            n_hidden=residual_depth,
-            n_units=n_units,
-            batch_norm=batch_norm,
-            dropout=dropout,
-            activation=activation,
-            layer_class=Linear,
-        )
         if self.n_input == self.n_out:
             self.projection = Identity()
         else:
             self.projection = Linear(n_input, n_out)
+        self.model_layers = self.build_model()
+
+    def build_model(self):
+        return super().build_model(
+            n_input=self.n_input,
+            n_out=self.n_out,
+            n_hidden=self.residual_depth,
+            n_units=self.n_units,
+            batch_norm=self.batch_norm,
+            dropout=self.dropout,
+            activation=self.activation,
+            layer_class=Linear,
+        )
 
     def forward(self, x: ArrayLike) -> Array:
-        residual = self.residual_block(x)
+        residual = self.model_layers(x)
         projection = self.projection(x)
         return self.activation()(residual + projection)
 
@@ -179,7 +182,10 @@ class TorchMLPBase(LinearStack):
         else:
             self._layer_class = Linear
             self._layer_kwargs = {}
-        self.model_layers = self.build_model(
+        self.model_layers = self.build_model()
+
+    def build_model(self):
+        return super().build_model(
             n_input=self.n_input,
             n_out=self.n_out, 
             layer_class=self._layer_class,
