@@ -60,7 +60,7 @@ duvida = "duvida.cli:main"
 #packages = ["duvida"]
 # If there are data files included in your packages that need to be
 # installed, specify them here.
-#package-data = {"duvida" = ["*.csv"]}
+package-data = {duvida = ["data/*.json"]}
 
 [build-system]
 # These are the assumed default build requirements from pip:
