@@ -3,7 +3,7 @@
 from typing import Callable, Iterable, List, Optional
 
 from carabiner import cast
-from torch.nn import BatchNorm1d, Dropout, Linear, Module, SiLU, Sequential
+from torch.nn import BatchNorm1d, Dropout, Identity, Linear, Module, SiLU, Sequential
 
 from torch.optim import Adam, Optimizer
 
@@ -11,8 +11,122 @@ from .utils.ensemble import TorchEnsembleMixin
 from .utils.lt import LightningMixin
 from ...stateless.typing import Array, ArrayLike
 
+_DEFAULT_ACTIVATION = SiLU  # Smooth activation to prevent gradient collapse
 
-class TorchMLPBase(Module):
+class LinearStack(Module):
+
+    @staticmethod
+    def _add_layer(
+        in_features: int,
+        out_features: int,
+        layers: Optional[list] = None,
+        layer_class: Callable[..., Module] = Linear,
+        batch_norm: bool = False,
+        dropout: float = 0.0,
+        activation: Callable[..., Module] = _DEFAULT_ACTIVATION,
+        **kwargs
+    ) -> List[Module]:
+        layers = cast(
+            [] if layers is None else layers, 
+            to=list,
+        )
+        layers += [layer_class(in_features, out_features, **kwargs)]
+        if batch_norm:
+            layers.append(BatchNorm1d(out_features))
+        layers.append(activation())
+        if dropout > 0.:
+            layers.append(Dropout(dropout))
+        return layers
+
+    def build_model(
+        self, 
+        n_input: int,
+        n_hidden: int,
+        n_units: int,
+        n_out: int,
+        batch_norm: bool = False,
+        dropout: float = 0.,
+        activation: Callable[..., Module] = _DEFAULT_ACTIVATION,
+        layer_class: Callable[..., Module] = Linear,
+        **layer_kwargs
+    ) -> Module:
+        common_kwargs = {
+            "out_features": n_units,
+            "layer_class": layer_class,
+            "batch_norm": batch_norm,
+            "dropout": dropout,
+            "activation": activation,
+        }
+        layers = self._add_layer(
+            in_features=n_input,
+            **common_kwargs,
+            **layer_kwargs,
+        )
+        for _ in range(1, n_hidden):
+            layers = self._add_layer(
+                in_features=n_units,
+                **common_kwargs,
+                **layer_kwargs,
+            )
+        layers.append(
+            Linear(in_features=n_units, out_features=n_out)
+        )
+        return Sequential(*layers)
+
+
+class TorchResidualBlock(LinearStack):
+
+    """Residual block module.
+
+    Examples
+    ========
+    >>> import torch
+    >>> net = TorchResidualBlock(n_input=4, n_hidden=2, n_units=8, n_out=1)
+    >>> net(torch.randn(3, 4)).shape 
+    torch.Size([3, 1])
+
+    """
+
+    def __init__(
+        self, 
+        n_input: int, 
+        residual_depth: int = 1,
+        n_units: int = 16, 
+        dropout: float = 0., 
+        activation: Callable = _DEFAULT_ACTIVATION,  
+        n_out: int = 1, 
+        batch_norm: bool = False
+    ):
+        super().__init__()
+        self.n_input = n_input
+        self.residual_depth = residual_depth
+        self.n_units = n_units
+        self.dropout = dropout
+        self.activation = activation
+        self.n_out = n_out
+        self.batch_norm = batch_norm
+        self.residual_block = self.build_model(
+            n_input=n_input,
+            n_hidden=residual_depth,
+            n_units=n_units,
+            n_out=n_out,
+            batch_norm=batch_norm,
+            dropout=dropout,
+            activation=activation,
+            layer_class=Linear,
+        )
+        if self.n_input == self.n_out:
+            self.projection = Identity()
+        else:
+            self.projection = Linear(n_input, n_out)
+
+    def forward(self, x: ArrayLike) -> Array:
+        residual = self.residual_block(x)
+        projection = self.projection(x)
+        return self.activation()(residual + projection)
+
+
+class TorchMLPBase(LinearStack):
 
     """Multilayer perceptron.
 
@@ -30,74 +144,51 @@ class TorchMLPBase(Module):
         n_input: int, 
         n_hidden: int = 1,
         n_units: int = 16, 
-        learning_rate: float = .01,
         dropout: float = 0., 
-        activation: Callable = SiLU,  # Smooth activation to prevent gradient collapse
+        activation: Callable = _DEFAULT_ACTIVATION,
         n_out: int = 1, 
         batch_norm: bool = False,
-        skip_length: Optional[int] = None
+        residual_depth: Optional[int] = None
     ):
         super().__init__()
         self.n_input = n_input
         self.n_hidden = n_hidden
         self.n_units = n_units
-        self.learning_rate = learning_rate
         self.dropout = dropout
         self.activation = activation
         self.n_out = n_out
         self.batch_norm = batch_norm
-        if skip_length is not None and (skip_length > self.n_hidden):
+        if residual_depth is not None and (residual_depth > self.n_hidden):
             raise ValueError(
                 f"""
                 Skip length must be greater than number of hidden layers:
-                - Skip length: {skip_length}
+                - Skip length: {residual_depth}
                 - Number of hidden layers: {self.n_hidden}
                 """
             )
-        self.skip_length = skip_length
-        self._stack_size = 2 + int(self.dropout > 0.) + int(self.batch_norm)
-        if skip_length is not None:
-            self._stack_skip_length = self.skip_length * self._stack_size
+        self.residual_depth = residual_depth
+        if self.residual_depth is not None:
+            self._layer_class = TorchResidualBlock
+            self._layer_kwargs = {
+                "residual_depth": self.residual_depth,
+            }
         else:
-            self._stack_skip_length = None
-        self.model_layers = self.create_model()
-
-    def _add_layer(
-        self, 
-        layer_input_size: int,
-        layers: Optional[Iterable[Module]] = None, 
-    ) -> List[Module]:
-        if layers is None:
-            layers = []
-        layers = cast(layers, to=list)
-        layers += [Linear(layer_input_size, self.n_units), self.activation()]
-        if self.dropout > 0.:
-            layers.append(Dropout(self.dropout))
-        if self.batch_norm:
-            layers.append(BatchNorm1d(self.n_units))
-        return layers
-
-    def create_model(self) -> Module:
-        layers = self._add_layer(self.n_input)
-        for _ in range(1, self.n_hidden):
-            layers = self._add_layer(self.n_units, layers)
-        layers.append(Linear(self.n_units, self.n_out))
-        return Sequential(*layers)
+            self._layer_class = Linear
+            self._layer_kwargs = {}
+        self.model_layers = self.build_model(
+            layer_class=self._layer_class,
+            n_hidden=self.n_hidden // (self.residual_depth or 1),
+            n_input=self.n_input,
+            n_units=self.n_units, 
+            dropout=self.dropout, 
+            activation=self.activation,  
+            n_out=self.n_out, 
+            batch_norm=self.batch_norm,
+            **self._layer_kwargs,
+        )
 
     def forward(self, x: ArrayLike) -> Array:
-        if self.skip_length is None:
-            return self.model_layers(x)
-        else:
-            activations = []
-            for i, layer in enumerate(self.model_layers):
-                x = layer(x)
-                activations.append(x)
-                not_input = i >= self._stack_size
-                modulo_1 = i % self._stack_skip_length == 1
-                make_skip = not_input and modulo_1
-                if make_skip:
-                    x = x + activations[i - self._stack_skip_length]
-            return x
+        return self.model_layers(x)
 
 
 class TorchMLPLightning(TorchMLPBase, LightningMixin):
@@ -142,7 +233,7 @@ class TorchMLPEnsemble(TorchEnsembleMixin, TorchMLPLightning):
     >>> ensemble = TorchMLPEnsemble(n_input=4, n_units=4, n_out=1, ensemble_size=2) 
     >>> ensemble(torch.randn(5, 4)).shape 
     torch.Size([5, 2])
-    >>> ensemble.set_model(0) # keep only the first sub-model
+    >>> ensemble.set_model(0)  # keep only the first sub-model
     >>> ensemble(torch.randn(2, 4)).shape 
     torch.Size([2, 1])
     >>> ensemble.set_model("all"); len(ensemble.model_ensemble) 
@@ -173,4 +264,4 @@ class TorchMLPEnsemble(TorchEnsembleMixin, TorchMLPLightning):
         )
 
     def create_module(self) -> Module:
-        return self.create_model()
+        return self.build_model()
