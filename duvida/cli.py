@@ -186,17 +186,16 @@ def _train_and_save_modelbox(
         callbacks = None
 
     if output_name is None:
-        checkpoint_path = os.path.join(
-            prefix, 
+        output_name = (
             f"{modelbox.class_name}_n{modelbox.size}_"
             f"y={'-'.join(modelbox._label_cols)}_"
             f"h={Hasher.hash(modelbox._input_featurizers)}",
         )
-    else:
-        checkpoint_path = os.path.join(
-            prefix, 
-            output_name,
-        )
+    
+    checkpoint_path = os.path.join(
+        prefix, 
+        output_name,
+    )
     modelbox.train(
         callbacks=callbacks,
         trainer_opts={  # passed to lightning.Trainer()
@@ -320,13 +319,16 @@ def _train(args: Namespace) -> None:
         training_args, 
         message=f">> Training {modelbox.class_name} with training configuration",
     )
+    if not os.path.exists(args.prefix):
+        os.makedirs(args.prefix)
     checkpoint_path, training_args = _train_and_save_modelbox(
         modelbox=modelbox,
         early_stopping=args.early_stopping,
-        prefix=args.prefix,
         epochs=args.epochs, 
         batch_size=args.batch,
         val_data=args.validation,
+        prefix=args.prefix,
+        output_name=args.output,
     )
     for obj, f in zip((training_args, load_data_args), ("training-args.json", "load-data-args.json")):
         save_json(obj, os.path.join(checkpoint_path, f))
@@ -344,8 +346,8 @@ def _train(args: Namespace) -> None:
                 dataset = None  # Use cached training data
             metrics = _evaluate_modelbox_and_save_metrics(
                 modelbox,
-                metric_filename=f"eval-metrics_{name}.json",
-                plot_filename=f"predictions_{name}",
+                metric_filename=os.path.join(checkpoint_path, f"eval-metrics_{name}.json"),
+                plot_filename=os.path.join(checkpoint_path, f"predictions_{name}"),
                 dataset=dataset,
             )
             pprint_dict(
