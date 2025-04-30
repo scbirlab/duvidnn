@@ -444,7 +444,7 @@ def _predict(args: Namespace) -> None:
     preprocessing_args = {
         "features": args.features,
         "structure_column": args.structure,
-        "structure_representation": args.input_representation,
+        "input_representation": args.input_representation,
     }
     common_args = {
         "batch_size": args.batch,
