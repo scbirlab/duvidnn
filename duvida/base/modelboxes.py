@@ -343,7 +343,7 @@ class VarianceMixin:
             raise ValueError("VarianceMixin can only be used with ModelBox!")
 
 
-class FingerprintModelBoxBase(ChemMixinBase, ModelBoxBase, VarianceMixin):
+class FingerprintModelBoxBase(ChemMixinBase, ModelBoxBase):
 
     def __init__(
         self, 
@@ -432,7 +432,7 @@ class FingerprintModelBoxBase(ChemMixinBase, ModelBoxBase, VarianceMixin):
         )    
 
 
-class ChempropModelBoxBase(FingerprintModelBoxBase, VarianceMixin):
+class ChempropModelBoxBase(FingerprintModelBoxBase):
 
     def __init__(
         self, 

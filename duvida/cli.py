@@ -468,7 +468,7 @@ def _predict(args: Namespace) -> None:
         **common_args,
     )
     if args.variance:
-        candidates_ds = modelbox.variance(
+        candidates_ds = modelbox.prediction_variance(
             candidates=candidates_ds,
             **preprocessing_args,
             **common_args,
