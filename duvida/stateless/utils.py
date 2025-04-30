@@ -43,7 +43,6 @@ elif config.backend == 'torch':
     from torch._dynamo import config as dynamo_config
     dynamo_config.suppress_errors = True
     dynamo_config.capture_scalar_outputs = True
-    dynamo_config.recompile_limit = 100
 
     _COMPILE_WARNINGS = set()
 
@@ -72,6 +71,7 @@ elif config.backend == 'torch':
         )
 
     def jit(fn):
+        global _COMPILE_WARNINGS
         try:
             compiled = compile(
                 fn,
@@ -87,6 +87,7 @@ elif config.backend == 'torch':
 
         @wraps(fn)
         def wrapped(*args, **kwargs):
+            global _COMPILE_WARNINGS
             try:
                 return compiled(*args, **kwargs)
             except Exception as e:

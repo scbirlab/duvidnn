@@ -115,7 +115,7 @@ class DoubtMixin(DoubtMixinBase):
 
         if flat_params:
 
-            @jit
+            # @jit  # Fails compile
             def stateless_model_flat_params(x, *flat_params):
                 try:
                     flat_params = torch.concat(flat_params)
@@ -198,7 +198,7 @@ class DoubtMixin(DoubtMixinBase):
             *args, **kwargs,
         )
 
-        @jit
+        # @jit  # Doesn't compile
         def _fisher_inform_diagonal_with_params(x_true, y_true):
             return self._pack_params_like(fisher_info_fn(flat_params, x_true, y_true.to(self.device)), params)
 
