@@ -1,15 +1,19 @@
 """Base mixins for data."""
 
-from typing import Any, Callable, Dict, Iterable, List, Mapping, Tuple, Optional, Union
+from typing import TYPE_CHECKING, Any, Callable, Dict, Iterable, List, Mapping, Tuple, Optional, Union
 from abc import abstractmethod, ABC
 import os
 
 from carabiner import cast, print_err
-from datasets import Dataset, IterableDataset, load_dataset
-from datasets.fingerprint import Hasher
+
+if TYPE_CHECKING:
+    from datasets import Dataset, DatasetDict, IterableDataset
+    from pandas import DataFrame
+else:
+    Dataset, DatasetDict, IterableDataset, DataFrame = Any, Any, Any, Any
+
 import numpy as np
 from numpy.typing import ArrayLike
-from pandas import DataFrame
 from schemist.converting import convert_string_representation
 
 from ..checkpoint_utils import load_checkpoint_file, save_json
@@ -162,7 +166,10 @@ class DataMixinBase(ABC):
     ) -> Dict[str, np.ndarray]:
 
         for featurizer in featurizers:
-            featurizer = Preprocessor.from_dict(featurizer)
+            if isinstance(featurizer, Mapping):
+                featurizer = Preprocessor.from_dict(featurizer)
+            elif not isinstance(featurizer, Preprocessor):
+                raise ValueError(f"Featurizer is neither a dict nor a `Preprocessor`: {featurizer}")
             if featurizer.output_column not in x:
                 x = featurizer(x)
             else:
@@ -192,6 +199,7 @@ class DataMixinBase(ABC):
         filename: str,
         cache: Optional[str] = None
     ) -> Dataset:
+        from datasets import Dataset
         return Dataset.from_csv(
             filename, 
             cache_dir=cache, 
@@ -204,6 +212,9 @@ class DataMixinBase(ABC):
         dataframe: Union[DataFrame, Mapping[str, ArrayLike]],
         cache: Optional[str] = None
     ) -> Dataset:
+        from datasets.fingerprint import Hasher
+        from pandas import DataFrame
+
         if cache is None:
             cache = cls._default_cache
             print_err(f"Defaulting to cache: {cache}")
@@ -304,6 +315,8 @@ class DataMixinBase(ABC):
         ref: str, 
         cache: str,
     ) -> Dataset:
+        from datasets import load_dataset
+
         hf_ref_full = ref.split("hf://")[-1]
         hf_ref = hf_ref_full.split("@")[0] if "@" in ref else hf_ref_full
         if ":" in hf_ref_full:
@@ -318,6 +331,9 @@ class DataMixinBase(ABC):
         data: DataLike, 
         cache: Optional[str] = None
     ) -> Union[Dataset, IterableDataset]:
+        from datasets import Dataset, IterableDataset
+        from pandas import DataFrame
+
         if isinstance(data, (Dataset, IterableDataset)):
             dataset = data
         elif isinstance(data, (DataFrame, Mapping)):
@@ -352,6 +368,7 @@ class DataMixinBase(ABC):
         batch_size: int = 128,
         cache: Optional[str] = None,
         one_column_input: Optional[str] = None,
+        _extra_cols_to_keep: Optional[StrOrIterableOfStr] = None,
         **preprocessing_args
     ) -> Tuple[
         List[str], 
@@ -389,9 +406,17 @@ class DataMixinBase(ABC):
         input_columns = sorted(set([
             featurizer.input_column for featurizer in featurizers
         ]))
+        if _extra_cols_to_keep is not None:
+            input_columns += cast(_extra_cols_to_keep, to=list)
         if len(input_columns) == 0:
             raise AttributeError("No input columns generated for model.")
         labels = cast(labels, to=list)
+        preprocessing_args = {
+            key: val or self._default_preprocessing_args.get(key)
+            for key, val in preprocessing_args.items()
+        }
+        print_err(f"{preprocessing_args=}")
+        
         input_dataset = (
             dataset
             .map(
@@ -606,7 +631,7 @@ class ChemMixinBase(DataMixinBase):
             "batch_size": batch_size
         }
         fp_map_opts = {
-            "fn": self._featurize,
+            "function": self._featurize,
             "fn_kwargs": {
                 "featurizers": [fp_preprocessor]
             }
@@ -617,6 +642,7 @@ class ChemMixinBase(DataMixinBase):
             .map(
                 self.preprocess_data,
                 fn_kwargs={
+                    "smiles_column": self.smiles_column,
                     "structure_column": query_structure_column,
                     "input_representation": query_input_representation,
                 },
@@ -628,7 +654,6 @@ class ChemMixinBase(DataMixinBase):
                 desc="Calculating query fingerprints",
             )
             .rename_column(query_fp_col, self.common_fp_column)
-            .select_columns([self.smiles_column, self.common_fp_column])
             .with_format(
                 self._format, 
                 **self._format_kwargs,

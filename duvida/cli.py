@@ -7,7 +7,7 @@ from collections import defaultdict
 import os
 import sys
 
-from carabiner.utils import pprint_dict, print_err
+from carabiner import cast, pprint_dict, print_err
 from carabiner.cliutils import clicommand, CLIOption, CLICommand, CLIApp
 
 from . import __version__
@@ -42,7 +42,7 @@ def _hyperprep(args: Namespace) -> None:
 
     output_dir = os.path.dirname(args.output)
     if not os.path.exists(output_dir):
-        os.mkdir(output_dir)
+        os.mkdirs(output_dir)
     configs.write(
         args.output, 
         serialize=args.serialize,
@@ -236,7 +236,8 @@ def _evaluate_modelbox_and_save_metrics(
     
     predictions, metrics = modelbox.evaluate(
         data=dataset,
-        aggregator=lambda x: np.mean(x, axis=-1, keepdims=True),
+        aggregator="mean",
+        agg_kwargs={"keepdims": True},
         **kwargs,
     )
     save_json(
@@ -442,7 +443,6 @@ def _predict(args: Namespace) -> None:
     if not os.path.exists(out_dir):
         os.makedirs(out_dir)
     preprocessing_args = {
-        "features": args.features,
         "structure_column": args.structure,
         "input_representation": args.input_representation,
     }
@@ -456,7 +456,6 @@ def _predict(args: Namespace) -> None:
         start=args.start,
         end=args.end,
     )
-    print_err(candidates_ds)
     modelbox = AutoModelBox.from_pretrained(
         args.checkpoint, 
         cache=args.cache,
@@ -465,41 +464,63 @@ def _predict(args: Namespace) -> None:
         modelbox._model_config, 
         message=f"Initialized model {modelbox.class_name} with {modelbox.size} parameters",
     )
+    for col in cast(modelbox._label_cols, to=list):
+        if col not in candidates_ds.column_names:
+            candidates_ds = candidates_ds.add_column(
+                col,
+                np.zeros_like(
+                    candidates_ds
+                    .with_format("numpy")
+                    [candidates_ds.column_names[0]]
+                )
+            )
     
+    print_err(preprocessing_args)
     candidates_ds = modelbox.predict(
         data=candidates_ds,
         aggregator="mean",
+        features=args.features,
         **preprocessing_args,
         **common_args,
     )
+    preprocessing_args["_extra_cols_to_keep"] = [modelbox._prediction_key]
     print_err(candidates_ds)
     if args.variance:
+        print_err(preprocessing_args)
         candidates_ds = modelbox.prediction_variance(
             candidates=candidates_ds,
+            features=args.features,
             **preprocessing_args,
             **common_args,
         )
         print_err(candidates_ds)
+        preprocessing_args["_extra_cols_to_keep"].append(modelbox._variance_key)
     if args.tanimoto:
         if hasattr(modelbox, "tanimoto_nn"):
+            print_err(preprocessing_args)
             candidates_ds = modelbox.tanimoto_nn(
                 data=candidates_ds,
                 query_structure_column=args.structure,
-                query_structure_representation=args.input_representation,
+                query_input_representation=args.input_representation,
                 **common_args,
             )
             print_err(candidates_ds)
+            preprocessing_args["_extra_cols_to_keep"].append(modelbox.tanimoto_column)
         else:
             print_err(f"Cannot calculate Tanimoto for non-chemical modelbox from {args.checkpoint}")
     if args.doubtscore:
+        print_err(preprocessing_args)
         modelbox.model.set_model(0)
         candidates_ds = modelbox.doubtscore(
             candidates=candidates_ds,
+            features=args.features,
             preprocessing_args=preprocessing_args,
             **common_args,
         )
         print_err(candidates_ds)
+        preprocessing_args["_extra_cols_to_keep"].append("doubtscore")
     if args.information_sensitivity:
+        print_err(candidates_ds)
         modelbox.model.set_model(0)
         if args.approx == "bekas":
             extra_args = {"n": args.bekas_n}
@@ -507,13 +528,16 @@ def _predict(args: Namespace) -> None:
             extra_args = {}
         candidates_ds = modelbox.information_sensitivity(
             candidates=candidates_ds,
+            features=args.features,
+            preprocessing_args=preprocessing_args,
             approximator=args.approx,
             optimality_approximation=args.optimality,
-            preprocessing_args=preprocessing_args,
             **common_args,
             **extra_args,
         )
-        print_err(candidates_ds)
+        preprocessing_args["_extra_cols_to_keep"].append("information sensitivity")
+        
+    print_err(preprocessing_args)
 
     _save_dataset(candidates_ds, output)
 
@@ -534,7 +558,7 @@ def _predict(args: Namespace) -> None:
         )
         overall_metrics["model_class"].append(modelbox.class_name)
         overall_metrics["n_parameters"].append(modelbox.size)
-        keys_added = []
+        keys_added = set(overall_metrics.keys())
         for d in (
             modelbox._init_kwargs, 
             modelbox._model_config, 
@@ -543,8 +567,11 @@ def _predict(args: Namespace) -> None:
             for key, val in d.items():
                 if key != "trainer_opts" and key not in keys_added:
                     overall_metrics[key].append(val)
-                    keys_added.append(key)
-        _dict_to_pandas(overall_metrics, os.path.join(args.prefix, "metrics.csv"))
+                    keys_added.add(key)
+        _dict_to_pandas(
+            overall_metrics, 
+            os.path.join(args.prefix, "metrics.csv"),
+        )
 
     return None
 

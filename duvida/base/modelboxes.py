@@ -201,12 +201,27 @@ class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
     def detach_tensor():
         pass
 
+    @staticmethod
     def _predict(
-        self,
-        x: Mapping[str, Any]
+        x: Mapping[str, Any],
+        model: Callable,
+        _in_key: str,
+        _prediction_column: str,
+        detacher_fn: Optional[Callable],
+        aggregator: Optional[Callable] = None
     ) -> Dict[str, Any]:
-        self.eval_mode()
-        return {self.__class__._prediction_key: self.model(x[self._in_key])}
+        prediction = model(x[_in_key])
+        x[_prediction_column] = detacher_fn(prediction)
+        return x
+
+    @staticmethod
+    def _aggregate(
+        x: Mapping[str, Any],
+        _prediction_column: str,
+        aggregator: Optional[Callable] = None
+    ) -> Dict[str, Any]:
+        x[_prediction_column] = aggregator(x[_prediction_column])
+        return x
 
     def predict(
         self, 
@@ -217,14 +232,18 @@ class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
         aggregator: Optional[Union[str, AggFunction]] = None,
         cache: Optional[str] = None,
         agg_kwargs: Optional[Mapping] = None,
+        _prediction_column: Optional[str] = None,
         **kwargs
     ) -> Dataset:
 
         """Make predictions on new data.
     
         """
-        if agg_kwargs is None:
-            agg_kwargs = {}
+        
+        _prediction_column = (
+            _prediction_column 
+            or self.__class__._prediction_key
+        )
         data = self._prepare_data(
             features=features,
             labels=labels,
@@ -233,25 +252,38 @@ class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
             cache=cache,
             **kwargs
         )
-        if aggregator is not None:
-            aggregator = get_aggregator(aggregator, **agg_kwargs)
-
-            def _predict(x):
-                x = self._predict(x)
-                x[self.__class__._prediction_key] = aggregator(
-                    self.detach_tensor(x[self.__class__._prediction_key])
-                )
-                return x
-
-        else:
-            _predict = self._predict
-
-        return data.map(
-            _predict, 
+            
+        self.eval_mode()
+        predictions = data.map(
+            self._predict,
+            fn_kwargs={
+                "model": self.model,
+                "detacher_fn": self.detach_tensor,
+                "_in_key": self.__class__._in_key,
+                "_prediction_column": _prediction_column,
+            },
             batched=True, 
             batch_size=batch_size, 
             desc="Predicting",
         )
+        if aggregator is not None:
+            if agg_kwargs is None:
+                agg_kwargs = {}
+            aggregator_fn = get_aggregator(
+                aggregator, 
+                **agg_kwargs,
+            )
+            predictions = predictions.map(
+                self._aggregate,
+                fn_kwargs={
+                    "_prediction_column": _prediction_column,
+                    "aggregator": aggregator_fn,
+                },
+                batched=True, 
+                batch_size=batch_size, 
+                desc=f"Aggregating predictions by {aggregator}",
+            )
+        return predictions
 
     def evaluate(
         self, 
@@ -261,6 +293,7 @@ class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
         metrics: Optional[Union[Callable, Iterable[Callable], Mapping[str, Callable]]] = None,
         batch_size: int = 16,
         aggregator: Optional[Union[str, AggFunction]] = None,
+        agg_kwargs: Optional[Mapping] = None,
         cache: Optional[str] = None,
         **kwargs
     ) -> Tuple[DataFrame, Union[Tuple[float], Dict[str, float]]]:
@@ -268,13 +301,16 @@ class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
         """Calculate metrics on training data or new data.
     
         """
+        eval_prediction_col = self.__class__._prediction_key
         predictions = self.predict(
             features=features,
             labels=labels, 
             data=data, 
             batch_size=batch_size,
             aggregator=aggregator,
+            agg_kwargs=agg_kwargs,
             cache=cache,
+            _prediction_column=eval_prediction_col,
             **kwargs,
         )
 
@@ -286,17 +322,20 @@ class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
             }
         predictions = predictions.with_format("numpy")
         y_vals = predictions[self._out_key]
-
+        preds = predictions[eval_prediction_col]
+        # if len(y_vals.shape) == 1 and len(preds.shape) == 2:
+        #     y_vals = y_vals[...,None]
+        print(y_vals.shape, preds.shape)
         if isinstance(metrics, Mapping):
             metrics = {
-                name: metric(predictions[self.__class__._prediction_key], y_vals).tolist()
+                name: metric(preds, y_vals).tolist()
                 for name, metric in dict(metrics).items()
             }
         elif isinstance(metrics, (Iterable, Callable)):
             if isinstance(metrics, Callable):
                 metrics = [metrics]
             metrics = tuple(
-                metric(predictions[self.__class__._prediction_key], y_vals).tolist()
+                metric(preds, y_vals).tolist()
                 for metric in metrics
             )
         
@@ -329,18 +368,16 @@ class ModelBoxWithVarianceBase(ModelBoxBase):
         """Make predictions on new data.
     
         """
-        predictions = super().predict(
+        predictions = self.predict(
             data=candidates, 
             aggregator="var", 
             agg_kwargs={"keepdims": False},
             batch_size=batch_size,
             cache=cache,
+            _prediction_column=self.__class__._variance_key,
             **kwargs,
         )
-        return predictions.rename_column(
-            self.__class__._prediction_key, 
-            self.__class__._variance_key,
-        )
+        return predictions
 
 
 class FingerprintModelBoxBase(ChemMixinBase, ModelBoxWithVarianceBase):
@@ -368,13 +405,13 @@ class FingerprintModelBoxBase(ChemMixinBase, ModelBoxWithVarianceBase):
     def load_training_data(
         self,
         structure_column,
-        structure_representation: str = "smiles",
+        input_representation: str = "smiles",
         features: Optional[FeatureLike] = None,
         _run_featurizer_constructor_first: bool = True,
         **kwargs
     ) -> None:
         self._default_preprocessing_args["structure_column"] = structure_column
-        self._default_preprocessing_args["input_representation"] = structure_representation
+        self._default_preprocessing_args["input_representation"] = input_representation
         if _run_featurizer_constructor_first:
             featurizer = self._featurizer_constructor(
                 smiles_column=self.smiles_column,
@@ -396,24 +433,24 @@ class FingerprintModelBoxBase(ChemMixinBase, ModelBoxWithVarianceBase):
     def train(
         self, 
         structure_column: Optional[str] = None,
-        structure_representation: Optional[str] = None,
+        input_representation: Optional[str] = None,
         *args, **kwargs
     ) -> None:
         if structure_column is None:
             structure_column = self._default_preprocessing_args["structure_column"]
-        if structure_representation is None:
-            structure_representation = self._default_preprocessing_args["input_representation"]
+        if input_representation is None:
+            input_representation = self._default_preprocessing_args["input_representation"]
         return super().train(
             *args, **kwargs, 
             structure_column=structure_column,
-            input_representation=structure_representation,
+            input_representation=input_representation,
             smiles_column=self.smiles_column,
         )
 
     def predict(
         self, 
         structure_column: Optional[str] = None,
-        structure_representation: Optional[str] = None,
+        input_representation: Optional[str] = None,
         **kwargs
     ) -> Dataset:
 
@@ -422,14 +459,51 @@ class FingerprintModelBoxBase(ChemMixinBase, ModelBoxWithVarianceBase):
         """
         if structure_column is None:
             structure_column = self._default_preprocessing_args["structure_column"]
-        if structure_representation is None:
-            structure_representation = self._default_preprocessing_args["input_representation"]
+        if input_representation is None:
+            input_representation = self._default_preprocessing_args["input_representation"]
+        _extra_cols_to_keep=(
+                [structure_column] + kwargs.pop("_extra_cols_to_keep", [])
+            )
         return super().predict(
             **kwargs, 
             structure_column=structure_column,
-            input_representation=structure_representation,
+            input_representation=input_representation,
             smiles_column=self.smiles_column,
-        )    
+            _extra_cols_to_keep=_extra_cols_to_keep,
+        )
+
+    def _info_score_entrypoint(
+        self, 
+        score_type: str,
+        candidates,
+        preprocessing_args: Optional[Mapping] = None,
+        **kwargs
+    ) -> Dataset:
+        base_pp_args = self._default_preprocessing_args | {
+            "smiles_column": self.smiles_column,
+        }
+        if preprocessing_args is None:
+            preprocessing_args = base_pp_args
+        elif isinstance(preprocessing_args, Mapping):
+            preprocessing_args = base_pp_args | dict(preprocessing_args)
+        else:
+            raise ValueError(
+                f"If provided, preprocessing_args must be a mapping, but was {type(preprocessing_args)}: {preprocessing_args}"
+            )
+        try:
+            structure_column = preprocessing_args["structure_column"] or self._default_preprocessing_args["structure_column"]
+        except KeyError:
+            raise ValueError(f"You didn't supply a `structure_column`!")
+
+        preprocessing_args["_extra_cols_to_keep"] = (
+            [structure_column] + preprocessing_args.get("_extra_cols_to_keep", [])
+        )
+        return super()._info_score_entrypoint(
+            score_type=score_type,
+            candidates=candidates,
+            preprocessing_args=preprocessing_args,
+            **kwargs
+        )
 
 
 class ChempropModelBoxBase(FingerprintModelBoxBase):
