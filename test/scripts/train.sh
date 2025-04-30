@@ -28,6 +28,8 @@ do
             --learning-rate 1e-5 \
             --descriptors \
             --fp
+        ls -lah
+        ls -lah "$class-$i"/*
         duvida predict \
             --test hf://scbirlab/fang-2023-biogen-adme@scaffold-split:train \
             --checkpoint "$class-$i" \
