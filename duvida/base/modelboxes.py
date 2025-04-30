@@ -50,9 +50,9 @@ class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
             "class_name": self.class_name,
         }
         init_kwargs.update(self._init_kwargs)
-        save_json(init_kwargs, os.path.join(checkpoint, self._init_kwargs_filename))
-        save_json(self._model_config, os.path.join(checkpoint, self._model_config_filename))
-        save_json(self._special_args, os.path.join(checkpoint, self._special_args_filename))
+        save_json(init_kwargs, os.path.join(checkpoint, self.__class__._init_kwargs_filename))
+        save_json(self._model_config, os.path.join(checkpoint, self.__class__._model_config_filename))
+        save_json(self._special_args, os.path.join(checkpoint, self.__class__._special_args_filename))
         self.save_weights(checkpoint)
         return None
 
@@ -63,8 +63,8 @@ class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
     ) -> None:
         print_err(f"Loading checkpoint from {checkpoint}")
         self.load_data_checkpoint(checkpoint, cache_dir=cache_dir)
-        self._model_config = _load_json(checkpoint, self._model_config_filename)
-        self._special_args = _load_json(checkpoint, self._special_args_filename)
+        self._model_config = _load_json(checkpoint, self.__class__._model_config_filename)
+        self._special_args = _load_json(checkpoint, self.__class__._special_args_filename)
         if self.training_data is not None:
             self.model = self.create_model()
             self.load_weights(checkpoint, cache_dir=cache_dir)
@@ -206,7 +206,7 @@ class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
         x: Mapping[str, Any]
     ) -> Dict[str, Any]:
         self.eval_mode()
-        return {self._prediction_key: self.model(x[self._in_key])}
+        return {self.__class__._prediction_key: self.model(x[self._in_key])}
 
     def predict(
         self, 
@@ -238,8 +238,8 @@ class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
 
             def _predict(x):
                 x = self._predict(x)
-                x[self._prediction_key] = aggregator(
-                    self.detach_tensor(x[self._prediction_key], **agg_kwargs), 
+                x[self.__class__._prediction_key] = aggregator(
+                    self.detach_tensor(x[self.__class__._prediction_key])
                 )
                 return x
 
@@ -289,14 +289,14 @@ class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
 
         if isinstance(metrics, Mapping):
             metrics = {
-                name: metric(predictions[self._prediction_key], y_vals).tolist()
+                name: metric(predictions[self.__class__._prediction_key], y_vals).tolist()
                 for name, metric in dict(metrics).items()
             }
         elif isinstance(metrics, (Iterable, Callable)):
             if isinstance(metrics, Callable):
                 metrics = [metrics]
             metrics = tuple(
-                metric(predictions[self._prediction_key], y_vals).tolist()
+                metric(predictions[self.__class__._prediction_key], y_vals).tolist()
                 for metric in metrics
             )
         
@@ -314,9 +314,8 @@ class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
         return DataFrame(predictions), metrics
 
 
-class VarianceMixin:
+class ModelBoxWithVarianceBase(ModelBoxBase):
 
-    _prediction_key: str = ModelBoxBase._prediction_key
     _variance_key: str = "prediction variance"
     
     def prediction_variance(
@@ -330,21 +329,21 @@ class VarianceMixin:
         """Make predictions on new data.
     
         """
-        if isinstance(self, ModelBoxBase):
-            predictions = self.predict(
-                data=candidates, 
-                aggregator="var", 
-                agg_kwargs={"keepdims": False},
-                batch_size=batch_size,
-                cache=cache,
-                **kwargs,
-            )#.select_columns([self._prediction_key])
-            return predictions.rename_column(self._prediction_key, self._variance_key)
-        else:
-            raise ValueError("VarianceMixin can only be used with ModelBox!")
+        predictions = super().predict(
+            data=candidates, 
+            aggregator="var", 
+            agg_kwargs={"keepdims": False},
+            batch_size=batch_size,
+            cache=cache,
+            **kwargs,
+        )
+        return predictions.rename_column(
+            self.__class__._prediction_key, 
+            self.__class__._variance_key,
+        )
 
 
-class FingerprintModelBoxBase(ChemMixinBase, ModelBoxBase):
+class FingerprintModelBoxBase(ChemMixinBase, ModelBoxWithVarianceBase):
 
     def __init__(
         self, 

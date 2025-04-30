@@ -9,7 +9,7 @@ from ...base.modelboxes import (
     ChempropModelBoxBase,
     FingerprintModelBoxBase, 
     ModelBoxBase, 
-    VarianceMixin
+    ModelBoxWithVarianceBase
 )
 from ...base.modelbox_registry import register_modelbox
 from ...checkpoint_utils import load_checkpoint_file
@@ -90,7 +90,7 @@ class TorchModelBoxBase(ModelBoxBase, DataMixin, DoubtMixin):
 
 
 @register_modelbox("mlp")
-class TorchMLPModelBox(TorchModelBoxBase, VarianceMixin):
+class TorchMLPModelBox(TorchModelBoxBase, ModelBoxWithVarianceBase):
 
     """ModelBox for pytorch multilayer perceptron ensemble.
 

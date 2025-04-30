@@ -456,23 +456,30 @@ def _predict(args: Namespace) -> None:
         start=args.start,
         end=args.end,
     )
-
+    print_err(candidates_ds)
     modelbox = AutoModelBox.from_pretrained(
         args.checkpoint, 
         cache=args.cache,
     )
+    pprint_dict(
+        modelbox._model_config, 
+        message=f"Initialized model {modelbox.class_name} with {modelbox.size} parameters",
+    )
+    
     candidates_ds = modelbox.predict(
         data=candidates_ds,
         aggregator="mean",
         **preprocessing_args,
         **common_args,
     )
+    print_err(candidates_ds)
     if args.variance:
         candidates_ds = modelbox.prediction_variance(
             candidates=candidates_ds,
             **preprocessing_args,
             **common_args,
         )
+        print_err(candidates_ds)
     if args.tanimoto:
         if hasattr(modelbox, "tanimoto_nn"):
             candidates_ds = modelbox.tanimoto_nn(
@@ -481,6 +488,7 @@ def _predict(args: Namespace) -> None:
                 query_structure_representation=args.input_representation,
                 **common_args,
             )
+            print_err(candidates_ds)
         else:
             print_err(f"Cannot calculate Tanimoto for non-chemical modelbox from {args.checkpoint}")
     if args.doubtscore:
@@ -490,6 +498,7 @@ def _predict(args: Namespace) -> None:
             preprocessing_args=preprocessing_args,
             **common_args,
         )
+        print_err(candidates_ds)
     if args.information_sensitivity:
         modelbox.model.set_model(0)
         if args.approx == "bekas":
@@ -504,6 +513,7 @@ def _predict(args: Namespace) -> None:
             **common_args,
             **extra_args,
         )
+        print_err(candidates_ds)
 
     _save_dataset(candidates_ds, output)
 
