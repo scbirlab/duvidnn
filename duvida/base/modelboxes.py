@@ -216,6 +216,7 @@ class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
         batch_size: int = 16,
         aggregator: Optional[Union[str, AggFunction]] = None,
         cache: Optional[str] = None,
+        agg_kwargs: Optional[Mapping] = None,
         **kwargs
     ) -> Dataset:
 
@@ -231,7 +232,7 @@ class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
             **kwargs
         )
         if aggregator is not None:
-            aggregator = get_aggregator(aggregator, **kwargs)
+            aggregator = get_aggregator(aggregator, **agg_kwargs)
 
             def _predict(x):
                 x = self._predict(x)
