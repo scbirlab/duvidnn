@@ -37,7 +37,7 @@ do
             --test "$TEST" \
             --checkpoint test/outputs/models/"$class-$i" \
             --start 10 \
-            --end 2_000 \
+            --end 2000 \
             --variance \
             --tanimoto \
             --doubtscore \
