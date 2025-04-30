@@ -42,12 +42,12 @@ dependencies = [
 
 [project.optional-dependencies]
 #tf = ["duvida", "tensorflow"]
-jax = ["duvida", "jax>=0.5.3"]
-jax_cuda12 = ["duvida", "jax[cuda12]>=0.5.3"]
-jax_cuda12_local = ["duvida", "jax[cuda12_local]>=0.5.3"]
-torch = ["duvida", "torch", "torchvision", "lightning", "tensorboard"]
-transformers = ["duvida", "transformers"]
-chem = ["duvida[torch]", "chemprop>=2.1.0", "schemist>=0.0.4.post1"]
+jax = ["jax>=0.5.3"]
+jax_cuda12 = ["jax[cuda12]>=0.5.3"]
+jax_cuda12_local = ["jax[cuda12_local]>=0.5.3"]
+torch = ["torch>=2.4", "torchvision", "lightning", "tensorboard"]
+transformers = ["torch>=2.4", "torchvision", "transformers"]
+chem = ["chemprop>=2.1.0", "schemist>=0.0.4.post1"]
 
 [project.urls]
 "Homepage" = "https://github.com/scbirlab/duvida"
