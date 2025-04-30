@@ -335,8 +335,9 @@ class VarianceMixin:
                 data=candidates, 
                 aggregator="var", 
                 agg_kwargs={"keepdims": False},
+                batch_size=batch_size,
                 cache=cache,
-                **kwargs
+                **kwargs,
             )#.select_columns([self._prediction_key])
             return predictions.rename_column(self._prediction_key, self._variance_key)
         else:

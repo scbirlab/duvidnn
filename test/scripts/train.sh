@@ -3,6 +3,10 @@
 set -e
 set -x
 
+TRAIN="hf://scbirlab/fang-2023-biogen-adme@scaffold-split:train"
+TEST="hf://scbirlab/fang-2023-biogen-adme@scaffold-split:test"
+LLM="transformer://scbirlab/lchemme-base-zinc22-lteq300:clean_smiles~mean"
+
 printf \
     '{"n_units": [8, 16], "n_hidden": [4, 6], "residual_depth": [null, 2]}' \
 | duvida hyperprep \
@@ -13,10 +17,9 @@ do
     for i in 0 1
     do
         duvida train \
-            -1 hf://scbirlab/fang-2023-biogen-adme@scaffold-split:train \
-            -2 hf://scbirlab/fang-2023-biogen-adme@scaffold-split:test \
+            -1 "$TRAIN" \
+            -2 "$TEST" \
             -S smiles \
-            -x "transformer://scbirlab/lchemme-base-zinc22-lteq300:clean_smiles~mean" \
             -y clogp \
             -c test/outputs/hyperopt.json \
             -k "$class" \
@@ -31,12 +34,12 @@ do
         ls -lah test/outputs/models
         ls -lah test/outputs/models/"$class-$i"/*
         duvida predict \
-            --test hf://scbirlab/fang-2023-biogen-adme@scaffold-split:train \
+            --test "$TEST" \
             --checkpoint test/outputs/models/"$class-$i" \
             --start 10 \
             --end 2_000 \
-            --tanimoto \
             --variance \
+            --tanimoto \
             --doubtscore \
             --information-sensitivity \
             --optimality \
