@@ -223,6 +223,8 @@ class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
         """Make predictions on new data.
     
         """
+        if agg_kwargs is None:
+            agg_kwargs = {}
         data = self._prepare_data(
             features=features,
             labels=labels,
