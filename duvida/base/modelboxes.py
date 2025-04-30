@@ -239,7 +239,7 @@ class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
             def _predict(x):
                 x = self._predict(x)
                 x[self._prediction_key] = aggregator(
-                    self.detach_tensor(x[self._prediction_key]), 
+                    self.detach_tensor(x[self._prediction_key], **agg_kwargs), 
                 )
                 return x
 
@@ -334,7 +334,7 @@ class VarianceMixin:
             predictions = self.predict(
                 data=candidates, 
                 aggregator="var", 
-                keepdims=False,
+                agg_kwargs={"keepdims": False},
                 cache=cache,
                 **kwargs
             )#.select_columns([self._prediction_key])
