@@ -330,7 +330,7 @@ class VarianceMixin:
         """Make predictions on new data.
     
         """
-        if hasattr(self, ModelBoxBase):
+        if isinstance(self, ModelBoxBase):
             predictions = self.predict(
                 data=candidates, 
                 aggregator="var", 
@@ -343,7 +343,7 @@ class VarianceMixin:
             raise ValueError("VarianceMixin can only be used with ModelBox!")
 
 
-class FingerprintModelBoxBase(ChemMixinBase, ModelBoxBase):
+class FingerprintModelBoxBase(ChemMixinBase, ModelBoxBase, VarianceMixin):
 
     def __init__(
         self, 
@@ -432,7 +432,7 @@ class FingerprintModelBoxBase(ChemMixinBase, ModelBoxBase):
         )    
 
 
-class ChempropModelBoxBase(FingerprintModelBoxBase):
+class ChempropModelBoxBase(FingerprintModelBoxBase, VarianceMixin):
 
     def __init__(
         self, 
