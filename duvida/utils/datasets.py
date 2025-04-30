@@ -24,7 +24,7 @@ def to_dataset(
     from datasets import Dataset, concatenate_datasets
     new_ds = None
     total_iter = np.ceil(nrows // batch_size).astype(int) if nrows is not None else None
-    for record in tqdm(ds.batch(batch_size=batch_size), total=total_iter):
+    for record in tqdm(ds.batch(batch_size=batch_size), total=total_iter, desc="Building dataset"):
         # print(record)
         if new_ds is not None:
             new_ds = concatenate_datasets([new_ds, Dataset.from_dict(record)])
