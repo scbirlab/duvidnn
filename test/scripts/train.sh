@@ -28,11 +28,11 @@ do
             --learning-rate 1e-5 \
             --descriptors \
             --fp
-        ls -lah
-        ls -lah "$class-$i"/*
+        ls -lah test/outputs/models
+        ls -lah test/outputs/models/"$class-$i"/*
         duvida predict \
             --test hf://scbirlab/fang-2023-biogen-adme@scaffold-split:train \
-            --checkpoint "$class-$i" \
+            --checkpoint test/outputs/models/"$class-$i" \
             --start 10 \
             --end 2_000 \
             --tanimoto \
