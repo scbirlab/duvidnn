@@ -388,6 +388,8 @@ def _resolve_and_slice_data(
     nrows = candidates_ds.num_rows
     skip = start or 0
     take = (end or nrows) - skip
+    if (take - skip) < nrows:
+        print_err(f"INFO: Reading dataset from row {skip} to row {take + skip} / {nrows}.")
     return to_dataset(
         candidates_ds
         .to_iterable_dataset()
