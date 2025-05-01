@@ -9,7 +9,7 @@ Hello.txt
 /docs/build
 /docs/_autosummary
 /duvida/data/modelbox-names.json
-/duvida/duvida-checkpoint/
+/test/duvida-checkpoint/
 .idea
 .vscode
 /test/*.tsv

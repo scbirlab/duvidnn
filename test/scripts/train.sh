@@ -45,9 +45,9 @@ do
             --optimality \
             -y clogp \
             --output test/outputs/predictions/"$class-$i".csv.gz
-        if [ ! "$(zcat "$class-$i".csv.gz | wc -l)" -eq "1990" ]
+        if [ ! "$(zcat test/outputs/models/"$class-$i".csv.gz | wc -l)" -eq "1990" ]
         then
-            echo "Predictions have wrong number of rows: $(zcat "$class-$i".csv.gz | wc -l)"
+            echo "Predictions have wrong number of rows: $(zcat test/outputs/models/"$class-$i".csv.gz | wc -l)"
             exit 1
         else
             zcat "$class-$i".csv.gz | tr , $'\t' | head -n50
