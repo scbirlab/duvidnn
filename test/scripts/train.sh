@@ -7,6 +7,9 @@ TRAIN="hf://scbirlab/fang-2023-biogen-adme@scaffold-split:train"
 TEST="hf://scbirlab/fang-2023-biogen-adme@scaffold-split:test"
 LLM="transformer://scbirlab/lchemme-base-zinc22-lteq300:clean_smiles~mean"
 
+START=100
+STOP=200
+
 printf \
     '{"n_units": [8, 16], "n_hidden": [4, 6], "residual_depth": [null, 2]}' \
 | duvida hyperprep \
@@ -17,8 +20,8 @@ do
     for i in 0 1
     do
         duvida train \
-            -1 "$TRAIN" \
-            -2 "$TEST" \
+            -1 "$TEST" \
+            -2 "$TRAIN" \
             -S smiles \
             -y clogp \
             -c test/outputs/hyperopt.json \
@@ -33,12 +36,12 @@ do
             --fp
         ls -lah test/outputs/models
         ls -lah test/outputs/models/"$class-$i"/*
-        outfile="test/outputs/predictions/$class-$i.csv.gz"
+        outfile="test/outputs/predictions/$class-$i.csv"
         duvida predict \
             --test "$TRAIN" \
             --checkpoint test/outputs/models/"$class-$i" \
-            --start 10 \
-            --end 2000 \
+            --start $START \
+            --end $STOP \
             --variance \
             --tanimoto \
             --doubtscore \
@@ -46,7 +49,7 @@ do
             --optimality \
             -y clogp \
             --output "$outfile"
-        if [ ! "$(cat "$outfile" | wc -l)" -eq "1991" ]
+        if [ ! "$(cat "$outfile" | wc -l)" -eq $(( $STOP - $START + 1 )) ]
         then
             echo "Predictions have wrong number of rows: $(cat "$outfile" | wc -l)"
             exit 1

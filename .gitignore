@@ -14,6 +14,7 @@ Hello.txt
 .vscode
 /test/*.tsv
 /test/*.csv
+/test/*.png
 /test/outputs/
 __pycache__/
 lightning_logs/
