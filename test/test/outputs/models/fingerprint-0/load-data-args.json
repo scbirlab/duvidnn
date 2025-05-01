@@ -1,9 +1,0 @@
-{
-    "cache": "test/outputs/cache",
-    "data": "hf://scbirlab/fang-2023-biogen-adme@scaffold-split:train",
-    "features": null,
-    "labels": [
-        "clogp"
-    ],
-    "structure_column": "smiles"
-}
