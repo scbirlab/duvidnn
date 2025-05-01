@@ -466,9 +466,10 @@ def _predict(args: Namespace) -> None:
     )
     for col in cast(modelbox._label_cols, to=list):
         if col not in candidates_ds.column_names:
+            from numpy import zeros_like
             candidates_ds = candidates_ds.add_column(
                 col,
-                np.zeros_like(
+                zeros_like(
                     candidates_ds
                     .with_format("numpy")
                     [candidates_ds.column_names[0]]

@@ -71,7 +71,6 @@ elif config.backend == 'torch':
         )
 
     def jit(fn):
-        global _COMPILE_WARNINGS
         try:
             compiled = compile(
                 fn,
@@ -87,7 +86,6 @@ elif config.backend == 'torch':
 
         @wraps(fn)
         def wrapped(*args, **kwargs):
-            global _COMPILE_WARNINGS
             try:
                 return compiled(*args, **kwargs)
             except Exception as e:
