@@ -42,7 +42,7 @@ def _hyperprep(args: Namespace) -> None:
 
     output_dir = os.path.dirname(args.output)
     if not os.path.exists(output_dir):
-        os.mkdirs(output_dir)
+        os.makedirs(output_dir)
     configs.write(
         args.output, 
         serialize=args.serialize,
