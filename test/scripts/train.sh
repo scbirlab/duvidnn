@@ -46,7 +46,7 @@ do
             --optimality \
             -y clogp \
             --output "$outfile"
-        if [ ! "$(cat "$outfile" | wc -l)" -eq "1990" ]
+        if [ ! "$(cat "$outfile" | wc -l)" -eq "1991" ]
         then
             echo "Predictions have wrong number of rows: $(cat "$outfile" | wc -l)"
             exit 1
