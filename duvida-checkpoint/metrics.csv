@@ -1,2 +1,0 @@
-model_class,n_parameters,dropout,ensemble_size,learning_rate,n_hidden,n_units,residual_depth,rmse,pearson_r,spearman_rho
-fingerprint,36434,0.0,1,1e-05,4,8,,3.3126914501190186,0.20356338340209498,0.1884197288456282
