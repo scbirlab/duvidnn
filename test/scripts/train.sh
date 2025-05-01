@@ -46,12 +46,12 @@ do
             --optimality \
             -y clogp \
             --output "$outfile"
-        if [ ! "$(zcat "$outfile" | wc -l)" -eq "1990" ]
+        if [ ! "$(cat "$outfile" | wc -l)" -eq "1990" ]
         then
-            echo "Predictions have wrong number of rows: $(zcat "$outfile" | wc -l)"
+            echo "Predictions have wrong number of rows: $(cat "$outfile" | wc -l)"
             exit 1
         else
-            zcat "$outfile" | tr , $'\t' | head -n50
+            cat "$outfile" | tr , $'\t' | head -n50
         fi
     done
 done
