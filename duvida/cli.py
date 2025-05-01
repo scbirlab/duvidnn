@@ -413,6 +413,7 @@ def _save_dataset(
         dataset.to_csv(
             output, 
             sep="," if output.endswith((".csv", ".csv.gz")) else "\t",
+            compression='gzip' if output.endswith(".gz"),
         )
     elif output.endswith(".json"):
         print_err("JSON.")
