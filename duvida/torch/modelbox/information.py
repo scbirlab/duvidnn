@@ -130,7 +130,7 @@ class DoubtMixin(DoubtMixinBase):
             flattened_params = torch.concat([p.flatten() for _, p in model_params.items()])
             return stateless_model_flat_params, model_params, flattened_params
         else:
-            return jit(stateless_model), model_params
+            return stateless_model, model_params
 
     def parameter_gradient(
         self,
@@ -242,7 +242,7 @@ class ChempropDoubtMixin(DoubtMixin):
         stateless_model, params = self.make_stateless_model(model)
         gradient_fn = parameter_gradient_unrolled(stateless_model)
 
-        @jit
+        # @jit  # fails compile
         def _parameter_gradient_with_params(x: ArrayLike) -> Array:
             g = [_g[0] for _g in gradient_fn((params,), x)]
             return {

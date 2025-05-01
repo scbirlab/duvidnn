@@ -130,7 +130,7 @@ class TorchResidualBlock(LinearStack):
             layer_class=Linear,
         )
 
-    @jit
+    # @jit  # Fails compile
     def forward(self, x: ArrayLike) -> Array:
         residual = self.model_layers(x)
         projection = self.projection(x)

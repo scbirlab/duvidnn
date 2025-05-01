@@ -532,7 +532,10 @@ def _predict(args: Namespace) -> None:
         
     print_err(preprocessing_args)
 
-    _save_dataset(candidates_ds, output)
+    _save_dataset(
+        candidates_ds.remove_columns([modelbox._in_key, modelbox._out_key]), 
+        output,
+    )
 
     if args.labels is not None:
         overall_metrics = defaultdict(list)
