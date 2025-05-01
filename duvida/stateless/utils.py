@@ -69,6 +69,7 @@ elif config.backend == 'torch':
             randomness='different',
             *args, **kwargs
         )
+        
 
     def jit(fn):
         try:
@@ -91,8 +92,8 @@ elif config.backend == 'torch':
             except Exception as e:
                 warning = f"[torch.compile] Running compiled `{fn}` failed; falling back"
                 if warning not in _COMPILE_WARNINGS:
-                    _COMPILE_WARNINGS.add(warning + "\n" + str(e))
-                    print_err(warning)
+                    _COMPILE_WARNINGS.add(warning)
+                    print_err(warning + "\n" + str(e))
                 return fn(*args, **kwargs)
         return wrapped
 
