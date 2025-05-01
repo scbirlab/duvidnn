@@ -535,8 +535,8 @@ def _predict(args: Namespace) -> None:
 
     if args.labels is not None:
         overall_metrics = defaultdict(list)
-        metric_filename = os.path.join(args.prefix, "predict-eval-metrics.csv")
-        plot_filename = os.path.join(args.prefix, "predict-eval-metrics.png")
+        metric_filename = os.path.join(args.prefix, "predict-eval-metrics-table.csv")
+        plot_filename = os.path.join(args.prefix, "predict-eval-scatter")
         metrics = _evaluate_modelbox_and_save_metrics(
             modelbox,
             dataset=candidates_ds,
@@ -723,7 +723,7 @@ def main() -> None:
     save_prefix = CLIOption(
         '--prefix', '-p',
         type=str,
-        default="duvida-checkpoint",
+        default=".",
         help='Prefix to save model checkpoints.',
     )
     output_name = CLIOption(
