@@ -47,7 +47,7 @@ jax_cuda12 = ["jax[cuda12]>=0.5.3"]
 jax_cuda12_local = ["jax[cuda12_local]>=0.5.3"]
 torch = ["torch>=2.4", "torchvision", "lightning", "tensorboard"]
 transformers = ["torch>=2.4", "torchvision", "transformers"]
-chem = ["chemprop>=2.1.0", "schemist>=0.0.4.post1"]
+chem = ["chemprop>=2.1.0", "schemist>=0.0.4.post1", "lightning", "tensorboard"]
 
 [project.urls]
 "Homepage" = "https://github.com/scbirlab/duvida"
@@ -69,4 +69,4 @@ requires = ["setuptools>=43.0.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [test]
-deps = ["pytest>=7.4", "pytest-cov", "duvida[chem,jax]"]   # always install both for CI
+deps = ["pytest>=7.4", "pytest-cov", "duvida[chem,jax,torch,transformers]"]   # always install both for CI

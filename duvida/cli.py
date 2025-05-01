@@ -475,7 +475,6 @@ def _predict(args: Namespace) -> None:
                 )
             )
     
-    print_err(preprocessing_args)
     candidates_ds = modelbox.predict(
         data=candidates_ds,
         aggregator="mean",
@@ -484,32 +483,26 @@ def _predict(args: Namespace) -> None:
         **common_args,
     )
     preprocessing_args["_extra_cols_to_keep"] = [modelbox._prediction_key]
-    print_err(candidates_ds)
     if args.variance:
-        print_err(preprocessing_args)
         candidates_ds = modelbox.prediction_variance(
             candidates=candidates_ds,
             features=args.features,
             **preprocessing_args,
             **common_args,
         )
-        print_err(candidates_ds)
         preprocessing_args["_extra_cols_to_keep"].append(modelbox._variance_key)
     if args.tanimoto:
         if hasattr(modelbox, "tanimoto_nn"):
-            print_err(preprocessing_args)
             candidates_ds = modelbox.tanimoto_nn(
                 data=candidates_ds,
                 query_structure_column=args.structure,
                 query_input_representation=args.input_representation,
                 **common_args,
             )
-            print_err(candidates_ds)
             preprocessing_args["_extra_cols_to_keep"].append(modelbox.tanimoto_column)
         else:
             print_err(f"Cannot calculate Tanimoto for non-chemical modelbox from {args.checkpoint}")
     if args.doubtscore:
-        print_err(preprocessing_args)
         modelbox.model.set_model(0)
         candidates_ds = modelbox.doubtscore(
             candidates=candidates_ds,
@@ -517,10 +510,8 @@ def _predict(args: Namespace) -> None:
             preprocessing_args=preprocessing_args,
             **common_args,
         )
-        print_err(candidates_ds)
         preprocessing_args["_extra_cols_to_keep"].append("doubtscore")
     if args.information_sensitivity:
-        print_err(candidates_ds)
         modelbox.model.set_model(0)
         if args.approx == "bekas":
             extra_args = {"n": args.bekas_n}

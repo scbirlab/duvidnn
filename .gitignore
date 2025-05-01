@@ -8,8 +8,8 @@ Hello.txt
 .pytest_cache/
 /docs/build
 /docs/_autosummary
-duvida/data/modelbox-names.json
-duvida-checkpoint/
+/duvida/data/modelbox-names.json
+/duvida/duvida-checkpoint/
 .idea
 .vscode
 /test/*.tsv
