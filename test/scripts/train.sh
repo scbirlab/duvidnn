@@ -35,7 +35,7 @@ do
         ls -lah test/outputs/models/"$class-$i"/*
         outfile="test/outputs/predictions/$class-$i.csv.gz"
         duvida predict \
-            --test "$TEST" \
+            --test "$TRAIN" \
             --checkpoint test/outputs/models/"$class-$i" \
             --start 10 \
             --end 2000 \
