@@ -33,6 +33,7 @@ do
             --fp
         ls -lah test/outputs/models
         ls -lah test/outputs/models/"$class-$i"/*
+        outfile="test/outputs/predictions/$class-$i.csv.gz"
         duvida predict \
             --test "$TEST" \
             --checkpoint test/outputs/models/"$class-$i" \
@@ -44,13 +45,13 @@ do
             --information-sensitivity \
             --optimality \
             -y clogp \
-            --output test/outputs/predictions/"$class-$i".csv.gz
-        if [ ! "$(zcat test/outputs/models/"$class-$i".csv.gz | wc -l)" -eq "1990" ]
+            --output "$outfile"
+        if [ ! "$(zcat "$outfile" | wc -l)" -eq "1990" ]
         then
-            echo "Predictions have wrong number of rows: $(zcat test/outputs/models/"$class-$i".csv.gz | wc -l)"
+            echo "Predictions have wrong number of rows: $(zcat "$outfile" | wc -l)"
             exit 1
         else
-            zcat "$class-$i".csv.gz | tr , $'\t' | head -n50
+            zcat "$outfile" | tr , $'\t' | head -n50
         fi
     done
 done
