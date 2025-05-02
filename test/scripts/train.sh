@@ -20,8 +20,8 @@ do
     for i in 0 1
     do
         duvida train \
-            -2 "$TEST" \
-            -1 "$TRAIN" \
+            -1 "$TEST" \
+            -2 "$TRAIN" \
             -S smiles \
             -y clogp \
             -c test/outputs/hyperopt.json \
