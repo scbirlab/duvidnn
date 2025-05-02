@@ -571,11 +571,11 @@ class ChemMixinBase(DataMixinBase):
         smiles_column: str,
         input_representation: str = "smiles"
     ) -> Dict[str, np.ndarray]:
-        data[smiles_column] = list(convert_string_representation(
+        data[smiles_column] = cast(convert_string_representation(
             strings=data[structure_column],
             input_representation=input_representation,
             output_representation="smiles",
-        ))
+        ), to=list)
         return data
 
     @staticmethod

@@ -35,7 +35,7 @@ class DataMixin(DataMixinBase):
         shuffle: bool = False,
         **kwargs
     ) -> DataLoader:
-        kwargs = {"num_workers": max(1, cpu_count() - 1)} | kwargs
+        kwargs = {"num_workers": min(4, cpu_count() - 1)} | kwargs
         return DataLoader(
             dataset, 
             batch_size=batch_size, 
