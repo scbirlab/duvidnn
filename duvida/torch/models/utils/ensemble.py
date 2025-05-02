@@ -4,7 +4,7 @@ from typing import Iterable, Union
 
 from abc import ABC, abstractmethod
 
-from torch import concat
+from torch import stack
 from torch.nn import Module, ModuleDict
 
 from ....stateless.typing import Array, ArrayLike
@@ -50,6 +50,11 @@ class TorchEnsembleMixin(ABC):
         return None
 
     def forward(self, x: ArrayLike) -> Array:
-        return concat([
+        # Stack outputs to shape [batch, n_out, ensemble_size]
+        out = stack([
             module(x) for _, module in self.model_ensemble.items()
         ], dim=-1)
+        # If n_out == 1 (scalar), squeeze the middle axis to get [batch, ensemble_size]
+        if out.size(-2) == 1:
+            out = out.squeeze(-2)
+        return out

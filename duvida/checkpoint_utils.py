@@ -1,14 +1,16 @@
 """"Utilities for loading and saving checkpoints."""
 
-from typing import Any, Callable, Dict, Optional, Union
+from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Union
 from tempfile import TemporaryDirectory
 import os
 import json
 
 from carabiner import print_err
-from datasets import Dataset, IterableDataset, load_from_disk
-from huggingface_hub import snapshot_download
-import torch
+
+if TYPE_CHECKING:
+    from datasets import Dataset, IterableDataset
+else:
+    Dataset, IterableDataset = Any, Any
 
 
 def _load_json(checkpoint: str, filename: str) -> Dict[str, Any]:
@@ -24,10 +26,12 @@ def save_json(obj, filename: str) -> None:
 
 
 def _load_hf_dataset(checkpoint, filename) -> Union[Dataset, IterableDataset]:
+    from datasets import load_from_disk
     return load_from_disk(os.path.join(checkpoint, filename))
 
 
 def _load_torch_weights(checkpoint, filename):
+    import torch
     return torch.load(
         os.path.join(checkpoint, filename),
         weights_only=True,
@@ -49,10 +53,13 @@ def load_checkpoint_file(
     cache_dir: Optional[str] = None,
     *args, **kwargs
 ) -> Union[Any, None]:
+    from huggingface_hub import snapshot_download
+
+    obj = None
     if isinstance(callback, str):
-        if callback in FILE_LOADING_CALLBACKS:
+        try:
             callback = FILE_LOADING_CALLBACKS[callback.casefold()]
-        else:
+        except KeyError:
             raise ValueError(
                 """
                 File loading callback must be callable or name.
@@ -84,5 +91,9 @@ def load_checkpoint_file(
                     raise e
             else:
                 obj = callback(tmpdirname, filename)
-
-    return obj
+    if obj is not None:
+        return obj
+    else:
+        raise AttributeError(
+            f"Could not load anything from {checkpoint=}, {filename=} with {callback=}."
+        )

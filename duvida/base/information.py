@@ -60,11 +60,11 @@ class DoubtMixinBase(ABC):
         batch_size: int = 1000
     ) -> Dataset:
         if columns is not None:
-            x = x.select_columns(
-                [col for col in cast(columns, to=list) 
-                 if col in x.column_names]
-            )
-        return {col: reducer(x[col]) for col in x.column_names}
+            columns = [
+                col for col in cast(columns, to=list) 
+                if col in x.column_names
+            ]
+        return {col: reducer(x[col]) for col in columns}
 
     def _mean_of_dictionaries(
         self,
@@ -164,13 +164,13 @@ class DoubtMixinBase(ABC):
                 desc=f"Calculating Fisher score{' and information' if hessian else ''}",
             )
         )
-        dataset = dataset.select_columns([
+        columns = [
             col for col in ['fisher_score', 'fisher_information_diagonal'] 
             if col in dataset.column_names
-        ])
+        ]
         return (
             self._reduce_dataset(dataset, self._mean_of_dictionaries, col)[col]
-            for col in dataset.column_names
+            for col in columns
         )
 
     def _doubtscore(
@@ -191,7 +191,8 @@ class DoubtMixinBase(ABC):
                 for name in fisher_score
             ], axis=-1), 
         )
-        return dict(score=doubtscore)
+        data["score"] = doubtscore
+        return data
 
     def _information_sensitivity(
         self, 
@@ -225,7 +226,8 @@ class DoubtMixinBase(ABC):
                 ) for name in fisher_score
             ], axis=-1), 
         )
-        return dict(score=infosens)
+        data["score"] = infosens
+        return data
 
     def _get_info_score(
         self, 
@@ -280,13 +282,13 @@ class DoubtMixinBase(ABC):
             batched=True, 
             batch_size=batch_size,
             desc=f"Calculating parameter gradients{' and Hessians' if use_hessian and not optimality_approximation else ''}",
-        ).select_columns(['score'])
+        )#.select_columns(['score'])
         return score.rename_column('score', score_type)
 
     def _check_training_data(self):
         if hasattr(self, "training_data"):
             if getattr(self, "training_data") is None:
-                raise ValueError("Training data is not provided. Run .load_training_data() first!")
+                raise AttributeError("Training data is not provided. Run .load_training_data() first!")
             else:
                 return self.training_data
         else:
@@ -296,24 +298,30 @@ class DoubtMixinBase(ABC):
         self, 
         score_type: str,
         candidates: Union[ArrayLike, Dataset],
-        candidate_features: Optional[str] = None,
-        candidate_labels: Optional[str] = None,
+        features: Optional[str] = None,
+        labels: Optional[str] = None,
         training_dataset: Optional[Dataset] = None,
         batch_size: int = 16,
+        preprocessing_args: Optional[Mapping] = None,
         cache: Optional[str] = None,
-        *args, **kwargs
+        **info_score_kwargs
     ) -> Dataset:
         self.release_memory()
+        if preprocessing_args is None:
+            preprocessing_args = {}
         if training_dataset is None:  
             dataset = self._check_training_data()
+        from carabiner import print_err
+        print_err(preprocessing_args)
 
         if hasattr(self, "_prepare_data"):
             candidates = self._prepare_data(
-                features=candidate_features,
-                labels=candidate_labels,
                 data=candidates,
+                features=features,
+                labels=labels,
                 batch_size=batch_size,
                 cache=cache,
+                **preprocessing_args
             )
             
         return self._get_info_score(
@@ -321,10 +329,15 @@ class DoubtMixinBase(ABC):
             candidates=candidates,
             dataset=dataset, 
             batch_size=batch_size,
-            *args, **kwargs,
+            **info_score_kwargs,
         )
 
-    def doubtscore(self, *args, **kwargs) -> Dataset:
+    def doubtscore(
+        self, 
+        features: Optional[str] = None,
+        preprocessing_args: Optional[Mapping] = None,
+        **info_score_kwargs
+    ) -> Dataset:
 
         """Calculate doubtscore.
         
@@ -332,10 +345,17 @@ class DoubtMixinBase(ABC):
 
         return self._info_score_entrypoint(
             score_type="doubtscore",
-            *args, **kwargs
+            features=features,
+            preprocessing_args=preprocessing_args,
+            **info_score_kwargs
         )
 
-    def information_sensitivity(self, *args, **kwargs) -> Dataset:
+    def information_sensitivity(
+        self, 
+        features: Optional[str] = None,
+        preprocessing_args: Optional[Mapping] = None,
+        **info_score_kwargs
+    ) -> Dataset:
 
         """Calculate information sensitivity.
         
@@ -343,5 +363,7 @@ class DoubtMixinBase(ABC):
 
         return self._info_score_entrypoint(
             score_type="information sensitivity",
-            *args, **kwargs
+            features=features,
+            preprocessing_args=preprocessing_args,
+            **info_score_kwargs
         )

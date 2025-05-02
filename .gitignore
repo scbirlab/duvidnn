@@ -8,10 +8,13 @@ Hello.txt
 .pytest_cache/
 /docs/build
 /docs/_autosummary
+/duvida/data/modelbox-names.json
+/test/duvida-checkpoint/
 .idea
 .vscode
 /test/*.tsv
 /test/*.csv
+/test/*.png
 /test/outputs/
 __pycache__/
 lightning_logs/

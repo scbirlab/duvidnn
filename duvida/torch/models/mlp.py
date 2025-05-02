@@ -3,16 +3,141 @@
 from typing import Callable, Iterable, List, Optional
 
 from carabiner import cast
-from torch.nn import BatchNorm1d, Dropout, Linear, Module, SiLU, Sequential
+from torch.nn import BatchNorm1d, Dropout, Identity, Linear, Module, SiLU, Sequential
 
 from torch.optim import Adam, Optimizer
 
 from .utils.ensemble import TorchEnsembleMixin
 from .utils.lt import LightningMixin
+from ...stateless.config import config
+
+config.set_backend('torch', precision='float')
+
 from ...stateless.typing import Array, ArrayLike
+from ...stateless.utils import jit
+
+_DEFAULT_ACTIVATION: Callable[..., Module] = SiLU  # Smooth activation to prevent gradient collapse
+_DEFAULT_N_UNITS: int = 16
+
+class LinearStack(Module):
+
+    @staticmethod
+    def _add_layer(
+        in_features: int,
+        out_features: int,
+        layers: Optional[list] = None,
+        layer_class: Callable[..., Module] = Linear,
+        batch_norm: bool = False,
+        dropout: float = 0.0,
+        activation: Callable[..., Module] = _DEFAULT_ACTIVATION,
+        **kwargs
+    ) -> List[Module]:
+        layers = cast(
+            [] if layers is None else layers, 
+            to=list,
+        )
+        layers += [layer_class(in_features, out_features, **kwargs)]
+        if batch_norm:
+            layers.append(BatchNorm1d(out_features))
+        layers.append(activation())
+        if dropout > 0.:
+            layers.append(Dropout(dropout))
+        return layers
+
+    def build_model(
+        self, 
+        n_input: int,
+        n_out: int = 1,
+        n_hidden: int = 1,
+        n_units: int =_DEFAULT_N_UNITS,
+        batch_norm: bool = False,
+        dropout: float = 0.,
+        activation: Callable[..., Module] = _DEFAULT_ACTIVATION,
+        layer_class: Callable[..., Module] = Linear,
+        **layer_kwargs
+    ) -> Module:
+        common_kwargs = {
+            "out_features": n_units,
+            "layer_class": layer_class,
+            "batch_norm": batch_norm,
+            "dropout": dropout,
+            "activation": activation,
+        }
+        layers = self._add_layer(
+            in_features=n_input,
+            **common_kwargs,
+            **layer_kwargs,
+        )
+        for _ in range(1, n_hidden):
+            layers = self._add_layer(
+                in_features=n_units,
+                layers=layers,
+                **common_kwargs,
+                **layer_kwargs,
+            )
+        layers.append(
+            Linear(in_features=n_units, out_features=n_out)
+        )
+        return Sequential(*layers)
 
 
-class TorchMLPBase(Module):
+class TorchResidualBlock(LinearStack):
+
+    """Residual block module.
+
+    Examples
+    ========
+    >>> import torch
+    >>> net = TorchResidualBlock(n_input=4, residual_depth=2, n_units=8, n_out=1)
+    >>> net(torch.randn(3, 4)).shape 
+    torch.Size([3, 1])
+
+    """
+
+    def __init__(
+        self, 
+        n_input: int, 
+        n_out: int, 
+        residual_depth: int = 1,
+        n_units: int =_DEFAULT_N_UNITS, 
+        dropout: float = 0., 
+        activation: Callable = _DEFAULT_ACTIVATION,  
+        batch_norm: bool = False
+    ):
+        super().__init__()
+        self.n_input = n_input
+        self.residual_depth = residual_depth
+        self.n_units = n_units
+        self.dropout = dropout
+        self.activation = activation
+        self.n_out = n_out
+        self.batch_norm = batch_norm
+        if self.n_input == self.n_out:
+            self.projection = Identity()
+        else:
+            self.projection = Linear(n_input, n_out)
+        self.model_layers = self.build_model()
+
+    def build_model(self):
+        return super().build_model(
+            n_input=self.n_input,
+            n_out=self.n_out,
+            n_hidden=self.residual_depth,
+            n_units=self.n_units,
+            batch_norm=self.batch_norm,
+            dropout=self.dropout,
+            activation=self.activation,
+            layer_class=Linear,
+        )
+
+    # @jit  # Fails compile
+    def forward(self, x: ArrayLike) -> Array:
+        residual = self.model_layers(x)
+        projection = self.projection(x)
+        return self.activation()(residual + projection)
+
+
+class TorchMLPBase(LinearStack):
 
     """Multilayer perceptron.
 
@@ -22,6 +147,9 @@ class TorchMLPBase(Module):
     >>> net = TorchMLPBase(n_input=4, n_hidden=2, n_units=8, n_out=1)
     >>> net(torch.randn(3, 4)).shape 
     torch.Size([3, 1])
+    >>> resnet = TorchMLPBase(n_input=4, n_hidden=4, n_units=8, n_out=1, residual_depth=2)
+    >>> resnet(torch.randn(3, 4)).shape 
+    torch.Size([3, 1])
 
     """
 
@@ -29,75 +157,75 @@ class TorchMLPBase(Module):
         self, 
         n_input: int, 
         n_hidden: int = 1,
-        n_units: int = 16, 
-        learning_rate: float = .01,
+        n_units: int = _DEFAULT_N_UNITS, 
         dropout: float = 0., 
-        activation: Callable = SiLU,  # Smooth activation to prevent gradient collapse
+        activation: Callable = _DEFAULT_ACTIVATION,
         n_out: int = 1, 
         batch_norm: bool = False,
-        skip_length: Optional[int] = None
+        residual_depth: Optional[int] = None
     ):
         super().__init__()
         self.n_input = n_input
         self.n_hidden = n_hidden
         self.n_units = n_units
-        self.learning_rate = learning_rate
         self.dropout = dropout
         self.activation = activation
         self.n_out = n_out
         self.batch_norm = batch_norm
-        if skip_length is not None and (skip_length > self.n_hidden):
+        if residual_depth is not None and (residual_depth > self.n_hidden):
             raise ValueError(
                 f"""
                 Skip length must be greater than number of hidden layers:
-                - Skip length: {skip_length}
+                - Skip length: {residual_depth}
                 - Number of hidden layers: {self.n_hidden}
                 """
             )
-        self.skip_length = skip_length
-        self._stack_size = 2 + int(self.dropout > 0.) + int(self.batch_norm)
-        if skip_length is not None:
-            self._stack_skip_length = self.skip_length * self._stack_size
+        self.residual_depth = residual_depth
+        if self.residual_depth is not None:
+            self._layer_class = TorchResidualBlock
+            self._layer_kwargs = {
+                "residual_depth": self.residual_depth,
+            }
+            self._n_residual_blocks = self.n_hidden // (self.residual_depth or 1)
+            self._n_extra_linear = self.n_hidden % (self.residual_depth or 1)
         else:
-            self._stack_skip_length = None
-        self.model_layers = self.create_model()
+            self._layer_class = Linear
+            self._layer_kwargs = {}
+            self._n_residual_blocks = 0
+            self._n_extra_linear = 0
+        self.model_layers = self.build_model()
 
-    def _add_layer(
-        self, 
-        layer_input_size: int,
-        layers: Optional[Iterable[Module]] = None, 
-    ) -> List[Module]:
-        if layers is None:
-            layers = []
-        layers = cast(layers, to=list)
-        layers += [Linear(layer_input_size, self.n_units), self.activation()]
-        if self.dropout > 0.:
-            layers.append(Dropout(self.dropout))
-        if self.batch_norm:
-            layers.append(BatchNorm1d(self.n_units))
+    def build_model(self):
+        layers = super().build_model(
+            n_input=self.n_input,
+            n_out=(self.n_out if self._n_extra_linear == 0 else self.n_units), 
+            layer_class=self._layer_class,
+            n_hidden=(self._n_residual_blocks if self.residual_depth is not None else self.n_hidden),
+            n_units=self.n_units, 
+            dropout=self.dropout, 
+            activation=self.activation,  
+            batch_norm=self.batch_norm,
+            **self._layer_kwargs,
+        )
+        if self._n_extra_linear > 0:
+            extra_layers = super().build_model(
+                n_input=self.n_units,
+                n_out=self.n_out, 
+                layer_class=Linear,
+                n_hidden=self._n_extra_linear,
+                n_units=self.n_units, 
+                dropout=self.dropout, 
+                activation=self.activation,  
+                batch_norm=self.batch_norm,
+                **self._layer_kwargs,
+            )
+            layers = Sequential(layers, extra_layers)
+
         return layers
-
-    def create_model(self) -> Module:
-        layers = self._add_layer(self.n_input)
-        for _ in range(1, self.n_hidden):
-            layers = self._add_layer(self.n_units, layers)
-        layers.append(Linear(self.n_units, self.n_out))
-        return Sequential(*layers)
-
+        
+    @jit
     def forward(self, x: ArrayLike) -> Array:
-        if self.skip_length is None:
-            return self.model_layers(x)
-        else:
-            activations = []
-            for i, layer in enumerate(self.model_layers):
-                x = layer(x)
-                activations.append(x)
-                not_input = i >= self._stack_size
-                modulo_1 = i % self._stack_skip_length == 1
-                make_skip = not_input and modulo_1
-                if make_skip:
-                    x = x + activations[i - self._stack_skip_length]
-            return x
+        return self.model_layers(x)
 
 
 class TorchMLPLightning(TorchMLPBase, LightningMixin):
@@ -142,7 +270,7 @@ class TorchMLPEnsemble(TorchEnsembleMixin, TorchMLPLightning):
     >>> ensemble = TorchMLPEnsemble(n_input=4, n_units=4, n_out=1, ensemble_size=2) 
     >>> ensemble(torch.randn(5, 4)).shape 
     torch.Size([5, 2])
-    >>> ensemble.set_model(0) # keep only the first sub-model
+    >>> ensemble.set_model(0)  # keep only the first sub-model
     >>> ensemble(torch.randn(2, 4)).shape 
     torch.Size([2, 1])
     >>> ensemble.set_model("all"); len(ensemble.model_ensemble) 
@@ -173,4 +301,4 @@ class TorchMLPEnsemble(TorchEnsembleMixin, TorchMLPLightning):
         )
 
     def create_module(self) -> Module:
-        return self.create_model()
+        return self.build_model()

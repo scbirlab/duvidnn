@@ -22,7 +22,7 @@ from ...stateless.information import (
     parameter_hessian_diagonal_unrolled
 )
 from ...stateless.typing import Array, ArrayLike, LossFunction, StatelessModel
-from ...stateless.utils import get_eps, vmap
+from ...stateless.utils import get_eps, jit, vmap
 from ..functions import mse_loss
 from ..models.utils.ensemble import TorchEnsembleMixin
 
@@ -114,6 +114,8 @@ class DoubtMixin(DoubtMixinBase):
             )
 
         if flat_params:
+
+            # @jit  # Fails compile
             def stateless_model_flat_params(x, *flat_params):
                 try:
                     flat_params = torch.concat(flat_params)
@@ -137,6 +139,7 @@ class DoubtMixin(DoubtMixinBase):
         stateless_model, params = self.make_stateless_model(model)
         gradient_fn = parameter_gradient(stateless_model)
 
+        @jit
         def _parameter_gradient_with_params(x: ArrayLike) -> Array:
             return gradient_fn((params,), x)[0]
 
@@ -150,6 +153,7 @@ class DoubtMixin(DoubtMixinBase):
         stateless_model, params = self.make_stateless_model(model)
         gradient_fn = fisher_score(stateless_model, loss)
         
+        @jit
         def _fisher_score_with_params(x_true: ArrayLike, y_true: ArrayLike) -> Array:
             return gradient_fn((params,), x_true, y_true.to(self.device))[0]
         
@@ -171,6 +175,7 @@ class DoubtMixin(DoubtMixinBase):
         )
         packing_fn = partial(vmap, in_axes=(0, None))(self._pack_params_like)
 
+        @jit
         def _parameter_hessian_with_params(x):
             return packing_fn(hessian_fn(flat_params, x), params)
 
@@ -193,11 +198,13 @@ class DoubtMixin(DoubtMixinBase):
             *args, **kwargs,
         )
 
+        # @jit  # Doesn't compile
         def _fisher_inform_diagonal_with_params(x_true, y_true):
             return self._pack_params_like(fisher_info_fn(flat_params, x_true, y_true.to(self.device)), params)
 
         return _fisher_inform_diagonal_with_params
 
+    @jit
     def doubtscore_core(
         self,
         fisher_score: ArrayLike, 
@@ -207,6 +214,7 @@ class DoubtMixin(DoubtMixinBase):
         doubtscore = parameter_gradient / (fisher_score.unsqueeze(0).to(self.device) + eps)
         return doubtscore.flatten(start_dim=1, end_dim=-1).detach().cpu()
     
+    @jit
     def information_sensitivity_core(
         self, 
         fisher_score: ArrayLike, 
@@ -234,6 +242,7 @@ class ChempropDoubtMixin(DoubtMixin):
         stateless_model, params = self.make_stateless_model(model)
         gradient_fn = parameter_gradient_unrolled(stateless_model)
 
+        # @jit  # fails compile
         def _parameter_gradient_with_params(x: ArrayLike) -> Array:
             g = [_g[0] for _g in gradient_fn((params,), x)]
             return {
@@ -264,6 +273,7 @@ class ChempropDoubtMixin(DoubtMixin):
         )
         packing_fn = partial(vmap, in_axes=(0, None))(self._pack_params_like)
 
+        @jit
         def _parameter_hessian_with_params(x):
             return packing_fn(torch.stack(hessian_fn(flat_params, x)), params)
 

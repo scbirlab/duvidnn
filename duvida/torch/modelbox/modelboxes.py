@@ -9,7 +9,7 @@ from ...base.modelboxes import (
     ChempropModelBoxBase,
     FingerprintModelBoxBase, 
     ModelBoxBase, 
-    VarianceMixin
+    ModelBoxWithVarianceBase
 )
 from ...base.modelbox_registry import register_modelbox
 from ...checkpoint_utils import load_checkpoint_file
@@ -20,7 +20,7 @@ config.set_backend('torch', precision='float')
 from ...stateless.typing import Array, ArrayLike
 from ..models import ChempropEnsemble, TorchMLPEnsemble
 from .data import ChempropDataMixin, DataMixin, TorchChemMixin
-from .information import DoubtMixin
+from .information import DoubtMixin, ChempropDoubtMixin
 from .training import ModelTrainer
 
 
@@ -90,7 +90,7 @@ class TorchModelBoxBase(ModelBoxBase, DataMixin, DoubtMixin):
 
 
 @register_modelbox("mlp")
-class TorchMLPModelBox(TorchModelBoxBase, VarianceMixin):
+class TorchMLPModelBox(TorchModelBoxBase, ModelBoxWithVarianceBase):
 
     """ModelBox for pytorch multilayer perceptron ensemble.
 
@@ -119,7 +119,7 @@ class TorchFingerprintModelBox(TorchChemMixin, FingerprintModelBoxBase, TorchMLP
 
 
 @register_modelbox("chemprop")
-class ChempropModelBox(ChempropDataMixin, ChempropModelBoxBase, TorchFingerprintModelBox):
+class ChempropModelBox(ChempropDataMixin, ChempropDoubtMixin, ChempropModelBoxBase, TorchFingerprintModelBox):
 
     def create_model(self, *args, **kwargs) -> ChempropEnsemble:
         self._model_config.update(kwargs)

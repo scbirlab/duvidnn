@@ -2,10 +2,10 @@
 
 from typing import Callable, Dict, Mapping, Union
 from functools import partial
+from multiprocessing import cpu_count
 
 from datasets import Dataset, IterableDataset
 import torch
-from torch.func import vmap
 from torch.utils.data import DataLoader
 
 from ...base.data import ChemMixinBase, DataMixinBase
@@ -14,6 +14,7 @@ from ...stateless.config import config
 config.set_backend('torch', precision='float')
 
 from ...stateless.typing import Array, ArrayLike
+from ...stateless.utils import vmap
 from ..models.chemprop.data import _collate_training_batch_for_forward
 
 _DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -29,11 +30,12 @@ class DataMixin(DataMixinBase):
 
     @staticmethod
     def make_dataloader(
-        dataset: Union[Dataset, IterableDataset], 
+        dataset: Union[Dataset, IterableDataset],
         batch_size: int = 16, 
         shuffle: bool = False,
         **kwargs
     ) -> DataLoader:
+        kwargs = {"num_workers": min(4, cpu_count() - 1)} | kwargs
         return DataLoader(
             dataset, 
             batch_size=batch_size, 

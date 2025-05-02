@@ -42,12 +42,12 @@ dependencies = [
 
 [project.optional-dependencies]
 #tf = ["duvida", "tensorflow"]
-jax = ["duvida", "jax>=0.5.3"]
-jax_cuda12 = ["duvida", "jax[cuda12]>=0.5.3"]
-jax_cuda12_local = ["duvida", "jax[cuda12_local]>=0.5.3"]
-torch = ["duvida", "torch", "torchvision", "lightning", "tensorboard"]
-transformers = ["duvida", "transformers"]
-chem = ["duvida[torch]", "chemprop>=2.1.0", "schemist>=0.0.4.post1"]
+jax = ["jax>=0.5.3"]
+jax_cuda12 = ["jax[cuda12]>=0.5.3"]
+jax_cuda12_local = ["jax[cuda12_local]>=0.5.3"]
+torch = ["torch>=2.4", "torchvision", "lightning", "tensorboard"]
+transformers = ["torch>=2.4", "torchvision", "transformers"]
+chem = ["chemprop>=2.1.0", "schemist>=0.0.4.post1", "lightning", "tensorboard"]
 
 [project.urls]
 "Homepage" = "https://github.com/scbirlab/duvida"
@@ -60,7 +60,7 @@ duvida = "duvida.cli:main"
 #packages = ["duvida"]
 # If there are data files included in your packages that need to be
 # installed, specify them here.
-#package-data = {"duvida" = ["*.csv"]}
+package-data = {duvida = ["data/*.json"]}
 
 [build-system]
 # These are the assumed default build requirements from pip:
@@ -69,4 +69,4 @@ requires = ["setuptools>=43.0.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [test]
-deps = ["pytest>=7.4", "pytest-cov", "duvida[chem,jax]"]   # always install both for CI
+deps = ["pytest>=7.4", "pytest-cov", "duvida[chem,jax,torch,transformers]"]   # always install both for CI

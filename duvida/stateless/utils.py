@@ -3,6 +3,8 @@
 from typing import Callable, Iterable, Union
 from functools import partial
 
+from carabiner import print_err
+
 from .config import config
 from .typing import Array, ArrayLike
 
@@ -33,10 +35,16 @@ if config.backend == 'jax':
         return _normal
 
 elif config.backend == 'torch':
+    from functools import wraps
     from torch import concat as concatenate, compile, normal, zeros, Generator, split
     from torch.random import manual_seed
     from torch.func import jvp, grad, hessian, vmap as vmap_torch
     from torch.utils._pytree import tree_flatten, tree_unflatten
+    from torch._dynamo import config as dynamo_config
+    dynamo_config.suppress_errors = True
+    dynamo_config.capture_scalar_outputs = True
+
+    _COMPILE_WARNINGS = set()
 
     def vmap(
         f: Callable, 
@@ -61,8 +69,34 @@ elif config.backend == 'torch':
             randomness='different',
             *args, **kwargs
         )
+        
 
-    jit = partial(compile, fullgraph=True)
+    def jit(fn):
+        try:
+            compiled = compile(
+                fn,
+                fullgraph=True,
+                mode="max-autotune",
+            )
+        except RuntimeError as e:
+            warning = f"[torch.compile] Compiling `{fn}` failed; running eagerly"
+            if warning not in _COMPILE_WARNINGS:
+                _COMPILE_WARNINGS.add(warning)
+                print_err(warning + "\n" + str(e))
+            return fn
+
+        @wraps(fn)
+        def wrapped(*args, **kwargs):
+            try:
+                return compiled(*args, **kwargs)
+            except Exception as e:
+                warning = f"[torch.compile] Running compiled `{fn}` failed; falling back"
+                if warning not in _COMPILE_WARNINGS:
+                    _COMPILE_WARNINGS.add(warning)
+                    print_err(warning + "\n" + str(e))
+                return fn(*args, **kwargs)
+        return wrapped
+
 
     def random_normal(seed: int, device='cpu') -> Callable:
         """Generate a sample from the Normal distribution.
@@ -167,7 +201,7 @@ def get_eps():
             return asarray(x)
 
     else:
-        from torch import as_tensor, finfo, float64
+        from torch import as_tensor, finfo
 
         def converter(x): 
             return as_tensor(x)
