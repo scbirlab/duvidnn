@@ -581,11 +581,11 @@ class ChemMixinBase(DataMixinBase):
         >>> out[ChemMixinBase.smiles_column]
         ['CCC', 'CCO']
         >>> d1 = {"struc": ["CCC"]}  # singleton batch
-        >>> out1 = CMB.preprocess_data(d1, "struc", ChemMixinBase.smiles_column)
+        >>> out1 = ChemMixinBase.preprocess_data(d1, "struc", ChemMixinBase.smiles_column)
         >>> out1[ChemMixinBase.smiles_column]  # returns list
         ['CCC']
         >>> d2 = {"struc": "CCC"}  # non-batched map
-        >>> out2 = CMB.preprocess_data(d2, "struc", ChemMixinBase.smiles_column)
+        >>> out2 = ChemMixinBase.preprocess_data(d2, "struc", ChemMixinBase.smiles_column)
         >>> out2[ChemMixinBase.smiles_column]  # still returns list
         ['CCC']
         
