@@ -20,6 +20,8 @@ from ..checkpoint_utils import load_checkpoint_file, save_json
 from .preprocessing import Preprocessor
 from .typing import DataLike, FeatureLike, StrOrIterableOfStr
 
+_DEFAULT_BATCH_SIZE: int = 128
+
 
 class DataMixinBase(ABC):
 
@@ -365,7 +367,7 @@ class DataMixinBase(ABC):
         data: DataLike,
         features: Optional[FeatureLike] = None, 
         labels: Optional[StrOrIterableOfStr] = None,
-        batch_size: int = 128,
+        batch_size: int = _DEFAULT_BATCH_SIZE,
         cache: Optional[str] = None,
         one_column_input: Optional[str] = None,
         _extra_cols_to_keep: Optional[StrOrIterableOfStr] = None,
@@ -415,7 +417,6 @@ class DataMixinBase(ABC):
             key: val or self._default_preprocessing_args.get(key)
             for key, val in preprocessing_args.items()
         }
-        print_err(f"{preprocessing_args=}")
         
         input_dataset = (
             dataset
@@ -483,7 +484,7 @@ class DataMixinBase(ABC):
         features: FeatureLike, 
         labels: Union[StrOrIterableOfStr, ArrayLike],
         data: DataLike,
-        batch_size: int = 128,
+        batch_size: int = _DEFAULT_BATCH_SIZE,
         cache: Optional[str] = None,
         **preprocessing_args
     ) -> None:
@@ -571,11 +572,33 @@ class ChemMixinBase(DataMixinBase):
         smiles_column: str,
         input_representation: str = "smiles"
     ) -> Dict[str, np.ndarray]:
-        data[smiles_column] = cast(convert_string_representation(
+        """Generate clean, canonical SMILES.
+
+        Examples
+        ========
+        >>> d  = {"struc": ["CCC", "CCO"]}
+        >>> out = ChemMixinBase.preprocess_data(d, "struc", ChemMixinBase.smiles_column)
+        >>> out[ChemMixinBase.smiles_column]
+        ['CCC', 'CCO']
+        >>> d1 = {"struc": ["CCC"]}  # singleton batch
+        >>> out1 = CMB.preprocess_data(d1, "struc", ChemMixinBase.smiles_column)
+        >>> out1[ChemMixinBase.smiles_column]  # returns list
+        ['CCC']
+        >>> d2 = {"struc": "CCC"}  # non-batched map
+        >>> out2 = CMB.preprocess_data(d2, "struc", ChemMixinBase.smiles_column)
+        >>> out2[ChemMixinBase.smiles_column]  # still returns list
+        ['CCC']
+        
+        """
+        converted = convert_string_representation(
             strings=data[structure_column],
             input_representation=input_representation,
             output_representation="smiles",
-        ), to=list)
+        )
+        if len(data[structure_column]) > 1 and not isinstance(data[structure_column], str):
+            data[smiles_column] = list(converted)
+        else:
+            data[smiles_column] = [converted]
         return data
 
     @staticmethod
@@ -599,7 +622,7 @@ class ChemMixinBase(DataMixinBase):
     ) -> Dict[str, np.ndarray]:
         query_fps = x[_in_key]
         refs = refs_data[_in_key]
-        results = [_sim_fn(q, r) for q, r in zip(query_fps, refs)]
+        results = [_sim_fn(q, refs) for q in query_fps]
         results = np.stack(results, axis=0)
         x[results_column] = results
         return x
@@ -609,7 +632,7 @@ class ChemMixinBase(DataMixinBase):
         data: DataLike,
         query_structure_column: Optional[str] = None,
         query_input_representation: Optional[str] = None,
-        batch_size: int = 16,
+        batch_size: int = _DEFAULT_BATCH_SIZE,
         cache: Optional[str] = None,
         **kwargs
     ) -> Dataset:
@@ -622,7 +645,7 @@ class ChemMixinBase(DataMixinBase):
             query_input_representation = self._default_preprocessing_args["input_representation"]
         fp_preprocessor = Preprocessor(
             name="morgan-fingerprint",
-            input_column=self.smiles_column,
+            input_column=self.__class__.smiles_column,
             **kwargs
         )
         query_dataset = self._resolve_data(data, cache=cache)
@@ -642,10 +665,11 @@ class ChemMixinBase(DataMixinBase):
             .map(
                 self.preprocess_data,
                 fn_kwargs={
-                    "smiles_column": self.smiles_column,
+                    "smiles_column": self.__class__.smiles_column,
                     "structure_column": query_structure_column,
                     "input_representation": query_input_representation,
                 },
+                **common_map_opts,
                 desc="Converting to clean SMILES",
             )
             .map(
@@ -699,4 +723,4 @@ class ChemMixinBase(DataMixinBase):
             },
             **common_map_opts,
             desc="Calculating Tanimoto similarity to nearest training neighbor",
-        )
+        ).remove_columns(self.common_fp_column)

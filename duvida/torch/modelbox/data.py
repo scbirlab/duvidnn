@@ -48,13 +48,12 @@ class TorchChemMixin(ChemMixinBase, DataMixin):
 
     @staticmethod
     def _get_max_sim(
-        q: ArrayLike, 
+        query: ArrayLike, 
         references: ArrayLike,
         aggregator: Callable[[ArrayLike], float] = torch.max
     ) -> Array:
-        a_n_b = torch.sum(q.unsqueeze(0) * references, dim=-1, keepdim=True)
-        sum_q = torch.sum(q)
-        similarities = a_n_b / (sum_q + torch.sum(references, dim=-1) - torch.sum(a_n_b, dim=-1)).unsqueeze(-1)
+        a_n_b = torch.sum(query.unsqueeze(0) * references, dim=-1, keepdim=True)
+        similarities = a_n_b / (torch.sum(query) + torch.sum(references, dim=-1) - torch.sum(a_n_b, dim=-1)).unsqueeze(-1)
         return aggregator(similarities)
 
     @staticmethod

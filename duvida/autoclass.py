@@ -6,7 +6,7 @@ from carabiner import print_err
 
 from .checkpoint_utils import load_checkpoint_file
 try:
-    from .torch import TorchMLPModelBox
+    from .torch.modelbox import *
 except ImportError as e:
     print_err(e)
     raise ImportError(
