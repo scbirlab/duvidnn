@@ -311,8 +311,6 @@ class DoubtMixinBase(ABC):
             preprocessing_args = {}
         if training_dataset is None:  
             dataset = self._check_training_data()
-        from carabiner import print_err
-        print_err(preprocessing_args)
 
         if hasattr(self, "_prepare_data"):
             candidates = self._prepare_data(
