@@ -27,10 +27,10 @@ do
             -c test/outputs/hyperopt.json \
             -k "$class" \
             -i $i \
-            --prefix test/outputs/models \
-            --output "$class-$i" \
+            --output "test/outputs/models/$class-$i" \
             --cache test/outputs/cache \
             --epochs 2 \
+            -z 10 \
             --learning-rate 1e-5 \
             --descriptors \
             --fp
@@ -45,9 +45,9 @@ do
             --variance \
             --tanimoto \
             --doubtscore \
-            --information-sensitivity \
             --optimality \
             -y clogp \
+            --cache test/outputs/cache \
             --output "$outfile"
         if [ ! "$(cat "$outfile" | wc -l)" -eq $(( $STOP - $START + 1 )) ]
         then

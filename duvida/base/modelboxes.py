@@ -101,7 +101,6 @@ class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
                 cache=cache,
                 **preprocessing_args,
             )
-        print_err(dataset, dataset.format)
         essential_keys = set([self._in_key, self._out_key])
         missing_keys = sorted(essential_keys - set(dataset.column_names))
         if len(missing_keys) > 0:

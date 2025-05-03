@@ -169,7 +169,6 @@ def _init_modelbox_and_load_training_data(
 def _train_and_save_modelbox(
     modelbox,
     early_stopping: Optional[int] = None,
-    prefix: str = ".",
     output_name: Optional[str] = None,
     **training_args
 ):
@@ -192,10 +191,7 @@ def _train_and_save_modelbox(
             f"h={Hasher.hash(modelbox._input_featurizers)}",
         )
     
-    checkpoint_path = os.path.join(
-        prefix, 
-        output_name,
-    )
+    checkpoint_path = output_name
     modelbox.train(
         callbacks=callbacks,
         trainer_opts={  # passed to lightning.Trainer()
@@ -320,15 +316,12 @@ def _train(args: Namespace) -> None:
         training_args, 
         message=f">> Training {modelbox.class_name} with training configuration",
     )
-    if not os.path.exists(args.prefix):
-        os.makedirs(args.prefix)
     checkpoint_path, training_args = _train_and_save_modelbox(
         modelbox=modelbox,
         early_stopping=args.early_stopping,
         epochs=args.epochs, 
         batch_size=args.batch,
         val_data=args.validation,
-        prefix=args.prefix,
         output_name=args.output,
     )
     for obj, f in zip((training_args, load_data_args), ("training-args.json", "load-data-args.json")):
@@ -439,7 +432,7 @@ def _predict(args: Namespace) -> None:
 
     from .autoclass import AutoModelBox
 
-    output = os.path.join(args.prefix, args.output)
+    output = args.output
     out_dir = os.path.dirname(output)
     if not os.path.exists(out_dir):
         os.makedirs(out_dir)
@@ -451,7 +444,6 @@ def _predict(args: Namespace) -> None:
         "batch_size": args.batch,
         "cache": args.cache,
     }
-
     candidates_ds = _resolve_and_slice_data(
         args.test,
         start=args.start,
@@ -539,8 +531,8 @@ def _predict(args: Namespace) -> None:
 
     if args.labels is not None:
         overall_metrics = defaultdict(list)
-        metric_filename = os.path.join(args.prefix, "predict-eval-metrics-table.csv")
-        plot_filename = os.path.join(args.prefix, "predict-eval-scatter")
+        metric_filename = os.path.join(out_dir, "predict-eval-metrics-table.csv")
+        plot_filename = os.path.join(out_dir, "predict-eval-scatter")
         metrics = _evaluate_modelbox_and_save_metrics(
             modelbox,
             dataset=candidates_ds,
@@ -566,7 +558,7 @@ def _predict(args: Namespace) -> None:
                     keys_added.add(key)
         _dict_to_pandas(
             overall_metrics, 
-            os.path.join(args.prefix, "metrics.csv"),
+            os.path.join(out_dir, "metrics.csv"),
         )
 
     return None
@@ -724,12 +716,6 @@ def main() -> None:
         default=0,
         help='If more than one config in `--config`, choose this one.',
     )
-    save_prefix = CLIOption(
-        '--prefix', '-p',
-        type=str,
-        default=".",
-        help='Prefix to save model checkpoints.',
-    )
     output_name = CLIOption(
         '--output', '-o', 
         type=str,
@@ -846,7 +832,6 @@ def main() -> None:
             ensemble_size,
             model_config,
             config_i,
-            save_prefix,
             output_name,
             cache,
         ],
@@ -865,7 +850,6 @@ def main() -> None:
             structure_col,
             structure_representation,
             _checkpoint,
-            save_prefix,
             cache,
             output_name,
             variance,
