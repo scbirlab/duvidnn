@@ -40,9 +40,12 @@ jobs:
         pytest duvida/stateless --doctest-modules
         pytest duvida/torch --doctest-modules
         pytest duvida/utils --doctest-modules
-    - name: Test CLI
+    - name: Test CLI train/test
       run: |
         bash test/scripts/train.sh
+    - name: Test CLI splitting/percentiles
+      run: |
+        bash test/scripts/split.sh
     # - name: Upload pytest test results
     #   uses: actions/upload-artifact@v4
     #   with:
