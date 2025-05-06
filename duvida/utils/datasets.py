@@ -2,6 +2,9 @@
 
 from typing import TYPE_CHECKING, Any, Mapping, Optional, Tuple, Union
 
+import os
+from tempfile import TemporaryDirectory
+
 from carabiner import print_err
 
 if TYPE_CHECKING:
@@ -16,20 +19,33 @@ else:
 import numpy as np
 from tqdm.auto import tqdm
 
+from ..checkpoint_utils import save_json
+
 def to_dataset(
     ds: IterableDataset,
     batch_size: int = 1024,
-    nrows: Optional[int] = None
+    nrows: Optional[int] = None,
+    cache: str = "./cache"
 ) -> Dataset:
     from datasets import Dataset, concatenate_datasets
+    if isinstance(ds, Dataset):
+        return ds
     new_ds = None
-    total_iter = np.ceil(nrows // batch_size).astype(int) if nrows is not None else None
-    for record in tqdm(ds.batch(batch_size=batch_size), total=total_iter, desc="Building dataset"):
+    total_iter = np.ceil(nrows / batch_size).astype(int) if nrows is not None else None
+    for record in tqdm(ds.iter(batch_size=batch_size), total=total_iter, desc="Building dataset"):
         # print(record)
         if new_ds is not None:
-            new_ds = concatenate_datasets([new_ds, Dataset.from_dict(record)])
+            with TemporaryDirectory() as tmpdirname:
+                filename = os.path.join(tmpdirname, "add-record.json")
+                save_json(record, filename)
+                print(record)
+                new_ds = concatenate_datasets([new_ds, Dataset.from_json(filename, cache_dir=cache)])
         else:
-            new_ds = Dataset.from_dict(record)
+            with TemporaryDirectory() as tmpdirname:
+                filename = os.path.join(tmpdirname, "init-record.json")
+                save_json(record, filename)
+                print(record)
+                new_ds = Dataset.from_json(filename, cache_dir=cache)
     return new_ds
 
 
