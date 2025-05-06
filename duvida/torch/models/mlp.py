@@ -1,6 +1,6 @@
 """Multi-layer perceptrons."""
 
-from typing import Callable, Iterable, List, Optional
+from typing import Callable, List, Optional
 
 from carabiner import cast
 from torch.nn import BatchNorm1d, Dropout, Identity, Linear, Module, SiLU, Sequential
