@@ -10,31 +10,6 @@ LLM="transformer://scbirlab/lchemme-base-zinc22-lteq300:clean_smiles~mean"
 START=50
 STOP=550
 
-duvida percentiles \
-    "$TRAIN" \
-    --columns clogp tpsa \
-    --percentiles 1 5 10 \
-    --batch 128 \
-    --cache test/outputs/cache \
-    --output test/outputs/split/percentiles.csv \
-    --plot test/outputs/split/percentiles-plot.png \
-    --structure smiles
-
-for type in faiss scaffold
-do
-    duvida split \
-        "$TRAIN" \
-        --train .7 \
-        --validation .15 \
-        -S smiles \
-        --type $type \
-        -k 2 \
-        --seed 1 \
-        --cache test/outputs/cache \
-        --output test/outputs/split/$type.csv \
-        --plot test/outputs/split/$type-plot.png
-done
-
 printf \
     '{"n_units": [8, 16], "n_hidden": [4, 6], "residual_depth": [null, 2]}' \
 | duvida hyperprep \

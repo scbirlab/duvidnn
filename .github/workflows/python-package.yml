@@ -39,6 +39,7 @@ jobs:
         pytest duvida/base --doctest-modules
         pytest duvida/stateless --doctest-modules
         pytest duvida/torch --doctest-modules
+        pytest duvida/utils --doctest-modules
     - name: Test CLI
       run: |
         bash test/scripts/train.sh

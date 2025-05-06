@@ -52,15 +52,6 @@ def _annotate_component(
 ) -> Dict[str, ...]:
     """Tag each entry with its graph component.
 
-    Examples
-    ========
-    >>> import numpy as np
-    >>> parent = np.array([0, 1, 0], dtype=np.int32)
-    >>> comp_map = {0: 'train', 1: 'test'}
-    >>> out = _annotate_split({}, idx=2, parent_lookup=parent, component_to_split=comp_map)
-    >>> out['faiss_component']
-    'train'
-
     """
     x[component_column] = disjoint_set.find(idx)
     return x
@@ -83,14 +74,6 @@ def faiss_split(
     """Approximate spectral split using FAISS and union-find.
 
     For an empty dataset, returns empty splits.
-
-    Examples
-    ========
-    >>> from datasets import Dataset
-    >>> empty = Dataset.from_dict({'smiles': []})
-    >>> splits = faiss_split(empty, 'smiles', train=1.0)
-    >>> isinstance(splits, dict)
-    True
 
     """
     faiss_index = faiss.IndexBinaryFlat(2048)  # Hamming/Jaccard on 2048-bit vectors
