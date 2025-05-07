@@ -71,4 +71,4 @@ requires = ["setuptools>=43.0.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [test]
-deps = ["pytest>=7.4", "pytest-cov", "duvida[chem,jax,torch,transformers,splits]"]   # always install both for CI
+deps = ["pytest>=7.4", "pytest-cov", "duvida[chem,jax,torch,transformers,splits]"] 
