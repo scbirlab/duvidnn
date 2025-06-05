@@ -226,9 +226,10 @@ def _evaluate_modelbox_and_save_metrics(
     dataset: Optional = None,
     **kwargs
 ):
-
+    import torch
     from .utils.plotting import _plot_prediction_scatter
-    
+
+    modelbox.to("cuda" if torch.cuda.is_available() else "cpu")
     predictions, metrics = modelbox.evaluate(
         data=dataset,
         aggregator="mean",
@@ -422,11 +423,12 @@ def _save_dataset(
 @clicommand("Predicting with the following parameters")
 def _predict(args: Namespace) -> None:
 
+    import torch
     from .autoclass import AutoModelBox
 
     output = args.output
     out_dir = os.path.dirname(output)
-    if not os.path.exists(out_dir):
+    if len(out_dir) > 0 and not os.path.exists(out_dir):
         os.makedirs(out_dir)
     preprocessing_args = {
         "structure_column": args.structure,
@@ -461,6 +463,8 @@ def _predict(args: Namespace) -> None:
                 )
             )
     
+    preprocessing_args["_extra_cols_to_keep"] = (args.extras or [])
+    modelbox.to("cuda" if torch.cuda.is_available() else "cpu")
     candidates_ds = modelbox.predict(
         data=candidates_ds,
         aggregator="mean",
@@ -468,7 +472,7 @@ def _predict(args: Namespace) -> None:
         **preprocessing_args,
         **common_args,
     )
-    preprocessing_args["_extra_cols_to_keep"] = [modelbox._prediction_key]
+    preprocessing_args["_extra_cols_to_keep"].append(modelbox._prediction_key)
     if args.variance:
         candidates_ds = modelbox.prediction_variance(
             candidates=candidates_ds,
@@ -562,7 +566,7 @@ def _split(args: Namespace) -> None:
     from .utils.splitting import split_dataset
     output = args.output
     out_dir = os.path.dirname(output)
-    if not os.path.exists(out_dir):
+    if len(out_dir) > 0 and not os.path.exists(out_dir):
         os.makedirs(out_dir)
     
     if args.train is None:
@@ -878,6 +882,13 @@ def main() -> None:
         default=None,
         help='Last row of dataset to process. Default: end of dataset.',
     )
+    extra_cols = CLIOption(
+        '--extras',
+        type=str,
+        nargs="*",
+        default=None,
+        help='Extra columns to retain in prediction table; useful for IDs.',
+    )
 
     # Information metrics
     variance = CLIOption(
@@ -1055,6 +1066,7 @@ def main() -> None:
             feature_cols,
             label_cols,
             structure_col,
+            extra_cols,
             structure_representation,
             _checkpoint,
             cache,
