@@ -463,7 +463,6 @@ class DataMixinBase(ABC):
             concat_label = [f.output_column for f in featurizers]
         processed_dataset = (
             input_dataset
-            .with_format("numpy")
             .map(
                 self._concat_features,
                 fn_kwargs={
@@ -492,7 +491,7 @@ class DataMixinBase(ABC):
             featurizers_dicts,
             input_dataset, 
             processed_dataset.with_format(
-                self._format, 
+                self._format, # do not put before concat_features - breaks Arrow with chemprop due to multidim arrays
                 **self._format_kwargs,
             )
         )
