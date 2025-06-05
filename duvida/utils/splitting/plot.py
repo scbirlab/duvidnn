@@ -119,7 +119,7 @@ def plot_chemical_splits(
 
     umapper = umap.UMAP(
         metric='jaccard', 
-        min_dist=.05,
+        min_dist=.1,
         random_state=seed, 
         low_memory=True,
     )
