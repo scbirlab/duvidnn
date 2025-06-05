@@ -1,7 +1,9 @@
 """Base mixins for data."""
 
 from typing import TYPE_CHECKING, Any, Callable, Dict, Iterable, List, Mapping, Tuple, Optional, Union
+
 from abc import abstractmethod, ABC
+from functools import partial
 import os
 
 from carabiner import cast, print_err
@@ -202,11 +204,22 @@ class DataMixinBase(ABC):
         cache: Optional[str] = None
     ) -> Dataset:
         from datasets import Dataset
-        return Dataset.from_csv(
-            filename, 
-            cache_dir=cache, 
-            sep="," if filename.endswith((".csv", ".csv.gz")) else "\t",
-        )
+
+        if filename.endswith((".csv", ".tsv", ".txt", ".csv.gz", ".tsv.gz", ".txt.gz")):
+            read_f = partial(
+                Dataset.from_csv,
+                cache_dir=cache,
+                sep="," if filename.endswith((".csv", ".csv.gz")) else "\t",
+            )
+        elif filename.endswith(".parquet"):
+            read_f = partial(Dataset.from_parquet, cache_dir=cache)
+        elif filename.endswith(".hf"):
+            read_f = Dataset.load_from_disk
+        elif filename.endswith(".arrow"):
+            read_f = Dataset.from_file
+        else:
+            raise IOError(f"Could not infer how to open '{filename}' from its extension.")
+        return read_f(filename)
 
     @classmethod
     def _load_from_dataframe(
@@ -317,15 +330,19 @@ class DataMixinBase(ABC):
         ref: str, 
         cache: str,
     ) -> Dataset:
-        from datasets import load_dataset
+        from datasets import concatenate_datasets, load_dataset, DatasetDict
 
         hf_ref_full = ref.split("hf://")[-1]
         hf_ref = hf_ref_full.split("@")[0] if "@" in ref else hf_ref_full
         if ":" in hf_ref_full:
             ds_config, ds_split = hf_ref_full.split("@")[-1].split(":")[:2]
         else:
-            ds_config, ds_split = hf_ref_full.split("@")[-1], "train"
-        return load_dataset(hf_ref, ds_config, split=ds_split, cache_dir=cache)
+            ds_config, ds_split = hf_ref_full.split("@")[-1], None
+        
+        dataset = load_dataset(path=hf_ref, name=ds_config, split=ds_split, cache_dir=cache)
+        if isinstance(dataset, DatasetDict):
+            dataset = concatenate_datasets([v for key, v in dataset.items()])
+        return dataset
 
     @classmethod
     def _resolve_data(
@@ -446,6 +463,7 @@ class DataMixinBase(ABC):
             concat_label = [f.output_column for f in featurizers]
         processed_dataset = (
             input_dataset
+            .with_format("numpy")
             .map(
                 self._concat_features,
                 fn_kwargs={
