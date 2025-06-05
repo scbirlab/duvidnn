@@ -220,7 +220,6 @@ class TorchMLPBase(LinearStack):
                 dropout=self.dropout, 
                 activation=self.activation,  
                 batch_norm=self.batch_norm,
-                **self._layer_kwargs,
             )
             layers = Sequential(layers, extra_layers)
 
