@@ -7,8 +7,8 @@ TRAIN="hf://scbirlab/fang-2023-biogen-adme@scaffold-split:train"
 TEST="hf://scbirlab/fang-2023-biogen-adme@scaffold-split:test"
 LLM="transformer://scbirlab/lchemme-base-zinc22-lteq300:clean_smiles~mean"
 
-START=100
-STOP=200
+START=50
+STOP=550
 
 printf \
     '{"n_units": [8, 16], "n_hidden": [4, 6], "residual_depth": [null, 2]}' \

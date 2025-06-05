@@ -226,10 +226,10 @@ def _evaluate_modelbox_and_save_metrics(
     dataset: Optional = None,
     **kwargs
 ):
-    import numpy as np
-
+    import torch
     from .utils.plotting import _plot_prediction_scatter
-    
+
+    modelbox.to("cuda" if torch.cuda.is_available() else "cpu")
     predictions, metrics = modelbox.evaluate(
         data=dataset,
         aggregator="mean",
@@ -378,7 +378,7 @@ def _resolve_and_slice_data(
     batch_size: int = 1024
 ):
     from .base.data import DataMixinBase
-    from .utils.datasets import to_dataset
+    # from .utils.datasets import to_dataset
 
     candidates_ds = DataMixinBase._resolve_data(data)
     nrows = candidates_ds.num_rows
@@ -386,14 +386,7 @@ def _resolve_and_slice_data(
     take = (end or nrows) - skip
     if (take - skip) < nrows:
         print_err(f"INFO: Reading dataset from row {skip} to row {take + skip} / {nrows}.")
-    return to_dataset(
-        candidates_ds
-        .to_iterable_dataset()
-        .skip(skip)
-        .take(take),
-        batch_size=batch_size,
-        nrows=nrows,
-    )
+    return candidates_ds.skip(skip).take(take)
 
 
 def _save_dataset(
@@ -430,11 +423,12 @@ def _save_dataset(
 @clicommand("Predicting with the following parameters")
 def _predict(args: Namespace) -> None:
 
+    import torch
     from .autoclass import AutoModelBox
 
     output = args.output
     out_dir = os.path.dirname(output)
-    if not os.path.exists(out_dir):
+    if len(out_dir) > 0 and not os.path.exists(out_dir):
         os.makedirs(out_dir)
     preprocessing_args = {
         "structure_column": args.structure,
@@ -469,6 +463,8 @@ def _predict(args: Namespace) -> None:
                 )
             )
     
+    preprocessing_args["_extra_cols_to_keep"] = (args.extras or [])
+    modelbox.to("cuda" if torch.cuda.is_available() else "cpu")
     candidates_ds = modelbox.predict(
         data=candidates_ds,
         aggregator="mean",
@@ -476,7 +472,7 @@ def _predict(args: Namespace) -> None:
         **preprocessing_args,
         **common_args,
     )
-    preprocessing_args["_extra_cols_to_keep"] = [modelbox._prediction_key]
+    preprocessing_args["_extra_cols_to_keep"].append(modelbox._prediction_key)
     if args.variance:
         candidates_ds = modelbox.prediction_variance(
             candidates=candidates_ds,
@@ -564,6 +560,133 @@ def _predict(args: Namespace) -> None:
     return None
 
 
+@clicommand("Splitting data with the following parameters")
+def _split(args: Namespace) -> None:
+
+    from .utils.splitting import split_dataset
+    output = args.output
+    out_dir = os.path.dirname(output)
+    if len(out_dir) > 0 and not os.path.exists(out_dir):
+        os.makedirs(out_dir)
+    
+    if args.train is None:
+        raise ValueError(f"You need to at least provide a --train fraction.")
+    
+    ds = _resolve_and_slice_data(
+        args.input_file,
+        start=args.start,
+        end=args.end,
+    )
+    if args.type == "faiss":
+        faiss_opts = {
+            "cache": args.cache,
+            "n_neighbors": args.n_neighbors,
+        }
+    else:
+        faiss_opts = {}
+    ds, splits = split_dataset(
+        ds=ds,
+        method=args.type,
+        structure_column=args.structure,
+        input_representation=args.input_representation,
+        train=args.train,
+        validation=args.validation,
+        test=args.test,
+        batch_size=args.batch,
+        seed=args.seed or 42,
+        deterministic=args.seed is not None,
+        **faiss_opts,
+    )
+    root, ext = os.path.splitext(output)
+    for key, split_ds in splits.items():
+        _save_dataset(
+            split_ds, 
+            f"{root}_{key}{ext}",
+        )
+
+    if args.plot is not None:
+
+        from carabiner.mpl import figsaver
+        from .utils.splitting.plot import plot_chemical_splits
+
+        print_err(f"Plotting splits...")
+        
+        (fig, axes), df = plot_chemical_splits(
+            ds=ds,
+            structure_column=args.structure,
+            input_representation=args.input_representation,
+            split_columns="split",
+            sample_size=args.plot_sample,
+            additional_columns=args.extras,
+            seed=args.plot_seed,
+            cache=args.cache,
+        )
+        root, ext = os.path.splitext(args.plot)
+        figsaver(format=ext.lstrip("."))(fig, root, df=df)
+    return None
+
+
+@clicommand("Tagging data percentiles with the following parameters")
+def _percentile(args: Namespace) -> None:
+
+    if args.plot is not None and args.structure is None:
+        raise ValueError(
+            f"""
+            If you want to save a plot at "{args.plot}", then you need to provide
+            a chemical structure (like SMILES) column name using --structure so 
+            that a UMAP embedding can be calculated.
+            """
+        )
+
+    from .utils.splitting.top_k import percentiles
+    
+    output = args.output
+    out_dir = os.path.dirname(output)
+    if not os.path.exists(out_dir):
+        os.makedirs(out_dir)
+    
+    ds = _resolve_and_slice_data(
+        args.input_file,
+        start=args.start,
+        end=args.end,
+    )
+    print(ds)
+    # for b in ds:
+    #     print(b)
+    #     break
+    q = {col: args.percentiles for col in args.columns}
+    ds = percentiles(
+        ds=ds,
+        q=q,
+        compression=args.compression,
+        delta=args.delta,
+        reverse=args.reverse,
+        cache=args.cache,
+    )
+    _save_dataset(ds, output)
+
+    if args.plot is not None:
+
+        from carabiner.mpl import figsaver
+        from .utils.splitting.plot import plot_chemical_splits
+
+        print_err(f"Plotting top percentiles...")
+
+        (fig, axes), df = plot_chemical_splits(
+            ds=ds,
+            structure_column=args.structure,
+            input_representation=args.input_representation,
+            split_columns=[col for col in ds.column_names if any(f"{_q}_top_" in col for _q in q)],
+            sample_size=args.plot_sample,
+            additional_columns=args.extras,
+            seed=args.plot_seed,
+            cache=args.cache,
+        )
+        root, ext = os.path.splitext(args.plot)
+        figsaver(format=ext.lstrip("."))(fig, root, df=df)
+    return None
+
+
 def main() -> None:
 
     input_file = CLIOption(
@@ -572,6 +695,11 @@ def main() -> None:
         default=sys.stdin,
         nargs='?',
         help='Input file. Default: STDIN',
+    )
+    input_filename = CLIOption(
+        'input_file',
+        type=str,
+        help='Input file.',
     )
     train_data = CLIOption(
         '--training', '-1',
@@ -610,7 +738,7 @@ def main() -> None:
     structure_representation = CLIOption(
         '--input-representation', '-R',
         type=str,
-        default=None,
+        default="smiles",
         choices=["smiles", "selfies", "inchi", "aa_seq"],
         help='Type of chemical structure string. Default: SMILES if training; for prediction, use same as training data.',
     )
@@ -754,6 +882,13 @@ def main() -> None:
         default=None,
         help='Last row of dataset to process. Default: end of dataset.',
     )
+    extra_cols = CLIOption(
+        '--extras',
+        type=str,
+        nargs="*",
+        default=None,
+        help='Extra columns to retain in prediction table; useful for IDs.',
+    )
 
     # Information metrics
     variance = CLIOption(
@@ -793,6 +928,89 @@ def main() -> None:
         type=int,
         default=1,
         help='Number of stochastic samples for Hessian approximation.',
+    )
+
+    split_type = CLIOption(
+        '--type', 
+        type=str,
+        default="scaffold",
+        choices=["scaffold", "faiss"],
+        help='Splitting method.',
+    )
+    random_seed = CLIOption(
+        '--seed', '-i', 
+        type=int,
+        default=None,
+        help='Random seed. Default: determininstic.',
+    )
+    n_neighbors = CLIOption(
+        '--n-neighbors', '-k', 
+        type=int,
+        default=10,
+        help='Number of nearest neighbors for FAISS splitting.',
+    )
+    train_test_val = [
+        CLIOption(
+            f'--{key}', 
+            type=float,
+            default=None,
+            help='Fraction of examples for each split. Default: infer.',
+        ) for key in ("train", "validation", "test")
+    ]
+
+    columns = CLIOption(
+        '--columns', '-c',
+        type=str,
+        nargs='*',
+        help='List of columns to tag percentiles for.',
+    )
+    percentiles = CLIOption(
+        '--percentiles', '-p', 
+        type=float,
+        nargs='*',
+        default=[5.],
+        help='List of percentiles to calculate.',
+    )
+    reverse = CLIOption(
+        '--reverse', '-r', 
+        action='store_true',
+        help='Whether to reverse percentiles (i.e. high to low).',
+    )
+    do_plot = CLIOption(
+        '--plot', 
+        type=str,
+        default=None,
+        help='Filename to save UMAP plot under.',
+    )
+    compression = CLIOption(
+        '--compression', '-z', 
+        type=int,
+        default=500,
+        help='How many centroids for quantile approximation. Higher is more accurate, but uses more memory.',
+    )
+    delta = CLIOption(
+        '--delta', '-d', 
+        type=float,
+        default=1.,
+        help='Width from percentile cutoff to buffer as borderline for refinement. Higher is more accurate, but uses more memory.',
+    )
+    plot_seed = CLIOption(
+        '--plot-seed', '-e', 
+        type=int,
+        default=42,
+        help='Seed for UMAP embedding.',
+    )
+    plot_sample = CLIOption(
+        '--plot-sample', '-n', 
+        type=int,
+        default=20_000,
+        help='Subsample size for UMAP embedding.',
+    )
+    extras = CLIOption(
+        '--extras', '-x',
+        type=str,
+        nargs='*',
+        help='Additional columns for coloring UMAP plot.',
     )
 
     hyperprep = CLICommand(
@@ -848,6 +1066,7 @@ def main() -> None:
             feature_cols,
             label_cols,
             structure_col,
+            extra_cols,
             structure_representation,
             _checkpoint,
             cache,
@@ -864,6 +1083,54 @@ def main() -> None:
         main=_predict,
     )
 
+    split = CLICommand(
+        "split",
+        description="Make chemical train-test-val splits on out-of-core datasets.",
+        options=[
+            input_filename, 
+            split_type,
+            n_neighbors,
+            slice_start,
+            slice_end,
+            structure_col,
+            structure_representation,
+            do_plot,
+            plot_sample,
+            plot_seed,
+            extras,
+            random_seed,
+            cache,
+            output_name,
+            batch_size,
+        ] + train_test_val,
+        main=_split,
+    )
+
+    percentiles = CLICommand(
+        "percentiles",
+        description="Add columns indicating whether rows are in a percentile.",
+        options=[
+            input_filename, 
+            columns,
+            percentiles,
+            reverse,
+            compression,
+            delta,
+            slice_start,
+            slice_end,
+            cache,
+            output_name,
+            batch_size,
+            do_plot,
+            structure_col,
+            structure_representation,
+            plot_sample,
+            plot_seed,
+            extras,
+        ],
+        main=_percentile,
+    )
+
     app = CLIApp(
         "duvida", 
         version=__version__,
@@ -876,6 +1143,8 @@ def main() -> None:
             hyperprep,
             train,
             predict,
+            split,
+            percentiles,
         ],
     )
 

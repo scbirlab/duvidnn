@@ -206,7 +206,7 @@ class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
         model: Callable,
         _in_key: str,
         _prediction_column: str,
-        detacher_fn: Optional[Callable],
+        detacher_fn: Callable,
         aggregator: Optional[Callable] = None
     ) -> Dict[str, Any]:
         prediction = model(x[_in_key])
@@ -217,9 +217,10 @@ class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
     def _aggregate(
         x: Mapping[str, Any],
         _prediction_column: str,
+        detacher_fn: Callable,
         aggregator: Optional[Callable] = None
     ) -> Dict[str, Any]:
-        x[_prediction_column] = aggregator(x[_prediction_column])
+        x[_prediction_column] = aggregator(detacher_fn(x[_prediction_column]))
         return x
 
     def predict(
@@ -277,6 +278,7 @@ class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
                 fn_kwargs={
                     "_prediction_column": _prediction_column,
                     "aggregator": aggregator_fn,
+                    "detacher_fn": self.detach_tensor,
                 },
                 batched=True, 
                 batch_size=batch_size, 

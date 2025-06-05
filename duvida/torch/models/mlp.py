@@ -1,8 +1,8 @@
 """Multi-layer perceptrons."""
 
-from typing import Callable, Iterable, List, Optional
+from typing import Callable, List, Optional
 
-from carabiner import cast
+from carabiner import cast, print_err
 from torch.nn import BatchNorm1d, Dropout, Identity, Linear, Module, SiLU, Sequential
 
 from torch.optim import Adam, Optimizer
@@ -173,14 +173,17 @@ class TorchMLPBase(LinearStack):
         self.n_out = n_out
         self.batch_norm = batch_norm
         if residual_depth is not None and (residual_depth > self.n_hidden):
-            raise ValueError(
+            print_err(
                 f"""
-                Skip length must be greater than number of hidden layers:
+                WARNING: Skip length must be greater than number of hidden layers:
                 - Skip length: {residual_depth}
                 - Number of hidden layers: {self.n_hidden}
+                Falling back to non-residual.
                 """
             )
-        self.residual_depth = residual_depth
+            self.residual_depth = None
+        else:
+            self.residual_depth = residual_depth
         if self.residual_depth is not None:
             self._layer_class = TorchResidualBlock
             self._layer_kwargs = {
@@ -217,7 +220,6 @@ class TorchMLPBase(LinearStack):
                 dropout=self.dropout, 
                 activation=self.activation,  
                 batch_norm=self.batch_norm,
-                **self._layer_kwargs,
             )
             layers = Sequential(layers, extra_layers)
 

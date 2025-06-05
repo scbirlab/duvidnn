@@ -1,6 +1,6 @@
 [project]
 name = "duvida"
-version = "0.0.1.post1"
+version = "0.0.1"
 authors = [
   { name="Eachan Johnson", email="eachan.johnson@crick.ac.uk" },
 ]
@@ -48,6 +48,8 @@ jax_cuda12_local = ["jax[cuda12_local]>=0.5.3"]
 torch = ["torch>=2.4", "torchvision", "lightning", "tensorboard"]
 transformers = ["torch>=2.4", "torchvision", "transformers"]
 chem = ["chemprop>=2.1.0", "schemist>=0.0.4.post1", "lightning", "tensorboard"]
+splits = ["umap-learn", "scipy", "schemist>=0.0.4.post1", "tdigest>=0.5", "faiss-cpu>=1.11"]
+splits_gpu = ["umap-learn", "scipy", "schemist>=0.0.4.post1", "tdigest>=0.5", "faiss-gpu"]
 
 [project.urls]
 "Homepage" = "https://github.com/scbirlab/duvida"
@@ -69,4 +71,4 @@ requires = ["setuptools>=43.0.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [test]
-deps = ["pytest>=7.4", "pytest-cov", "duvida[chem,jax,torch,transformers]"]   # always install both for CI
+deps = ["pytest>=7.4", "pytest-cov", "duvida[chem,jax,torch,transformers,splits]"] 
