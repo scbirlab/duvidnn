@@ -67,9 +67,9 @@ or evidence already seen by the model.
 There are several `ModelBox` classes for specific deep learning architechtures in pytorch. 
 
 ```python
->>> from duvida.torch.models import _MODEL_CLASSES
+>>> from duvida.base.modelbox_registry import MODELBOX_REGISTRY
 >>> from pprint import pprint
->>> pprint(_MODEL_CLASSES)
+>>> pprint(MODELBOX_REGISTRY)
 {'chemprop': <class 'duvida.torch.chem.ChempropModelBox'>,
  'fingerprint': <class 'duvida.torch.chem.FPMLPModelBox'>,
  'fp': <class 'duvida.torch.chem.FPMLPModelBox'>,
@@ -208,7 +208,7 @@ Various approximations are also allowed.
 
 ```python
 >>> from duvida.stateless.hessians import get_approximators
->>> get_approximators()  # No arguments to list available
+>>> get_approximators()  # Use no arguments to show what's available
 ('squared_jacobian', 'exact_diagonal', 'bekas', 'rough_finite_difference')
 ```
 
@@ -218,7 +218,7 @@ Now apply:
 >>> approx_hessian_diag = get_approximators("bekas")
 >>> g = lambda x: dnp.sum(dnp.sum(x) ** 3. + x ** 2. + 4.)
 >>> a = dnp.array([1., 2.])
->>> dnp.diag(hessian(g)(a))  # Exact for reference
+>>> dnp.diag(hessian(g)(a))  # Exact
 Array([38., 38.], dtype=float64)
 >>> approx_hessian_diag(g, n=1000)(a)  # Less accurate when parameters interact
 Array([38.52438307, 38.49679655], dtype=float64)
@@ -273,28 +273,30 @@ class SimpleMLP(torch.nn.Module, LightningMixin):
         return self.model_layers(x)
 ```
 
-Then subclass `duvida.torch.nn.ModelBox` and implement the `create_model()` method, which should
+Then subclass `duvida.torch.modelbox.TorchModelBoxBase` and implement the `create_model()` method, which should
 simply return your instantiated model. If you want to preprocess input data on the fly, then
 add a `preprocess_data()` method which takes a data dictionary and returns a data dictionary.
 
 ```python
 from typing import Dict
 
-from duvida.torch.nn import ModelBox
+from duvida.torch.modelbox import TorchModelBoxBase
 import numpy as np
 
-class MLPModelBox(ModelBox):
+class MLPModelBox(TorchModelBoxBase):
     
     def __init__(self, *args, **kwargs):
         super().__init__()
         self._mlp_kwargs = kwargs
 
     def create_model(self, *args, **kwargs):
+        self._model_config.update(kwargs)  # makes sure model checkpointing saves the keyword args
         return SimpleMLP(
-            n_input=self.input_shape[-1],
+            n_input=self.input_shape[-1],  # defined on data loading
             n_out=self.output_shape[-1], 
-            *args, **kwargs,
-            **self._mlp_kwargs,
+            *args, 
+            **self._model_config,
+            **self._mlp_kwargs,  # if init kwargs are relevant to model creation
         )
 
     # Define this method if your data needs preprocessing
@@ -306,8 +308,8 @@ class MLPModelBox(ModelBox):
         }
 ```
 
-If the built-in `ModelBox`es don't suit your needs, you can subclass the `base_classes.ModelBoxBase` abstract 
-class, making sure to implement its abstract methods.
+If you want to build `ModelBox`es based on a framework other than pytorch, you can subclass 
+the `duvida.base.ModelBoxBase` abstract class, making sure to implement its abstract methods.
 
 ## Command-line interface
 
@@ -315,19 +317,74 @@ class, making sure to implement its abstract methods.
 
 ```bash
 $ duvida --help
+usage: duvida [-h] [--version] {hyperprep,train,predict,split,percentiles} ...
+
+Calculating exact and approximate confidence and information metrics for deep learning on general purpose and chemistry tasks.
+
+options:
+  -h, --help            show this help message and exit
+  --version, -v         show program's version number and exit
+
+Sub-commands:
+  {hyperprep,train,predict,split,percentiles}
+                        Use these commands to specify the tool you want to use.
+    hyperprep           Prepare inputs for hyperparameter search.
+    train               Train a PyTorch model.
+    predict             Make predictions and calculate uncertainty using a duvida checkpoint.
+    split               Make chemical train-test-val splits on out-of-core datasets.
+    percentiles         Add columns indicating whether rows are in a percentile.
 ```
+
+In all cases, you can get further options with `duvida <command> --help`, for example:
+
+```bash
+duvida train --help
+```
+
+### Annotating top percentiles
+
+You can add columns to datasets which annotate the top percentiles of named columns. This is compatible
+with datasets that don't fit in memory.
+
+```bash
+duvida percentiles \
+    hf://scbirlab/fang-2023-biogen-adme@scaffold-split:train \
+    --columns clogp tpsa \
+    --percentiles 1 5 10 \
+    --output percentiles.parquet \
+    --plot percentiles-plot.png \
+    --structure smiles
+```
+
+### Data splitting
+
+There are utilities for out-of-memory scaffold and (approximate using FAISS) spectral splitting of datasets
+that don't fit in memory. Make it random but reproducible with `--seed`, otherwise a deterministic bin-packing
+algorithm is used.
+
+```bash
+$ duvida split hf://scbirlab/fang-2023-biogen-adme@scaffold-split:train \
+    --train .7 \
+    --validation .15 \
+    --structure smiles \
+    --type faiss \
+    --seed 1 \
+    --output faiss.csv \
+    --plot faiss.png
+  ```
+
+### Model training and evaluation
 
 To train:
 
 ```bash
-$ duvida train hf://scbirlab/fang-2023-biogen-adme@scaffold-split:train -2 hf://scbirlab/fang-2023-biogen-adme@scaffold-split:test --ensemble-size 10 --epochs 10 --learning-rate 0.001
+$ duvida train -1 hf://scbirlab/fang-2023-biogen-adme@scaffold-split:train \
+    -2 hf://scbirlab/fang-2023-biogen-adme@scaffold-split:test \
+    --ensemble-size 10 --epochs 10 --learning-rate 0.001 \
+    --output model.dv
 ```
 
-You can read about all the options here:
-
-```bash
-$ duvida train --help
-```
+### Hyperparameters
 
 There is also a simple hyperparameter utility.
 
@@ -339,7 +396,35 @@ This generates a file containing the Cartesian product of the JSON items. It can
 with the `-i <int>` option to supply a specific training configuration like so:
 
 ```bash
-$ duvida train hf://scbirlab/fang-2023-biogen-adme@scaffold-split:train -2 hf://scbirlab/fang-2023-biogen-adme@scaffold-split:test -c hyperopt.json -i 0
+$ duvida train \
+    -1 hf://scbirlab/fang-2023-biogen-adme@scaffold-split:train \
+    -2 hf://scbirlab/fang-2023-biogen-adme@scaffold-split:test \
+    -c hyperopt.json \
+    -i 0 \
+    --output model.dv
+```
+
+This **overrides any conflicting command line arguments**.
+
+### Predictions
+
+You cna make predictions on datasets using `duvida predict`, and optionally predict only a chunk of the dataset using `--start` and `--stop`, in case you
+want to parallelize.
+
+When predicting, there is also the option to calculate uncertainty metrics like ensemble variance, Tanomoto nearest neighbor distance to training set
+(for chemistry models), doubtscore, and information sensitivity.
+
+```bash
+duvida predict \
+    --test hf://scbirlab/fang-2023-biogen-adme@scaffold-split:test \
+    --checkpoint model.dv \
+    --start 100 \
+    --end 200 \
+    --variance \
+    --tanimoto \
+    --doubtscore \
+    -y clogp \
+    --output predictions.parquet
 ```
 
 ## Issues, problems, suggestions
