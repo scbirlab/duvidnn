@@ -87,7 +87,7 @@ def rmse(x, y):
     >>> pred = np.array([1.0, 2.0, 3.0])
     >>> truth = np.array([1.0, 2.0, 4.0])
     >>> np.allclose(rmse(pred, truth), np.sqrt(((pred - truth) ** 2).mean()))
-    1.2909944487358056
+    True
 
     """
 
