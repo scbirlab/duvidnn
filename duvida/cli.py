@@ -12,20 +12,16 @@ from carabiner.cliutils import clicommand, CLIOption, CLICommand, CLIApp
 
 from . import __version__
 from .checkpoint_utils import _load_json, save_json
+from .utils.package_data import _get_data_path
 
-_data_root = os.path.join(
-    os.path.dirname(__file__), 
-    "data",
-)
-modelbox_name_file = os.path.join(_data_root, "modelbox-names.json")
+
+cache_dir, modelbox_name_file = _get_data_path("modelbox-names.json")
 if not os.path.exists(modelbox_name_file):
     from .autoclass import AutoModelBox
     from .base.modelbox_registry import DEFAULT_MODELBOX, MODELBOX_NAMES
-    if not os.path.exists(_data_root):
-        os.makedirs(_data_root)
     save_json([DEFAULT_MODELBOX, MODELBOX_NAMES], modelbox_name_file)
 else:
-    DEFAULT_MODELBOX, MODELBOX_NAMES = _load_json(_data_root, "modelbox-names.json")
+    DEFAULT_MODELBOX, MODELBOX_NAMES = _load_json(cache_dir, os.path.basename(modelbox_name_file))
 
 _LR_DEFAULT: float = .01
 
