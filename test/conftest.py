@@ -13,4 +13,4 @@ def reload_package():
     # delete all modules from package
     loaded_package_modules = [key for key, value in sys.modules.items() if "duvida" in str(value)]
     for key in loaded_package_modules:
-        del sys.modules[key]
+        pass #del sys.modules[key]
