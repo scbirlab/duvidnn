@@ -36,10 +36,13 @@ jobs:
     - name: Test with pytest
       run: |
         export JAX_PLATFORM_NAME=cpu
+        # run doctests as individual packages
         pytest duvida/base --doctest-modules
         pytest duvida/stateless --doctest-modules
         pytest duvida/torch --doctest-modules
         pytest duvida/utils --doctest-modules
+        # run other tests
+        pytest test/test_evaluation.py
     - name: Test CLI train/test
       run: |
         bash test/scripts/train.sh
