@@ -321,7 +321,7 @@ class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
                 "pearson_r": pearson_r, 
                 "spearman_rho": spearman_r,
             }
-        predictions = predictions.with_format("numpy")
+        predictions = predictions.with_format(None)
         y_vals = predictions[self._out_key]
         preds = predictions[eval_prediction_col]
         # if len(y_vals.shape) == 1 and len(preds.shape) == 2:
@@ -462,9 +462,9 @@ class FingerprintModelBoxBase(ChemMixinBase, ModelBoxWithVarianceBase):
             structure_column = self._default_preprocessing_args["structure_column"]
         if input_representation is None:
             input_representation = self._default_preprocessing_args["input_representation"]
-        _extra_cols_to_keep=(
-                [structure_column] + kwargs.pop("_extra_cols_to_keep", [])
-            )
+        _extra_cols_to_keep = (
+            [structure_column] + kwargs.pop("_extra_cols_to_keep", [])
+        )
         return super().predict(
             **kwargs, 
             structure_column=structure_column,
