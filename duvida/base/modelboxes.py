@@ -462,9 +462,9 @@ class FingerprintModelBoxBase(ChemMixinBase, ModelBoxWithVarianceBase):
             structure_column = self._default_preprocessing_args["structure_column"]
         if input_representation is None:
             input_representation = self._default_preprocessing_args["input_representation"]
-        _extra_cols_to_keep=(
-                [structure_column] + kwargs.pop("_extra_cols_to_keep", [])
-            )
+        _extra_cols_to_keep = (
+            [structure_column] + kwargs.pop("_extra_cols_to_keep", [])
+        )
         return super().predict(
             **kwargs, 
             structure_column=structure_column,

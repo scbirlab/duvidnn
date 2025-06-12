@@ -463,6 +463,7 @@ class DataMixinBase(ABC):
             concat_label = [f.output_column for f in featurizers]
         processed_dataset = (
             input_dataset
+            .with_format(None)  # guard against tensors
             .map(
                 self._concat_features,
                 fn_kwargs={
