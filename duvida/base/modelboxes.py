@@ -321,7 +321,7 @@ class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
                 "pearson_r": pearson_r, 
                 "spearman_rho": spearman_r,
             }
-        predictions = predictions.with_format(None)
+        predictions = predictions.with_format("numpy")
         y_vals = predictions[self._out_key]
         preds = predictions[eval_prediction_col]
         # if len(y_vals.shape) == 1 and len(preds.shape) == 2:
