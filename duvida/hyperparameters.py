@@ -1,6 +1,6 @@
 """Utilities for generating hyperparameter plans."""
 
-from typing import Any, Dict, Iterator, Optional, Union
+from typing import Any, Dict, Iterator, Iterable, Mapping, Optional, Union
 from dataclasses import dataclass
 import pickle
 from io import TextIOWrapper
@@ -161,7 +161,12 @@ class HyperOpt(dict):
 
     """
 
-    def __init__(self, silent: bool = False, *args, **kwargs):
+    def __init__(
+        self, 
+        silent: bool = False, 
+        _ranges: Optional[Iterable[Mapping]] = None, 
+        *args, **kwargs
+    ):
         super().__init__(self, *args, **kwargs)
         for key in self.keys():
             val = self[key]
@@ -175,7 +180,7 @@ class HyperOpt(dict):
         configs = tuple(dict(zip(self.keys(), args)) for args in iterator)
         if not silent:
             print_err(f"There are {len(configs)} configurations to test.")
-        self._ranges = configs
+        self._ranges = tuple(_ranges or []) + configs
         self._keys = tuple(self._ranges[0])
 
     def __iter__(self) -> Iterator[Dict[str, Any]]:
@@ -187,7 +192,7 @@ class HyperOpt(dict):
     @classmethod
     def from_file(
         cls, 
-        file: Union[str, TextIOWrapper], 
+        file: Union[str, TextIOWrapper],
         serialized: bool = False,
         **kwargs
     ):
@@ -206,6 +211,7 @@ class HyperOpt(dict):
     def write(
         self, 
         file: Union[str, TextIOWrapper],
+        as_list: bool = False,
         serialize: bool = False
     ) -> None:
         """Save a HyperOpt object in a reloadable format.
@@ -217,10 +223,13 @@ class HyperOpt(dict):
             if serialize:
                 pickle.dump(obj=self, file=f)
             else:
+                data = {key: list(val) for key, val in self.items()}
+                if as_list:
+                    data.update({"_ranges": self._ranges})
                 json.dump(
-                    {key: list(val) for key, val in self.items()}, 
+                    data, 
                     f,
-                    sort_keys=True,
+                    sort_keys=False,  # ensure round trip yields same order
                     indent=4,
                 )
         return None
