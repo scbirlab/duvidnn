@@ -5,7 +5,17 @@ from typing import Callable, Iterable, List, Optional, Union
 from carabiner import cast
 
 from torch.optim import Adam, Optimizer
-from torch.nn import BatchNorm1d, Conv2d, Dropout, Flatten, Linear, Module, SiLU, Sequential
+from torch.nn import (
+    BatchNorm1d, 
+    Conv2d, 
+    Dropout, 
+    Flatten, 
+    Linear, 
+    MaxPool2d, 
+    Module, 
+    SiLU, 
+    Sequential
+)
 from torch import nn
 
 from .mlp import LinearStack
@@ -49,14 +59,14 @@ class CNNStack(LinearStack):
 
     def build_model(
         self, 
-        n_input: int,
+        n_input: int,  # input channels
         n_out: int = 1,
         n_hidden: int = 1,
         n_units: int = _DEFAULT_N_UNITS,
         batch_norm: bool = False,
         dropout: float = 0.,
         activation = _DEFAULT_ACTIVATION,
-        layer_class = nn.Linear,
+        layer_class = Linear,
         extras=None,
         flatten: bool = True,
         infer_projection: bool = False,
@@ -89,7 +99,11 @@ class CNNStack(LinearStack):
             img_shape = list(img_shape)
         if flatten:
             layers.append(
-                Flatten(start_dim=1 - (2 + len(img_shape)), end_dim=-1)
+                Flatten(
+                    # needs to be -ve to count from right for `vmap` compatibility
+                    start_dim=1 - (2 + len(img_shape)),
+                    end_dim=-1,
+                )
             )
         if infer_projection:
             with torch.no_grad():
@@ -134,6 +148,8 @@ class TorchCNN2DBase(LinearStack2):
         self.n_conv_layers = n_conv_layers
         self.filters = filters
         self.kernel_size = kernel_size
+
+        # functorch is not compatible with these strings
         if padding == "same":
             self.padding = self.kernel_size // 2
         elif padding == "valid":
@@ -142,6 +158,7 @@ class TorchCNN2DBase(LinearStack2):
             raise ValueError(f"Value for padding ({padding}) is not acceptable. Use integer or 'same' or 'valid'.")
         else:
             self.padding = padding
+        
         self.dropout = dropout
         self.pool_stride = pool_stride
         self._layer_class = Conv2d
@@ -162,7 +179,7 @@ class TorchCNN2DBase(LinearStack2):
             activation=self.activation,
             batch_norm=self.batch_norm,
             extras=[
-                nn.MaxPool2d(
+                MaxPool2d(
                     self.kernel_size, 
                     stride=self.pool_stride,
                 ),
