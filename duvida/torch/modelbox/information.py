@@ -139,7 +139,7 @@ class DoubtMixin(DoubtMixinBase):
         stateless_model, params = self.make_stateless_model(model)
         gradient_fn = parameter_gradient(stateless_model)
 
-        @jit
+        # @jit  # generates lots of dynamo warnings
         def _parameter_gradient_with_params(x: ArrayLike) -> Array:
             return gradient_fn((params,), x)[0]
 
@@ -148,7 +148,7 @@ class DoubtMixin(DoubtMixinBase):
     def fisher_score(
         self, 
         model: Optional[StatelessModel] = None,
-        loss: LossFunction = mse_loss,
+        loss: LossFunction = mse_loss
     ) -> Callable[[ArrayLike, ArrayLike], Array]:
         stateless_model, params = self.make_stateless_model(model)
         gradient_fn = fisher_score(stateless_model, loss)
@@ -175,7 +175,7 @@ class DoubtMixin(DoubtMixinBase):
         )
         packing_fn = partial(vmap, in_axes=(0, None))(self._pack_params_like)
 
-        @jit
+        # @jit  # torch.compile dynamo complains
         def _parameter_hessian_with_params(x):
             return packing_fn(hessian_fn(flat_params, x), params)
 
@@ -204,29 +204,33 @@ class DoubtMixin(DoubtMixinBase):
 
         return _fisher_inform_diagonal_with_params
 
-    @jit
+    # @staticmethod
+    # @jit  # torch.compile complains about Tensor.to(device)
+    @staticmethod
     def doubtscore_core(
-        self,
         fisher_score: ArrayLike, 
         parameter_gradient: ArrayLike, 
-        eps: float = _EPS
+        eps: float = _EPS,
+        device=_DEVICE
     ) -> Array:
-        doubtscore = parameter_gradient / (fisher_score.unsqueeze(0).to(self.device) + eps)
+        doubtscore = parameter_gradient / (fisher_score.unsqueeze(0).to(device) + eps)
         return doubtscore.flatten(start_dim=1, end_dim=-1).detach().cpu()
     
-    @jit
+    # @staticmethod
+    # @jit  # torch.compile complains a lot when optimality_approximation=False
+    @staticmethod
     def information_sensitivity_core(
-        self, 
         fisher_score: ArrayLike, 
         fisher_information_diagonal: ArrayLike, 
         parameter_gradient: ArrayLike, 
         parameter_hessian_diagonal: Optional[ArrayLike] = None, 
         eps: float = _EPS,
-        optimality_approximation: bool = False
+        optimality_approximation: bool = False,
+        device=_DEVICE
     ) -> Array:
-        term1 = fisher_information_diagonal.unsqueeze(0).to(self.device) * parameter_gradient
+        term1 = fisher_information_diagonal.unsqueeze(0).to(device) * parameter_gradient
         if not (optimality_approximation or parameter_hessian_diagonal is None):
-            term2 = fisher_score.unsqueeze(0).to(self.device) * parameter_hessian_diagonal
+            term2 = fisher_score.unsqueeze(0).to(device) * parameter_hessian_diagonal
         else:
             term2 = 0.
         information_sensitivity = torch.square(parameter_gradient) / (term1 - term2 + eps)

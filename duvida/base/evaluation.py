@@ -69,7 +69,7 @@ def rmse(x, y):
     """Root mean square error.
 
     Parameters
-    ----------
+    ==========
     x : numpy.ndarray
         Predicted values. If predictions are provided as an ensemble, the mean
         across the last axis is used.
@@ -77,12 +77,12 @@ def rmse(x, y):
         Ground truth values.
 
     Returns
-    -------
+    =======
     float
         The RMSE between ``x`` and ``y``.
     
     Examples
-    --------
+    ========
     >>> import numpy as np
     >>> pred = np.array([1.0, 2.0, 3.0])
     >>> truth = np.array([1.0, 2.0, 4.0])

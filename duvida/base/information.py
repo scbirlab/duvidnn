@@ -15,6 +15,7 @@ from .aggregators import get_aggregator, AggFunction
 class DoubtMixinBase(ABC):
 
     optimizer = None
+    device = "cpu"
 
     @staticmethod
     def _pack_params_like(
@@ -187,7 +188,11 @@ class DoubtMixinBase(ABC):
         param_gradient = param_grad_fn(data[self._in_key])
         doubtscore = aggregator(
             concatenate([
-                self.doubtscore_core(fisher_score[name], param_gradient[name]) 
+                self.doubtscore_core(
+                    fisher_score[name], 
+                    param_gradient[name], 
+                    device=self.device,
+                ) 
                 for name in fisher_score
             ], axis=-1), 
         )
@@ -223,6 +228,7 @@ class DoubtMixinBase(ABC):
                     param_gradient[name], 
                     param_hessian[name],
                     optimality_approximation=optimality_approximation,
+                    device=self.device,
                 ) for name in fisher_score
             ], axis=-1), 
         )
