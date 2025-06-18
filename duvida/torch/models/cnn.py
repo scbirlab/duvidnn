@@ -5,7 +5,7 @@ from typing import Callable, Iterable, List, Optional, Union
 from carabiner import cast
 
 from torch.optim import Adam, Optimizer
-from torch.nn import BatchNorm1d, Dropout, Flatten, Linear, Module, SiLU, Sequential
+from torch.nn import BatchNorm1d, Conv2d, Dropout, Flatten, Linear, Module, SiLU, Sequential
 from torch import nn
 
 from .mlp import LinearStack
@@ -144,7 +144,7 @@ class TorchCNN2DBase(LinearStack2):
             self.padding = padding
         self.dropout = dropout
         self.pool_stride = pool_stride
-        self._layer_class = nn.Conv2d
+        self._layer_class = Conv2d
         self._layer_kwargs = {
             "kernel_size": self.kernel_size,
             "padding": self.padding,
@@ -174,7 +174,7 @@ class TorchCNN2DBase(LinearStack2):
         linear_layers = super().build_model(
             n_input=self.n_units,
             n_out=self.n_out,
-            layer_class=nn.Linear,
+            layer_class=Linear,
             n_hidden=self.n_conv_layers,
             n_units=self.n_units,
             dropout=self.dropout,
