@@ -18,7 +18,7 @@ from ...stateless.config import config
 config.set_backend('torch', precision='float')
 
 from ...stateless.typing import Array, ArrayLike
-from ..models import ChempropEnsemble, TorchMLPEnsemble
+from ..models import ChempropEnsemble, TorchMLPEnsemble, TorchCNN2DEnsemble
 from .data import ChempropDataMixin, DataMixin, TorchChemMixin
 from .information import DoubtMixin, ChempropDoubtMixin
 from .training import ModelTrainer
@@ -130,5 +130,18 @@ class ChempropModelBox(ChempropDataMixin, ChempropDoubtMixin, ChempropModelBoxBa
         return ChempropEnsemble(
             n_input=self.input_shape[-1],
             n_out=self.output_shape[-1], 
+            **self._model_config,
+        )
+
+@register_modelbox("cnn")
+class CNN2DModelBox(TorchModelBoxBase, ModelBoxWithVarianceBase):
+
+    def create_model(self, *args, **kwargs):
+        self._model_config.update(kwargs)  # makes sure model checkpointing saves the keyword args
+        return TorchCNN2DEnsemble(
+            n_input=self.input_shape[-3],  # input channels (batch, C, H, W)
+            img_shape=self.input_shape[-2:],
+            n_out=self.output_shape[-1], 
+            *args, 
             **self._model_config,
         )
