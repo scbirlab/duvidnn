@@ -118,7 +118,7 @@ class CNNStack(LinearStack):
         return Sequential(*layers)
         
 
-class TorchCNN2DBase(LinearStack2):
+class TorchCNN2DBase(CNNStack):
     def __init__(
         self,
         n_input: int, 
