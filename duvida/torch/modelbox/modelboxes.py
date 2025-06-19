@@ -134,7 +134,7 @@ class ChempropModelBox(ChempropDataMixin, ChempropDoubtMixin, ChempropModelBoxBa
         )
 
 @register_modelbox("cnn")
-class CNN2DModelBox(TorchModelBoxBase, ModelBoxWithVarianceBase):
+class TorchCNN2DModelBox(TorchModelBoxBase, ModelBoxWithVarianceBase):
 
     def create_model(self, *args, **kwargs):
         self._model_config.update(kwargs)  # makes sure model checkpointing saves the keyword args
