@@ -16,7 +16,7 @@ from torch.nn import (
     SiLU, 
     Sequential
 )
-from torch import nn
+from torch import zeros
 
 from .mlp import LinearStack
 from .utils.ensemble import TorchEnsembleMixin
@@ -107,7 +107,7 @@ class CNNStack(LinearStack):
             )
         if infer_projection:
             with torch.no_grad():
-                dummy = torch.zeros(1, n_input, *img_shape)  # adjust shape to match input
+                dummy = zeros(1, n_input, *img_shape)  # adjust shape to match input
                 out = Sequential(*layers)(dummy)
                 n_feats = out.view(1, -1).size(1)
         else:
