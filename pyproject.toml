@@ -1,10 +1,10 @@
 [project]
-name = "duvida"
-version = "0.0.2"
+name = "duvidnn"
+version = "0.0.3"
 authors = [
   { name="Eachan Johnson", email="eachan.johnson@crick.ac.uk" },
 ]
-description = "Calculating exact and approximate confidence and information metrics for deep learning on general purpose and chemistry tasks."
+description = "Deep learning with uncertainty for general purpose, chemistry, and taxonomic tasks."
 readme = "README.md"
 requires-python = ">=3.11"
 license = { file = "LICENSE" }
@@ -35,25 +35,25 @@ classifiers = [
 dependencies = [
   "carabiner-tools[pd,mpl]>=0.0.4",
   "datasets>=2.15.0",
+  "duvida>=0.0.3",
   "huggingface_hub",
   "numpy",
+  "torch>=2.4",
+  "torchvision",
+  "lightning",
+  "tensorboard",
   "tqdm",
 ]
 
 [project.optional-dependencies]
-#tf = ["duvida", "tensorflow"]
-jax = ["jax>=0.5.3"]
-jax_cuda12 = ["jax[cuda12]>=0.5.3"]
-jax_cuda12_local = ["jax[cuda12_local]>=0.5.3"]
-torch = ["torch>=2.4", "torchvision", "lightning", "tensorboard"]
 transformers = ["torch>=2.4", "torchvision", "transformers"]
-chem = ["chemprop>=2.1.0", "schemist>=0.0.4.post1", "lightning", "tensorboard"]
+chem = ["chemprop>=2.1.0", "schemist>=0.0.4.post1"]
 splits = ["umap-learn", "scipy", "schemist>=0.0.4.post1", "tdigest>=0.5", "faiss-cpu>=1.11"]
 splits_gpu = ["umap-learn", "scipy", "schemist>=0.0.4.post1", "tdigest>=0.5", "faiss-gpu"]
 
 [project.urls]
-"Homepage" = "https://github.com/scbirlab/duvida"
-"Bug Tracker" = "https://github.com/scbirlab/duvida/issues"
+"Homepage" = "https://github.com/scbirlab/duvidnn"
+"Bug Tracker" = "https://github.com/scbirlab/duvidnn/issues"
 
 [project.scripts] 
 duvida = "duvida.cli:main"

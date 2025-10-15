@@ -1,20 +1,18 @@
 # 🧐 duvida
 
-![GitHub Workflow Status (with branch)](https://img.shields.io/github/actions/workflow/status/scbirlab/duvida/python-publish.yml)
-![PyPI - Python Version](https://img.shields.io/pypi/pyversions/duvida)
-![PyPI](https://img.shields.io/pypi/v/duvida)
+![GitHub Workflow Status (with branch)](https://img.shields.io/github/actions/workflow/status/scbirlab/duvidnn/python-publish.yml)
+![PyPI - Python Version](https://img.shields.io/pypi/pyversions/duvidnn)
+![PyPI](https://img.shields.io/pypi/v/duvidnn)
 
-**duvida** (Portuguese for _doubt_) is a suite of python tools for calculating confidence and information metrics 
-for deep learning. It provides lower-level function transforms for exact and approximate Hessian diagonals 
-in JAX and pytorch, as well as a higher-level framework for calculating confidence and information metrics
-of geenral purpose and chemistry-specific neural networks. 
+**duvidnn** is a suite of python tools for calculating confidence and information metrics 
+for deep learning. It provides a higher-level framework for calculating confidence and information metrics
+of general purpose, taxonomic and chemistry-specific neural networks. 
 
 As a bonus, **duvida** also provides an easy command-line interface for training and testing models.
 
 - [Installation](#installation)
 - [Python API](#python-api)
     - [Neural networks](#neural-networks)
-    - [Exact and approximate Hessian diagonals](#exact-and-approximate-hessian-diagonals)
 - [More advanced API](#more-advanced-python-api-implementing-a-new-modelbox)
 - [Command-line interface](#command-line-interface)
 - [Issues, problems, suggestions](#issues-problems-suggestions)
@@ -24,36 +22,24 @@ As a bonus, **duvida** also provides an easy command-line interface for training
 
 ### The easy way
 
-You can install the precompiled version directly using `pip`. You need to specify the machine learning framework
-that you want to use:
+You can install the precompiled version directly using `pip`.
 
 ```bash
-$ pip install duvida[jax]
-# or
-$ pip install duvida[jax_cuda12]  # for JAX installing CUDA 12 for GPU support
-# or
-$ pip install duvida[jax_cuda12_local]  # for JAX using a locally-installed CUDA 12
-# or
-$ pip install duvida[torch]
+$ pip install duvidnn
 ```
 
-If you want to use duvida for chemistry machine learning and AI (using the pytorch backend), use:
+If you want to use duvida for chemistry machine learning and AI, use:
 
 ```bash
 $ pip install duvida[chem]
 ```
-
-We have implemented JAX and pytorch functional transformations for approximate and exact Hessian diagonals,
-and doubtscore and information sensitivity. These can be used with JAX- and pytorch-based frameworks.
-
-At the moment, training and inference of full models in `ModelBox` objects is implemented only in pytorch. 
 
 ### From source
 
 Clone the repository, then `cd` into it. Then run:
 
 ```bash
-$ pip install -e .[torch]
+$ pip install -e .
 ```
 
 ## Python API
@@ -170,62 +156,6 @@ doubtscore = doubtscore.to_pandas()
 
 See the [Huggingface datasets documentation](https://huggingface.co/docs/datasets/) for more.
 
-### Exact and approximate Hessian diagonals
-
-**duvida** provides functional transforms for JAX and pytorch that calculate 
-either exact or approximate Hessian diagonals.
-
-You can check which backend you're using:
-
-```python
->>> from duvida.stateless.config import config
->>> config
-Config(backend='jax', precision='double', fallback=True)
-```
-
-It can be changed:
-
-```python
->>> config.set_backend("torch")
-'torch'
->>> config
-Config(backend='torch', precision='double', fallback=True)
-```
-
-Now you can calculate exact Hessian diagonals without calculating the 
-full matrix:
-
-```python
->>> from duvida.stateless.utils import hessian
->>> import duvida.stateless.numpy as dnp 
->>> f = lambda x: dnp.sum(x ** 3. + x ** 2. + 4.)
->>> a = dnp.array([1., 2.])
->>> exact_diagonal(f)(a) == dnp.diag(hessian(f)(a))
-Array([ True,  True], dtype=bool)
-```
-
-Various approximations are also allowed.
-
-```python
->>> from duvida.stateless.hessians import get_approximators
->>> get_approximators()  # Use no arguments to show what's available
-('squared_jacobian', 'exact_diagonal', 'bekas', 'rough_finite_difference')
-```
-
-Now apply:
-
-```python
->>> approx_hessian_diag = get_approximators("bekas")
->>> g = lambda x: dnp.sum(dnp.sum(x) ** 3. + x ** 2. + 4.)
->>> a = dnp.array([1., 2.])
->>> dnp.diag(hessian(g)(a))  # Exact
-Array([38., 38.], dtype=float64)
->>> approx_hessian_diag(g, n=1000)(a)  # Less accurate when parameters interact
-Array([38.52438307, 38.49679655], dtype=float64)
->>> approx_hessian_diag(g, n=1000, seed=1)(a)  # Change the seed to alter the outcome
-Array([39.07878869, 38.97796601], dtype=float64)
-```
-
 ## More advanced Python API: Implementing a new `ModelBox`
 
 Bringing a new pytorch model to **duvida** is relatively straightforward. First, write your model,
@@ -313,11 +243,11 @@ the `duvida.base.ModelBoxBase` abstract class, making sure to implement its abst
 
 ## Command-line interface
 
-**duvida** has a command-line interface for training and checkpointing the built-in models. 
+**duvidnn** has a command-line interface for training and checkpointing the built-in models. 
 
 ```bash
 $ duvida --help
-usage: duvida [-h] [--version] {hyperprep,train,predict,split,percentiles} ...
+usage: duvidnn [-h] [--version] {hyperprep,train,predict,split,percentiles} ...
 
 Calculating exact and approximate confidence and information metrics for deep learning on general purpose and chemistry tasks.
 
@@ -347,7 +277,7 @@ You can add columns to datasets which annotate the top percentiles of named colu
 with datasets that don't fit in memory.
 
 ```bash
-duvida percentiles \
+$ duvidnn percentiles \
     hf://scbirlab/fang-2023-biogen-adme@scaffold-split:train \
     --columns clogp tpsa \
     --percentiles 1 5 10 \
@@ -363,7 +293,7 @@ that don't fit in memory. Make it random but reproducible with `--seed`, otherwi
 algorithm is used.
 
 ```bash
-$ duvida split hf://scbirlab/fang-2023-biogen-adme@scaffold-split:train \
+$ duvidnn split hf://scbirlab/fang-2023-biogen-adme@scaffold-split:train \
     --train .7 \
     --validation .15 \
     --structure smiles \
@@ -378,7 +308,7 @@ $ duvida split hf://scbirlab/fang-2023-biogen-adme@scaffold-split:train \
 To train:
 
 ```bash
-$ duvida train -1 hf://scbirlab/fang-2023-biogen-adme@scaffold-split:train \
+$ duvidnn train -1 hf://scbirlab/fang-2023-biogen-adme@scaffold-split:train \
     -2 hf://scbirlab/fang-2023-biogen-adme@scaffold-split:test \
     --ensemble-size 10 --epochs 10 --learning-rate 0.001 \
     --output model.dv
@@ -389,14 +319,14 @@ $ duvida train -1 hf://scbirlab/fang-2023-biogen-adme@scaffold-split:train \
 There is also a simple hyperparameter utility.
 
 ```bash
-$ printf '{"model_class": "fingerprint", use_2d": [true, false], "n_units": 16, "n_hidden": 3}' | duvida hyperprep -o hyperopt.json
+$ printf '{"model_class": "fingerprint", use_2d": [true, false], "n_units": 16, "n_hidden": 3}' | duvidnn hyperprep -o hyperopt.json
 ```
 
 This generates a file containing the Cartesian product of the JSON items. It can be indexed (0-based) 
 with the `-i <int>` option to supply a specific training configuration like so:
 
 ```bash
-$ duvida train \
+$ duvidnn train \
     -1 hf://scbirlab/fang-2023-biogen-adme@scaffold-split:train \
     -2 hf://scbirlab/fang-2023-biogen-adme@scaffold-split:test \
     -c hyperopt.json \
@@ -415,7 +345,7 @@ When predicting, there is also the option to calculate uncertainty metrics like 
 (for chemistry models), doubtscore, and information sensitivity.
 
 ```bash
-duvida predict \
+$ duvidnn predict \
     --test hf://scbirlab/fang-2023-biogen-adme@scaffold-split:test \
     --checkpoint model.dv \
     --start 100 \
@@ -429,7 +359,7 @@ duvida predict \
 
 ## Issues, problems, suggestions
 
-Add to the [issue tracker](https://www.github.com/scbirlab/duvida/issues).
+Add to the [issue tracker](https://www.github.com/scbirlab/duvidnn/issues).
 
 ## Documentation
 
