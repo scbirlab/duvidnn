@@ -10,7 +10,7 @@ import sys
 from carabiner import cast, pprint_dict, print_err
 from carabiner.cliutils import clicommand, CLIOption, CLICommand, CLIApp
 
-from . import __version__
+from . import app_name, __version__
 from .checkpoint_utils import _load_json, save_json
 from .utils.package_data import _get_data_path
 
@@ -1128,7 +1128,7 @@ def main() -> None:
     )
 
     app = CLIApp(
-        "duvida", 
+        app_name, 
         version=__version__,
         description=(
             "Calculating exact and approximate confidence and "
