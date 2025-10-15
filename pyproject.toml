@@ -35,13 +35,14 @@ classifiers = [
 dependencies = [
   "carabiner-tools[pd,mpl]>=0.0.4",
   "datasets>=2.15.0",
-  "duvida[torch]>=0.0.3",
+  "duvida[torch]>=0.0.3.post1",
   "huggingface_hub",
   "numpy",
   "platformdirs>=4.4.0",
   "torch>=2.4",
   "torchvision",
   "lightning",
+  "scipy",
   "tensorboard",
   "tqdm",
 ]
