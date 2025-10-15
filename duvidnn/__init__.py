@@ -1,3 +1,3 @@
 from importlib.metadata import version
 
-__version__ = version("duvida")
+__version__ = version("duvidnn")

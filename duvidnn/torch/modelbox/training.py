@@ -1,13 +1,12 @@
 """Mixins for training."""
 
+from duvida.config import config
+config.set_backend('torch', precision='float')
 from lightning import LightningModule, Trainer
 from lightning.pytorch.plugins.environments import LightningEnvironment
 from torch.utils.data import DataLoader
 
 from ...base.training import ModelTrainerBase
-from ...stateless.config import config
-
-config.set_backend('torch', precision='float')
 
 class ModelTrainer(ModelTrainerBase):
 

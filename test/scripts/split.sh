@@ -5,7 +5,7 @@ set -x
 
 TRAIN="hf://scbirlab/fang-2023-biogen-adme@scaffold-split:train"
 
-duvida percentiles \
+duvidnn percentiles \
     "$TRAIN" \
     --columns clogp tpsa \
     --percentiles 1 5 10 \
@@ -17,7 +17,7 @@ duvida percentiles \
 
 for type in faiss scaffold
 do
-    duvida split \
+    duvidnn split \
         "$TRAIN" \
         --train .7 \
         --validation .15 \

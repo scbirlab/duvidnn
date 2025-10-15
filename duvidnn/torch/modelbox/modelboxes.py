@@ -3,6 +3,9 @@
 from typing import Tuple, Optional
 import os
 
+from duvida.config import config
+config.set_backend('torch', precision='float')
+from duvida.types import Array, ArrayLike
 import torch
 
 from ...base.modelboxes import (
@@ -13,11 +16,7 @@ from ...base.modelboxes import (
 )
 from ...base.modelbox_registry import register_modelbox
 from ...checkpoint_utils import load_checkpoint_file
-from ...stateless.config import config
 
-config.set_backend('torch', precision='float')
-
-from ...stateless.typing import Array, ArrayLike
 from ..models import ChempropEnsemble, TorchMLPEnsemble, TorchCNN2DEnsemble
 from .data import ChempropDataMixin, DataMixin, TorchChemMixin
 from .information import DoubtMixin, ChempropDoubtMixin

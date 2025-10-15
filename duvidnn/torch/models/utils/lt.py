@@ -2,12 +2,12 @@
 
 from typing import Mapping, Optional
 
+from duvida.types import Array, ArrayLike
 from lightning import LightningModule
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import ReduceLROnPlateau 
 
 from ...functions import mse_loss
-from ....stateless.typing import Array, ArrayLike
 
 
 class LightningMixin(LightningModule):

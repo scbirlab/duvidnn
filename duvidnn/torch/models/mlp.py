@@ -2,6 +2,10 @@
 
 from typing import Callable, List, Optional
 
+from duvida.config import config
+config.set_backend('torch', precision='float')
+from duvida.types import Array, ArrayLike
+from duvida import jit
 from carabiner import cast, print_err
 from torch.nn import BatchNorm1d, Dropout, Identity, Linear, Module, SiLU, Sequential
 
@@ -9,12 +13,6 @@ from torch.optim import Adam, Optimizer
 
 from .utils.ensemble import TorchEnsembleMixin
 from .utils.lt import LightningMixin
-from ...stateless.config import config
-
-config.set_backend('torch', precision='float')
-
-from ...stateless.typing import Array, ArrayLike
-from ...stateless.utils import jit
 
 _DEFAULT_ACTIVATION: Callable[..., Module] = SiLU  # Smooth activation to prevent gradient collapse
 _DEFAULT_N_UNITS: int = 16

@@ -3,17 +3,12 @@
 from typing import Callable, Dict, Mapping, Tuple, Optional, Union
 from functools import partial
 
-import torch
-from torch.func import functional_call, replace_all_batch_norm_modules_
-from torch.nn import Module, Parameter
-
-from ...base.information import DoubtMixinBase
-from ...stateless.config import config
-
+from duvida.config import config
 config.set_backend('torch', precision='float')
-
-from ...stateless.hessians import _DEFAULT_APPROXIMATOR
-from ...stateless.information import (
+from duvida.types import Array, ArrayLike, LossFunction, StatelessModel
+from duvida import get_eps, jit, vmap
+from duvida.hessians import _DEFAULT_APPROXIMATOR
+from duvida.information import (
     fisher_score, 
     fisher_information_diagonal, 
     parameter_gradient, 
@@ -21,8 +16,12 @@ from ...stateless.information import (
     parameter_gradient_unrolled, 
     parameter_hessian_diagonal_unrolled
 )
-from ...stateless.typing import Array, ArrayLike, LossFunction, StatelessModel
-from ...stateless.utils import get_eps, jit, vmap
+import torch
+from torch.func import functional_call, replace_all_batch_norm_modules_
+from torch.nn import Module, Parameter
+
+from ...base.information import DoubtMixinBase
+
 from ..functions import mse_loss
 from ..models.utils.ensemble import TorchEnsembleMixin
 

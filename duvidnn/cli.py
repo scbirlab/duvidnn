@@ -1,4 +1,4 @@
-"""Command-line interface for duvida."""
+"""Command-line interface for duvidnn."""
 
 from typing import Mapping, Optional, Union
 

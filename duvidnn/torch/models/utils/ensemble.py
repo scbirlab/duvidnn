@@ -4,10 +4,10 @@ from typing import Iterable, Union
 
 from abc import ABC, abstractmethod
 
+from duvida.types import Array, ArrayLike
 from torch import stack
 from torch.nn import Module, ModuleDict
 
-from ....stateless.typing import Array, ArrayLike
 
 
 class TorchEnsembleMixin(ABC):

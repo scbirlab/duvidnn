@@ -2,8 +2,17 @@
 
 import os
 
-DUVIDA_CACHE = "DUVIDA_CACHE"
-DEFAULT_CACHE = os.path.join("~", ".cache", "duvida", "data")
+from platformdirs import user_cache_dir
+
+from .. import app_name, __author__, __version__
+
+CACHE_DIR = user_cache_dir(
+    app_name,
+    __author__,
+)
+
+DUVIDA_CACHE = "DUVIDNN_CACHE"
+DEFAULT_CACHE = CACHE_DIR
 
 def _get_data_path(
     filename: str, 

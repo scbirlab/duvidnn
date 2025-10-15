@@ -35,9 +35,10 @@ classifiers = [
 dependencies = [
   "carabiner-tools[pd,mpl]>=0.0.4",
   "datasets>=2.15.0",
-  "duvida>=0.0.3",
+  "duvida[torch]>=0.0.3",
   "huggingface_hub",
   "numpy",
+  "platformdirs>=4.4.0",
   "torch>=2.4",
   "torchvision",
   "lightning",
@@ -56,13 +57,13 @@ splits_gpu = ["umap-learn", "scipy", "schemist>=0.0.4.post1", "tdigest>=0.5", "f
 "Bug Tracker" = "https://github.com/scbirlab/duvidnn/issues"
 
 [project.scripts] 
-duvida = "duvida.cli:main"
+duvidnn = "duvidnn.cli:main"
 
 [tool.setuptools]
 #packages = ["duvida"]
 # If there are data files included in your packages that need to be
 # installed, specify them here.
-package-data = {duvida = ["data/*.json"]}
+package-data = {duvidnn = ["data/*.json"]}
 
 [build-system]
 # These are the assumed default build requirements from pip:
@@ -71,4 +72,4 @@ requires = ["setuptools>=43.0.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [test]
-deps = ["pytest>=7.4", "pytest-cov", "duvida[chem,jax,torch,transformers,splits]"] 
+deps = ["pytest>=7.4", "pytest-cov", "duvidnn[chem,transformers,splits]"] 

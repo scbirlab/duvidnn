@@ -12,14 +12,14 @@ STOP=550
 
 printf \
     '{"n_units": [8, 16], "n_hidden": [4, 6], "residual_depth": [null, 2]}' \
-| duvida hyperprep \
+| duvidnn hyperprep \
     -o test/outputs/hyperopt.json
 
 for class in fingerprint chemprop
 do
     for i in 0 1
     do
-        duvida train \
+        duvidnn train \
             -1 "$TEST" \
             -2 "$TRAIN" \
             -S smiles \
@@ -37,7 +37,7 @@ do
         ls -lah test/outputs/models
         ls -lah test/outputs/models/"$class-$i"/*
         outfile="test/outputs/predictions/$class-$i.csv"
-        duvida predict \
+        duvidnn predict \
             --test "$TRAIN" \
             --checkpoint test/outputs/models/"$class-$i" \
             --start $START \

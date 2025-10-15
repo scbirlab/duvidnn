@@ -1,4 +1,4 @@
-# 🧐 duvida
+# 🧐 duvidnn
 
 ![GitHub Workflow Status (with branch)](https://img.shields.io/github/actions/workflow/status/scbirlab/duvidnn/python-publish.yml)
 ![PyPI - Python Version](https://img.shields.io/pypi/pyversions/duvidnn)

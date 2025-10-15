@@ -2,8 +2,9 @@
 
 from typing import Callable, Iterable, List, Optional, Union
 
+from duvida.types import Array, ArrayLike
+from duvida import jit
 from carabiner import cast
-
 from torch.optim import Adam, Optimizer
 from torch.nn import (
     BatchNorm1d, 
@@ -22,8 +23,6 @@ from .mlp import LinearStack
 from .utils.ensemble import TorchEnsembleMixin
 from .utils.lt import LightningMixin
 
-from ...stateless.typing import Array, ArrayLike
-from ...stateless.utils import jit
 
 _DEFAULT_ACTIVATION = SiLU  # Smooth activation to prevent gradient collapse
 _DEFAULT_N_UNITS: int = 16

@@ -2,9 +2,8 @@
 
 from typing import Callable, Tuple
 
+from duvida.types import ArrayLike, Array
 import torch 
-
-from ..stateless.typing import ArrayLike, Array
 
 
 def _normalize_dims(
