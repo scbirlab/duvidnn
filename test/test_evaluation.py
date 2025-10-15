@@ -1,6 +1,6 @@
 import numpy as np
 import pytest
-from duvida.base.evaluation import rmse, pearson_r, spearman_r
+from duvidnn.base.evaluation import rmse, pearson_r, spearman_r
 
 
 def test_rmse_simple():
