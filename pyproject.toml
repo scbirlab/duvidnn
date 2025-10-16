@@ -58,7 +58,7 @@ splits_gpu = ["umap-learn", "scipy", "schemist>=0.0.4.post1", "tdigest>=0.5", "f
 "Bug Tracker" = "https://github.com/scbirlab/duvidnn/issues"
 
 [project.scripts] 
-duvidnn = "duvidnn.cli:main"
+duvidnn = "duvidnn.cli_module.cli:main"
 
 [tool.setuptools]
 #packages = ["duvida"]
