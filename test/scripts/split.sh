@@ -1,31 +1,34 @@
 #!/usr/bin/env bash
 
-set -e
-set -x
+set -euox pipefail
 
 TRAIN="hf://scbirlab/fang-2023-biogen-adme@scaffold-split:train"
 
-duvidnn percentiles \
+script_dir=$(readlink -f $(dirname "$0"))
+CACHE="$script_dir/outputs/cache"
+OUTPUT="$script_dir/outputs/split"
+
+HF_DATASETS_CACHE="$CACHE" duvidnn percentiles \
     "$TRAIN" \
     --columns clogp tpsa \
     --percentiles 1 5 10 \
     --batch 128 \
-    --cache test/outputs/cache \
-    --output test/outputs/split/percentiles.csv \
-    --plot test/outputs/split/percentiles-plot.png \
+    --cache "$CACHE" \
+    --output "$OUTPUT"/percentiles.csv \
+    --plot "$OUTPUT"/percentiles-plot.png \
     --structure smiles
 
 for type in faiss scaffold
 do
-    duvidnn split \
+    HF_DATASETS_CACHE="$CACHE" duvidnn split \
         "$TRAIN" \
         --train .7 \
         --validation .15 \
         -S smiles \
-        --type $type \
+        --type "$type" \
         -k 2 \
-        --seed 1 \
-        --cache test/outputs/cache \
-        --output test/outputs/split/$type.csv \
-        --plot test/outputs/split/$type-plot.png
+        --seed 42 \
+        --cache "$CACHE" \
+        --output "$OUTPUT"/$type.csv \
+        --plot "$OUTPUT"/$type-plot.png
 done

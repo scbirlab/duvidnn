@@ -13,7 +13,7 @@ def _plot_history(
     data_to_plot = (
         pd.read_csv(lightning_csv)
         .groupby(['epoch', 'step'])
-        .agg(np.nanmean)
+        .agg("mean")
         .reset_index()
     )
 

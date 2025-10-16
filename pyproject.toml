@@ -34,7 +34,7 @@ classifiers = [
 
 dependencies = [
   "carabiner-tools[pd,mpl]>=0.0.4",
-  "datasets>=2.15.0",
+  "datasets<4,>=3.0.0",
   "duvida[torch]>=0.0.3.post1",
   "huggingface_hub",
   "numpy",
