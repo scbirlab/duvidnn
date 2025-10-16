@@ -21,7 +21,7 @@ printf \
 | duvidnn hyperprep \
     -o "$HYPERPARAMS"
 
-for class in chemprop fingerprint #chemprop
+for class in fingerprint chemprop
 do
     for i in 0 1
     do
@@ -61,7 +61,7 @@ do
             echo "Predictions have wrong number of rows: $output_nlines"
             exit 1
         else
-            cat "$outfile" | tr , $'\t' | head -n50
+            head -n50 "$outfile" | tr , $'\t'
         fi
     done
 done

@@ -5,8 +5,9 @@ set -euox pipefail
 TRAIN="hf://scbirlab/fang-2023-biogen-adme@scaffold-split:train"
 
 script_dir=$(readlink -f $(dirname "$0"))
-CACHE="$script_dir/outputs/cache"
-OUTPUT="$script_dir/outputs/split"
+OUTPUT_DIR=$(readlink -f "$script_dir"/..)/outputs
+CACHE="$OUTPUT_DIR/cache"
+OUTPUT="$OUTPUT_DIR/split"
 
 HF_DATASETS_CACHE="$CACHE" duvidnn percentiles \
     "$TRAIN" \
