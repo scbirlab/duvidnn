@@ -29,4 +29,6 @@ def _get_data_path(
         os.path.expanduser(default),
     )
     os.makedirs(cache_dir, exist_ok=True)
+    os.environ["HF_HOME"] = cache_dir
+    os.environ["HF_DATASETS_CACHE"] = cache_dir
     return cache_dir, os.path.join(cache_dir, filename)
