@@ -158,7 +158,7 @@ def plot_chemical_splits(
                     c="lightgrey" if (label in (False, 0) and binary) else f"C{i}",
                     data=df.query(f"{col} == @label"),
                     zorder=1,
-                    label=label,
+                    label="_none" if (label in (False, 0) and binary) else label,
                 )
             add_legend(ax)
         else:
