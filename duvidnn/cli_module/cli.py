@@ -18,8 +18,8 @@ from .train import _train
 
 cache_dir, modelbox_name_file = _get_data_path("modelbox-names.json")
 if not os.path.exists(modelbox_name_file):
-    from .autoclass import AutoModelBox
-    from .base.modelbox_registry import DEFAULT_MODELBOX, MODELBOX_NAMES
+    from ..autoclass import AutoModelBox
+    from ..base.modelbox_registry import DEFAULT_MODELBOX, MODELBOX_NAMES
     save_json([DEFAULT_MODELBOX, MODELBOX_NAMES], modelbox_name_file)
 else:
     DEFAULT_MODELBOX, MODELBOX_NAMES = _load_json(cache_dir, os.path.basename(modelbox_name_file))
