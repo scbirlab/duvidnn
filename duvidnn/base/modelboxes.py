@@ -6,7 +6,7 @@ import os
 
 from carabiner import print_err
 from datasets import Dataset
-from numpy import ndarray
+from numpy import ndarray, asarray
 from pandas import DataFrame
 
 from .aggregators import get_aggregator, AggFunction
@@ -329,7 +329,7 @@ class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
         print(y_vals.shape, preds.shape)
         if isinstance(metrics, Mapping):
             metrics = {
-                name: metric(preds, y_vals).tolist()
+                name: asarray(metric(preds, y_vals)).tolist()
                 for name, metric in dict(metrics).items()
             }
         elif isinstance(metrics, (Iterable, Callable)):

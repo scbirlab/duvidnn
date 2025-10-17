@@ -295,7 +295,7 @@ class DataMixinBase(ABC):
                     )
                 elif ":" in featurizer and featurizer.split(":")[-1] in Preprocessor.show():
                     try:
-                        name, col = featurizer.split(":")
+                        col, name = featurizer.split(":")
                     except ValueError:
                         raise ValueError(
                             f"""
@@ -614,9 +614,10 @@ class ChemMixinBase(DataMixinBase):
             output_representation="smiles",
         )
         if len(data[structure_column]) > 1 and not isinstance(data[structure_column], str):
-            data[smiles_column] = list(converted)
+            result = list(converted)
         else:
-            data[smiles_column] = [converted]
+            result = [converted]
+        data[smiles_column] = result
         return data
 
     @staticmethod

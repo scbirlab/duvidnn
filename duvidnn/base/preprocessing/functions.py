@@ -1,15 +1,9 @@
 """Data preprocessing functions."""
 
 from typing import Any, Callable, Dict, Iterable, List, Mapping, Optional, Union
-from functools import partial
+from functools import cache, partial
 
-from chemprop.data import (
-    MoleculeDatapoint, 
-    MoleculeDataset, 
-    MolGraph
-)
 import numpy as np
-from schemist.features import calculate_feature
 
 from .registry import register_function
 
@@ -25,6 +19,19 @@ def Identity() -> Callable:
     ) -> np.ndarray:
         return np.asarray(data[input_column])
     return _identity
+
+
+@register_function("log")
+def Log() -> Callable:
+    """Log10 of float.
+    
+    """
+    def _log(
+        data: Mapping[str, Iterable],
+        input_column: str
+    ) -> np.ndarray:
+        return np.log(np.asarray(data[input_column]))
+    return _log
 
 
 @register_function("one-hot")
@@ -54,6 +61,10 @@ def MorganFingerprint(**kwargs) -> Callable:
     """Get Morgan fingerprint from SMILES.
     
     """
+    try:
+        from schemist.features import calculate_feature
+    except ImportError:
+        raise ImportError(f"schemist not installed! Try `pip install duvidnn[chem]`.")
     feature_calculator = partial(
         calculate_feature,
         feature_type="fp",
@@ -80,6 +91,11 @@ def Descriptors2D(
     """Get 2D descriptors from SMILES, optionally normalized.
     
     """
+    try:
+        from schemist.features import calculate_feature
+    except ImportError:
+        raise ImportError(f"schemist not installed! Try `pip install duvidnn[chem]`.")
+
     feature_calculator = partial(
         calculate_feature,
         feature_type="2d",
@@ -98,6 +114,36 @@ def Descriptors2D(
     return _descriptors_2d
 
 
+@register_function("vectome-fingerprint")
+def VectomeFingerprint(
+    method: str = "countsketch",
+    check_spelling: bool = True,
+    **kwargs
+) -> Callable:
+    """Get MinHash fingerprint from species name or taxon ID.
+    
+    """
+    try:
+        from vectome.vectorize import vectorize
+    except ImportError:
+        raise ImportError(f"Vectome not installed! Try `pip install duvidnn[bio]`.")
+
+    feature_calculator = cache(partial(
+        vectorize,
+        method=method,
+        check_spelling=check_spelling,
+        **kwargs,
+    ))
+
+    def _vectome_fingerprint(
+        data: Mapping[str, Iterable],
+        input_column: str
+    ) -> np.ndarray:
+        return feature_calculator(query=tuple(data[input_column]))
+        
+    return _vectome_fingerprint
+
+
 @register_function("chemprop-mol")
 def ChempropData(
     label_column: Optional[Union[str, Iterable[str]]] = None,
@@ -106,6 +152,15 @@ def ChempropData(
     """Convert SMILES to iterable of Chemprop datum.
     
     """
+    try:
+        from chemprop.data import (
+            MoleculeDatapoint, 
+            MoleculeDataset, 
+            MolGraph
+        )
+    except ImportError:
+        raise ImportError("Chemprop not installed. Try `pip install duvidnn[chem]`.")
+
     if isinstance(extra_featurizers, str):
         extra_featurizers = [extra_featurizers]
     if isinstance(label_column, str):

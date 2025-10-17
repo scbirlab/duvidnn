@@ -50,6 +50,7 @@ dependencies = [
 [project.optional-dependencies]
 transformers = ["torch>=2.4", "torchvision", "transformers"]
 chem = ["chemprop>=2.1.0", "schemist>=0.0.4.post1"]
+bio = ["vectome>=0.0.1"]
 splits = ["umap-learn", "scipy", "schemist>=0.0.4.post1", "tdigest>=0.5", "faiss-cpu>=1.11"]
 splits_gpu = ["umap-learn", "scipy", "schemist>=0.0.4.post1", "tdigest>=0.5", "faiss-gpu"]
 
@@ -73,4 +74,4 @@ requires = ["setuptools>=43.0.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [test]
-deps = ["pytest>=7.4", "pytest-cov", "duvidnn[chem,transformers,splits]"] 
+deps = ["pytest>=7.4", "pytest-cov", "duvidnn[chem,bio,transformers,splits]"] 

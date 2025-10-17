@@ -10,6 +10,7 @@ from .eval import _evaluate_modelbox_and_save_metrics
 from .utils import _dict_to_pandas, _init_modelbox
 from ..checkpoint_utils import _load_json, save_json
 
+STRUCTURE_COLUMN_DEFAULT: str = "smiles"
 
 def _load_modelbox_training_data(
     modelbox,
@@ -31,7 +32,10 @@ def _load_modelbox_training_data(
         }
         if hasattr(modelbox, "tanimoto_column"):  # i.e., is for chemistry
             # command-line takes precedent:
-            load_data_args["structure_column"] = overrides.get("structure") or modelbox.structure_column
+            load_data_args["structure_column"] = overrides.get("structure") or modelbox._default_preprocessing_args.get("structure_column")
+            if load_data_args["structure_column"] is None:
+                print_err(f"Structure column not provided, falling back to {STRUCTURE_COLUMN_DEFAULT}.")
+                load_data_args["structure_column"] = STRUCTURE_COLUMN_DEFAULT
         pprint_dict(
             load_data_args,
             message="Data-loading configuration",
