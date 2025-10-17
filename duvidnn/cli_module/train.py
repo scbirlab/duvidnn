@@ -3,7 +3,7 @@ from argparse import Namespace
 from collections import defaultdict
 import os
 
-from carabiner import pprint_dict
+from carabiner import pprint_dict, print_err
 from carabiner.cliutils import clicommand
 
 from .eval import _evaluate_modelbox_and_save_metrics
