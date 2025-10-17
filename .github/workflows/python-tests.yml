@@ -42,6 +42,9 @@ jobs:
         pytest duvidnn/utils --doctest-modules
         # run other tests
         pytest test/test_evaluation.py
+    - name: Test CLI species featurizer
+      run: |
+        bash test/scripts/train-species.sh
     - name: Test CLI train/test
       run: |
         bash test/scripts/train.sh
