@@ -24,10 +24,10 @@ for class in fingerprint chemprop
 do
     for i in 0 1
     do
-        XDG_CACHE_HOME="$CACHE" HF_DATASETS_CACHE="$CACHE" duvidnn train \
+        XDG_CACHE_HOME="$CACHE" HF_HOME="$CACHE" duvidnn train \
             -1 "$TEST" \
             -2 "$TRAIN" \
-            -x species:vectome-fingerprint clogp mwt:log \
+            -x full_strain_name:vectome-fingerprint clogp mwt:log \
             -S smiles \
             -y pmic \
             -c "$HYPERPARAMS" \
@@ -43,7 +43,7 @@ do
         ls -lah "$OUTPUT"
         ls -lah "$OUTPUT"/"$class-$i"/*
         outfile="$OUTPUT_DIR"/predictions/"$class-$i.csv"
-        XDG_CACHE_HOME="$CACHE" HF_DATASETS_CACHE="$CACHE" duvidnn predict \
+        XDG_CACHE_HOME="$CACHE" HF_HOME="$CACHE" duvidnn predict \
             --test "$TRAIN" \
             --checkpoint "$OUTPUT"/"$class-$i" \
             --start $START \

@@ -21,11 +21,11 @@ printf \
 | duvidnn hyperprep \
     -o "$HYPERPARAMS"
 
-for class in fingerprint chemprop
+for class in chemprop fingerprint #chemprop
 do
     for i in 0 1
     do
-        HF_DATASETS_CACHE="$CACHE" duvidnn train \
+        HF_HOME="$CACHE" duvidnn train \
             -1 "$TEST" \
             -2 "$TRAIN" \
             -x clogp \
@@ -44,7 +44,7 @@ do
         ls -lah "$OUTPUT"
         ls -lah "$OUTPUT"/"$class-$i"/*
         outfile="$script_dir"/outputs/predictions/"$class-$i.csv"
-        HF_DATASETS_CACHE="$CACHE" duvidnn predict \
+        HF_HOME="$CACHE" duvidnn predict \
             --test "$TRAIN" \
             --checkpoint "$OUTPUT"/"$class-$i" \
             --start $START \
@@ -52,6 +52,8 @@ do
             --variance \
             --tanimoto \
             --doubtscore \
+            --information-sensitivity \
+            --last-layer \
             --optimality \
             -y log_rlm \
             --cache "$CACHE" \
