@@ -5,8 +5,9 @@ from dataclasses import asdict, dataclass, field
 
 import numpy as np
 
-from .registry import FUNCTION_REGISTRY
+from ... import app_name, __version__
 from ...checkpoint_utils import save_json, _load_json
+from .registry import FUNCTION_REGISTRY
 
 
 @dataclass
@@ -22,7 +23,7 @@ class Preprocessor:
         except KeyError:
             raise ValueError(f"Function '{self.name}' is not registered.")
         self.hash = self._get_hash()
-        self.hash_stub = self.hash[:7]
+        self.hash_stub = self.hash[:8]
         self.output_column = self._get_output_column()
         self.function = self.closure(**self.kwargs)
 
@@ -31,7 +32,7 @@ class Preprocessor:
         return Hasher.hash(self.to_dict())
 
     def _get_output_column(self):
-        return f"__f__{self.name}__{self.hash_stub}__{self.input_column}"
+        return f"{app_name}/{__version__}/feat:{self.input_column}:{self.name}={self.hash_stub}"
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert the function call to a JSON-serializable format."""
