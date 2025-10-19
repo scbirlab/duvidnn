@@ -27,8 +27,9 @@ def _load_modelbox_training_data(
             "data": overrides.get("training"), 
             "cache": cache,
             # command-line takes precedent:
-            "features": overrides.get("features") or modelbox._input_featurizers,
-            "labels": overrides.get("labels") or modelbox._label_cols, 
+            "features": overrides.get("features"),
+            "labels": overrides.get("labels"),
+            "context": overrides.get("context"),
         }
         if hasattr(modelbox, "tanimoto_column"):  # i.e., is for chemistry
             # command-line takes precedent:
@@ -133,6 +134,7 @@ def _train(args: Namespace) -> None:
 
     cli_config = {
         "class_name": args.model_class.casefold(),
+        "merge_method": args.fusion.casefold(),
         "use_2d": args.descriptors,
         "use_fp": args.fp,
         "n_hidden": args.hidden,
@@ -142,6 +144,20 @@ def _train(args: Namespace) -> None:
         "ensemble_size": args.ensemble_size,
         "learning_rate": args.learning_rate,
     }
+    if args.features is None:
+        if args.x2 is None:
+            features = None
+        else:
+            features = [args.x2]
+    else:
+        if args.x2 is None:
+            features = [args.features]
+        else:
+            features = [args.features, args.x2]
+
+    if (args.x2 is not None or args.context is not None) and not args.model_class.casefold().startswith("bilinear"):
+        print_err("[WARN] Can only use --x2 or --context with --model-class bilinear; concatentating to -x")
+        features = [[_f for f in features for _f in f]]
 
     modelbox, load_data_args = _init_modelbox_and_load_training_data(
         cli_config=cli_config,
@@ -154,7 +170,8 @@ def _train(args: Namespace) -> None:
         structure=args.structure,
         structure_representation=args.input_representation,
         labels=args.labels,
-        features=args.features,
+        features=features,
+        context=args.context,
     )
 
     pprint_dict(
