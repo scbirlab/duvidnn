@@ -252,6 +252,7 @@ def VectomeFingerprint(
         method=method,
         dim=ndim,
         check_spelling=check_spelling,
+        quiet=True,
         **kwargs,
     ))
 

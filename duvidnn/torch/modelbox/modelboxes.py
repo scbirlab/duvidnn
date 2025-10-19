@@ -121,14 +121,14 @@ class TorchBilinearModelBox(TorchModelBoxBase, ModelBoxWithVarianceBase):
     Examples
     ========
     >>> mb = TorchBilinearModelBox(ensemble_size=3) 
-    >>> mb.input_shape, mb.output_shape = (4,), (1,) # usually set by .load_training_data() 
-    >>> l = mb.create_model().bilinear_model
-    >>> l.n_input, l.n_out 
-    ((4,), 1)
+    >>> mb.input_shape, mb.output_shape = [(4,)], (1,) # usually set by .load_training_data() 
+    >>> mb.model = mb.create_model()
+    >>> mb.model.n_input, mb.model.n_out 
+    ([4], 1)
     >>> mb.input_shape, mb.output_shape, mb.context_shape = [(4,), (2,)], (1,), (5,) # usually set by .load_training_data() 
-    >>> l = mb.create_model().bilinear_model
-    >>> l.n_input, l.n_context, l.n_out 
-    ((4, 2), 5, 1)
+    >>> mb.model = mb.create_model()
+    >>> mb.model.n_input, mb.model.n_context, mb.model.n_out 
+    ([4, 2], 5, 1)
 
     """
 

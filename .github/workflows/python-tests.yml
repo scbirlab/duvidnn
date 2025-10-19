@@ -35,11 +35,8 @@ jobs:
         flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
     - name: Test with pytest
       run: |
-        export JAX_PLATFORM_NAME=cpu
         # run doctests as individual packages
-        pytest duvidnn/base --doctest-modules
-        pytest duvidnn/torch --doctest-modules
-        pytest duvidnn/utils --doctest-modules
+        pytest duvidnn --doctest-modules
         # run other tests
         pytest test/test_evaluation.py
     - name: Test CLI bilinear model with fingerprints

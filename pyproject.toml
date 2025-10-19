@@ -50,9 +50,10 @@ dependencies = [
 [project.optional-dependencies]
 transformers = ["torch>=2.4", "torchvision", "transformers"]
 chem = ["chemprop>=2.1.0", "schemist>=0.0.4.post1"]
-bio = ["vectome>=0.0.2"]
+bio = ["vectome>=0.0.3"]
 splits = ["umap-learn", "scipy", "schemist>=0.0.4.post1", "tdigest>=0.5", "faiss-cpu>=1.11"]
 splits_gpu = ["umap-learn", "scipy", "schemist>=0.0.4.post1", "tdigest>=0.5", "faiss-gpu"]
+dev = ["duvidnn[chem,bio,splits,transformers]", "pytest", "flake8"]
 
 [project.urls]
 "Homepage" = "https://github.com/scbirlab/duvidnn"
@@ -74,4 +75,4 @@ requires = ["setuptools>=43.0.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [test]
-deps = ["pytest>=7.4", "pytest-cov", "duvidnn[chem,bio,transformers,splits]"] 
+deps = ["pytest>=7.4", "pytest-cov", "duvidnn[dev]"] 

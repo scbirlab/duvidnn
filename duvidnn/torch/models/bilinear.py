@@ -235,6 +235,9 @@ class TorchBilinearBase(Module):
         super().__init__()
         self._args = args
         self._kwargs = kwargs
+        for key, arg in kwargs.items():
+            if not hasattr(self, key):
+                setattr(self, key, arg)
         if _init_model:
             self.bilinear_model = self.build_model()
         else:

@@ -36,7 +36,7 @@ do
         -i $i \
         --output "$OUTPUT/$class-$i" \
         --cache "$CACHE" \
-        --epochs 10 \
+        --epochs 2 \
         -z 10 \
         --learning-rate 0.001
     ls -lah "$OUTPUT"
