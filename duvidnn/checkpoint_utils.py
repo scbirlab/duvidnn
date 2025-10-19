@@ -21,7 +21,11 @@ def _load_json(checkpoint: str, filename: str) -> Dict[str, Any]:
 
 def save_json(obj, filename: str) -> None:
     with open(filename, "w") as f:
-        json.dump(obj, f, sort_keys=True, indent=4)
+        try:
+            json.dump(obj, f, sort_keys=True, indent=4)
+        except TypeError as e:
+            print_err(f"{obj=}")
+            raise e
     return None
 
 
