@@ -27,7 +27,8 @@ do
         XDG_CACHE_HOME="$CACHE" HF_HOME="$CACHE" duvidnn train \
             -1 "$TEST" \
             -2 "$TRAIN" \
-            -x full_strain_name:vectome-fingerprint clogp mwt:log \
+            -x clogp mwt:log \
+            --x2 full_strain_name:vectome-fingerprint \
             -S smiles \
             -y pmic \
             -c "$HYPERPARAMS" \

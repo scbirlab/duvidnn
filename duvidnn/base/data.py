@@ -622,7 +622,7 @@ class DataMixinBase(ABC):
             .with_format("numpy")
         )
         if len(input_towers) == 1:
-            self.input_shape = self.training_example[self._in_key].shape[1:]
+            self.input_shape = self.training_example[input_towers[0]].shape[1:]
         else:
             input_shape = tuple(
                 self.training_example[key].shape[1:] for key in input_towers

@@ -168,7 +168,8 @@ class TorchMLPBase(LinearStack):
         batch_norm: bool = False,
         residual_depth: Optional[int] = None,
         final_activation: Optional[Callable[..., Module]] = None,
-        _init_model: bool = True
+        _init_model: bool = True,
+        *args, **kwargs
     ):
         super().__init__()
         self.n_input = n_input
