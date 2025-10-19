@@ -4,10 +4,12 @@ from typing import Mapping, Optional
 
 from duvida.types import Array, ArrayLike
 from lightning import LightningModule
+import torch
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import ReduceLROnPlateau 
 
 from ...functions import mse_loss
+from .... import app_name, __version__
 
 
 class LightningMixin(LightningModule):
@@ -15,6 +17,8 @@ class LightningMixin(LightningModule):
     # optimizer: Optimizer = None
     # learning_rate: float = .01
     model_attr: str = None
+    _in_key: str = f"{app_name}/v{__version__}/inputs"
+    _out_key: str = f"{app_name}/v{__version__}/labels"
     # reduce_lr_on_plateau: bool = False
     # reduce_lr_patience: int = 10
 
@@ -45,8 +49,13 @@ class LightningMixin(LightningModule):
         self, 
         batch: Mapping[str, ArrayLike]
     ) -> Array:
-        inputs, outputs = batch['inputs'], batch['labels']
+        input_keys = sorted(k for k in batch if k.startswith(self._in_key))
+        if len(input_keys) == 1:
+            inputs = batch[input_keys[0]]
+        else:
+            inputs = [batch[k] for k in input_keys]
         predicted = self(inputs)
+        outputs = batch[self._out_key]
         return mse_loss(predicted, outputs)
 
     def training_step(
@@ -55,7 +64,11 @@ class LightningMixin(LightningModule):
         batch_idx: int
     ) -> Array:
         loss = self.get_loss(batch)
-        self.log('loss', loss, on_step=False, on_epoch=True, prog_bar=True, batch_size=batch['labels'].shape[-1])
+        self.log(
+            'loss', loss, 
+            on_step=False, on_epoch=True, prog_bar=True, 
+            batch_size=batch[self._out_key].shape[-1],
+        )
         return loss
 
     def validation_step(
@@ -64,7 +77,11 @@ class LightningMixin(LightningModule):
         batch_idx: int
     ) -> Array:
         loss = self.get_loss(batch)
-        self.log('val_loss', loss, on_step=False, on_epoch=True, prog_bar=True, batch_size=batch['labels'].shape[-1])
+        self.log(
+            'val_loss', loss, 
+            on_step=False, on_epoch=True, prog_bar=True, 
+            batch_size=batch[self._out_key].shape[-1],
+        )
         return loss
 
     def on_validation_epoch_end(self):
