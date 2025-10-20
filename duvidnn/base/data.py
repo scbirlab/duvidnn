@@ -409,6 +409,24 @@ class DataMixinBase(ABC):
             )
         return dataset
 
+    @staticmethod
+    def _fill_na(
+        x: Mapping[str, Any],
+        types: Mapping[str, Any]
+    ) -> Dict[str, Any]:
+        for key in x:
+            this_type = types[key]
+            if this_type.startswith(("int", "uint")):
+                fill_value = 0
+            elif this_type.startswith("float"):
+                fill_value = 0.
+            elif this_type in ("string", "large_string"):
+                fill_value = ""
+            
+            x[key] = [fill_value if v is None else v for v in x[key]]
+
+        return x
+
     def _ingest_data(
         self, 
         data: DataLike,
@@ -509,6 +527,19 @@ class DataMixinBase(ABC):
         input_dataset = (
             input_dataset
             .select_columns(flat_input_columns + labels)
+        )
+        feature_types = {
+            key: f.dtype for key, f in input_dataset.info.features.items()
+        }
+        input_dataset = (
+            input_dataset
+            .map(
+                self._fill_na,
+                fn_kwargs={"types": feature_types},
+                batched=True,
+                batch_size=batch_size,
+                desc="Filling NaN values",
+            )
             .map(
                 self._featurize,
                 fn_kwargs={"featurizers": tuple(item for f in featurizers_dicts for item in f)},
