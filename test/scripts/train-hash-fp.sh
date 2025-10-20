@@ -65,3 +65,5 @@ do
         head -n50 "$outfile" | tr , $'\t'
     fi
 done
+
+rm -r "$CACHE"

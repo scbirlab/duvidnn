@@ -66,3 +66,5 @@ do
         fi
     done
 done
+
+rm -r "$CACHE"

@@ -8,7 +8,7 @@ TEST="hf://scbirlab/fang-2023-biogen-adme@scaffold-split:test"
 LLM="transformer://scbirlab/lchemme-base-zinc22-lteq300:clean_smiles~mean"
 
 script_dir=$(readlink -f $(dirname "$0"))
-OUTPUT_DIR=$(readlink -f "$script_dir"/..)/outputs
+OUTPUT_DIR=$(readlink -f "$script_dir"/..)/outputs/original
 CACHE="$OUTPUT_DIR/cache"
 OUTPUT="$OUTPUT_DIR/models"
 HYPERPARAMS="$OUTPUT_DIR"/hyperopt.json
@@ -38,7 +38,7 @@ do
             --cache "$CACHE" \
             --epochs 2 \
             -z 10 \
-            --learning-rate 0.01 \
+            --learning-rate 0.001 \
             --descriptors \
             --fp
         ls -lah "$OUTPUT"
