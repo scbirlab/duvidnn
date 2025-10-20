@@ -7,7 +7,7 @@ from carabiner import pprint_dict, print_err
 from carabiner.cliutils import clicommand
 
 from .eval import _evaluate_modelbox_and_save_metrics
-from .utils import _dict_to_pandas, _init_modelbox
+from .utils import _dict_to_pandas, _init_modelbox, _overwrite_config
 from ..checkpoint_utils import _load_json, save_json
 
 STRUCTURE_COLUMN_DEFAULT: str = "smiles"
@@ -62,11 +62,16 @@ def _init_modelbox_and_load_training_data(
         **overrides,
     )
 
+    cli_config = _overwrite_config(
+        cli_config, 
+        config_file=config_file, 
+        config_idx=config_idx,
+    )
     modelbox, load_data_args = _load_modelbox_training_data(
         modelbox=modelbox,
         checkpoint=checkpoint,
         cache=cache,
-        **overrides,
+        **(overrides | cli_config),
     )
 
     if checkpoint is None:  # model not instantiated yet
