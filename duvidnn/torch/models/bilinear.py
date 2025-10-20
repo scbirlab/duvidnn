@@ -108,11 +108,11 @@ class _TorchBilinearBase(Module):
             self.merge_size = sum(self.tower_out_sizes)
         elif self.merge_method == "product":
             self._merge_fn = self._product
-            self.tower_out_sizes = tuple(max(*self.n_units) for _ in range(self.n_towers))
+            self.tower_out_sizes = tuple(max(self.n_units) for _ in range(self.n_towers))
             self.merge_size = self.tower_out_sizes[0]
         elif self.merge_method == "sum":
             self._merge_fn = self._sum
-            self.tower_out_sizes = tuple(max(*self.n_units) for _ in range(self.n_towers))
+            self.tower_out_sizes = tuple(max(self.n_units) for _ in range(self.n_towers))
             self.merge_size = self.tower_out_sizes[0]
         else:
             raise ValueError(f"Merge method {self.merge_method} is not implemented.")
