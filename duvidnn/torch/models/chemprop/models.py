@@ -1,5 +1,6 @@
 """Chemprop message-passing neural network."""
 
+from typing import Callable
 from abc import ABC, abstractmethod
 
 from carabiner import print_err
@@ -11,15 +12,18 @@ from chemprop.nn import (
     RegressionFFN
 )
 import torch
-from torch.nn import Module
+from torch.nn import Module, SiLU
 from torch.optim import Adam, Optimizer
 
 from .data import (
-    DuvidaTrainingBatch, 
+    ChempropTrainingBatch, 
     _collate_training_batch_for_forward
 )
 from ..utils.ensemble import TorchEnsembleMixin
 from ..utils.lt import LightningMixin
+
+_DEFAULT_ACTIVATION: str = "ELU"  # Smooth activation to prevent gradient collapse
+_DEFAULT_N_UNITS: int = 16
 
 
 class ChempropBase(Module, ABC):
@@ -28,13 +32,13 @@ class ChempropBase(Module, ABC):
         self, 
         n_input: int, 
         n_hidden: int = 1,
-        n_units: int = 16, 
+        n_units: int = _DEFAULT_N_UNITS, 
         mp_units: int = 300,
         mp_hidden: int = 3,
-        mp_activation: str = "elu",
+        mp_activation: str = _DEFAULT_ACTIVATION,
         learning_rate: float = .01,
         dropout: float = 0., 
-        activation: str = "ELU",  # Smooth activation to prevent gradient collapse
+        activation: str = _DEFAULT_ACTIVATION,  # Smooth activation to prevent gradient collapse
         n_out: int = 1, 
         batch_norm: bool = False,
         evidential: bool = False,
@@ -95,7 +99,7 @@ class ChempropBase(Module, ABC):
         )
 
     @abstractmethod
-    def forward(self, x: DuvidaTrainingBatch) -> torch.Tensor:
+    def forward(self, x: ChempropTrainingBatch) -> torch.Tensor:
         pass
 
 
@@ -124,11 +128,9 @@ class ChempropEnsemble(TorchEnsembleMixin, ChempropBase, LightningMixin):
     def create_module(self):
         return self.build_model()
 
-    def forward(self, x: DuvidaTrainingBatch) -> torch.Tensor:
-        if not isinstance(x, DuvidaTrainingBatch):
-            for p in self.parameters():
-                device = p.device
-                break
+    def forward(self, x: ChempropTrainingBatch) -> torch.Tensor:
+        if not isinstance(x, ChempropTrainingBatch):
+            device = next(self.parameters()).device
             x = _collate_training_batch_for_forward(x, device=device)
         x = (x.bmg, x.V_d, x.X_d)
         # Stack outputs to shape [batch, n_out, ensemble_size]

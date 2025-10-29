@@ -3,6 +3,7 @@
 from typing import Callable, Dict, Mapping, Tuple, Optional, Union
 from functools import partial
 
+from carabiner import print_err
 from duvida.config import config
 config.set_backend('torch', precision='float')
 from duvida.types import Array, ArrayLike, LossFunction, StatelessModel
@@ -87,7 +88,8 @@ class DoubtMixin(DoubtMixinBase):
     def make_stateless_model(
         self, 
         model: Optional[Module] = None,
-        flat_params: bool = False
+        flat_params: bool = False,
+        last_layer_only: bool = False
     ) -> Union[Tuple[StatelessModel, Dict[str, Array]], Tuple[StatelessModel, Dict[str, Array], Array]]:
         if model is None:
             self.to(self.device)
@@ -99,9 +101,51 @@ class DoubtMixin(DoubtMixinBase):
         model_params = {key: val.detach().clone() for key, val in model.named_parameters()}
         if isinstance(model, TorchEnsembleMixin):
             model_params = {
-                key: val for key, val in model_params.items()
+                key: val
+                for key, val in model_params.items()
                 if any(model_key in key for model_key in model.model_keys)
             }
+        if last_layer_only:
+            original_n_params = sum([val.numel() for _, val in model_params.items()])
+            if isinstance(model, TorchEnsembleMixin):
+                print_err(f"[INFO] Using only final parameter layer of each ensemble member: {model.model_keys}")
+                weight_keys, bias_keys = [], []
+                for model_key in model.model_keys:
+                    _weight_keys = [
+                        key for key in model_params 
+                        if model_key in key and key.endswith(".weight")
+                    ]
+                    _bias_keys = [
+                        key for key in model_params 
+                        if model_key in key and key.endswith(".bias")
+                    ]
+                    if len(_weight_keys) > 0 and len(_bias_keys) > 0:
+                        weight_keys.append(_weight_keys[-1])
+                        bias_keys.append(_bias_keys[-1])
+                keys_to_keep = weight_keys + bias_keys
+            else:
+                weight_keys = [
+                    key for key in model_params 
+                    if key.endswith(".weight")
+                ]
+                bias_keys = [
+                    key for key in model_params 
+                    if key.endswith(".bias")
+                ]
+                if len(weight_keys) > 0 and len(bias_keys) > 0:
+                    keys_to_keep = [weight_keys[-1], bias_keys[-1]]
+            model_params = {
+                key: model_params[key] 
+                for key in keys_to_keep
+            }
+            if len(model_params) == 0:
+                raise AttributeError(
+                    f"Could not get last layer of ensemble: {list(dict(model.named_parameters()))}"
+                )
+            
+            final_n_params = sum([val.numel() for _, val in model_params.items()])
+            print_err(f"[INFO] Using only final parameter layer: {({key: val.shape for key, val in model_params.items()})}")
+            print_err(f"[INFO] Using {(100. * final_n_params / original_n_params):.1f}% ({final_n_params} / {original_n_params}) of original parameters.")
 
         def stateless_model(x, *params):
             # x = x.to(self.device)
@@ -113,30 +157,36 @@ class DoubtMixin(DoubtMixinBase):
             )
 
         if flat_params:
-
             # @jit  # Fails compile
             def stateless_model_flat_params(x, *flat_params):
                 try:
-                    flat_params = torch.concat(flat_params)
+                    flat_params = torch.concat(flat_params, axis=0)
                 except RuntimeError:  # if flat_params has already gone through *tuple unpacking
-                    flat_params = torch.stack(flat_params)
+                    # print_err(f"[WARN] Flat params seem to be unpacked: {[x.shape for x in flat_params]}")
+                    flat_params = torch.stack(flat_params, axis=0)
                 packed_params = self._pack_params_like(
                     torch.as_tensor(flat_params), 
                     model_params,
                 )
                 return stateless_model(x, packed_params)
             
-            flattened_params = torch.concat([p.flatten() for _, p in model_params.items()])
+            flattened_params = torch.concat([
+                p.flatten() for _, p in model_params.items()
+            ], axis=0)
             return stateless_model_flat_params, model_params, flattened_params
         else:
             return stateless_model, model_params
 
     def parameter_gradient(
         self,
-        model: Optional[StatelessModel] = None
+        model: Optional[StatelessModel] = None,
+        last_layer_only: bool = False
     ) -> Callable[[ArrayLike], Array]:
-        stateless_model, params = self.make_stateless_model(model)
-        gradient_fn = parameter_gradient(stateless_model)
+        stateless_model, params = self.make_stateless_model(
+            model, 
+            last_layer_only=last_layer_only,
+        )
+        gradient_fn = jit(parameter_gradient)(stateless_model)
 
         # @jit  # generates lots of dynamo warnings
         def _parameter_gradient_with_params(x: ArrayLike) -> Array:
@@ -147,12 +197,16 @@ class DoubtMixin(DoubtMixinBase):
     def fisher_score(
         self, 
         model: Optional[StatelessModel] = None,
-        loss: LossFunction = mse_loss
+        loss: LossFunction = mse_loss,
+        last_layer_only: bool = False
     ) -> Callable[[ArrayLike, ArrayLike], Array]:
-        stateless_model, params = self.make_stateless_model(model)
-        gradient_fn = fisher_score(stateless_model, loss)
+        stateless_model, params = self.make_stateless_model(
+            model, 
+            last_layer_only=last_layer_only,
+        )
+        gradient_fn = jit(fisher_score)(stateless_model, loss)
         
-        @jit
+        # @jit
         def _fisher_score_with_params(x_true: ArrayLike, y_true: ArrayLike) -> Array:
             return gradient_fn((params,), x_true, y_true.to(self.device))[0]
         
@@ -162,12 +216,22 @@ class DoubtMixin(DoubtMixinBase):
         self, 
         model: Optional[StatelessModel] = None,
         approximator: str = _DEFAULT_APPROXIMATOR, 
+        last_layer_only: bool = False,
         *args, **kwargs
     ) -> Callable:
-        stateless_model, params, flat_params = self.make_stateless_model(model, flat_params=True)
+        stateless_model, params, flat_params = self.make_stateless_model(
+            model, 
+            flat_params=True,
+            last_layer_only=last_layer_only,
+        )
         if approximator in ('bekas', 'exact_diagonal'):
             kwargs['device'] = self.device
-        hessian_fn = parameter_hessian_diagonal(
+        if approximator != "bekas": 
+            # compiler complains about randomness
+            _parameter_hessian_diagonal = jit(parameter_hessian_diagonal)
+        else:
+            _parameter_hessian_diagonal = parameter_hessian_diagonal
+        hessian_fn = _parameter_hessian_diagonal(
             stateless_model,
             approximator=approximator,
             *args, **kwargs,
@@ -184,13 +248,23 @@ class DoubtMixin(DoubtMixinBase):
         self, 
         model: Optional[StatelessModel] = None,
         loss: LossFunction = mse_loss,
-        approximator: str = _DEFAULT_APPROXIMATOR, 
+        approximator: str = _DEFAULT_APPROXIMATOR,
+        last_layer_only: bool = False,
         *args, **kwargs
     ) -> Callable:
-        stateless_model, params, flat_params = self.make_stateless_model(model, flat_params=True)
+        stateless_model, params, flat_params = self.make_stateless_model(
+            model, 
+            flat_params=True,
+            last_layer_only=last_layer_only,
+        )
         if approximator in ('bekas', 'exact_diagonal'):
             kwargs['device'] = self.device
-        fisher_info_fn = fisher_information_diagonal(
+        if approximator != "bekas": 
+            # compiler complains about randomness
+            _fisher_information_diagonal = jit(fisher_information_diagonal)
+        else:
+            _fisher_information_diagonal = fisher_information_diagonal
+        fisher_info_fn = _fisher_information_diagonal(
             stateless_model,
             loss,
             approximator=approximator,
@@ -240,9 +314,13 @@ class ChempropDoubtMixin(DoubtMixin):
 
     def parameter_gradient(
         self,
-        model: Optional[StatelessModel] = None
+        model: Optional[StatelessModel] = None,
+        last_layer_only: bool = False
     ) -> Callable[[ArrayLike], Array]:
-        stateless_model, params = self.make_stateless_model(model)
+        stateless_model, params = self.make_stateless_model(
+            model, 
+            last_layer_only=last_layer_only,
+        )
         gradient_fn = parameter_gradient_unrolled(stateless_model)
 
         # @jit  # fails compile
@@ -258,14 +336,20 @@ class ChempropDoubtMixin(DoubtMixin):
     def parameter_hessian_diagonal(
         self, 
         model: Optional[StatelessModel] = None,
-        approximator: str = _DEFAULT_APPROXIMATOR, 
+        approximator: str = _DEFAULT_APPROXIMATOR,
+        last_layer_only: bool = False,
         *args, **kwargs
     ) -> Callable:
         (
             stateless_model, 
             params, 
             flat_params,
-        ) = self.make_stateless_model(model, flat_params=True)
+        ) = self.make_stateless_model(
+            model, 
+            flat_params=True,
+            last_layer_only=last_layer_only,
+        )
+
         if approximator in ('bekas', 'exact_diagonal'):
             # these need explicit device placement for hvp
             kwargs['device'] = self.device

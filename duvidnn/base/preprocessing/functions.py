@@ -1,15 +1,10 @@
 """Data preprocessing functions."""
 
 from typing import Any, Callable, Dict, Iterable, List, Mapping, Optional, Union
-from functools import partial
+from functools import cache, partial
+import hashlib
 
-from chemprop.data import (
-    MoleculeDatapoint, 
-    MoleculeDataset, 
-    MolGraph
-)
 import numpy as np
-from schemist.features import calculate_feature
 
 from .registry import register_function
 
@@ -27,9 +22,22 @@ def Identity() -> Callable:
     return _identity
 
 
+@register_function("log")
+def Log() -> Callable:
+    """Log10 of float.
+    
+    """
+    def _log(
+        data: Mapping[str, Iterable],
+        input_column: str
+    ) -> np.ndarray:
+        return np.log(np.asarray(data[input_column]))
+    return _log
+
+
 @register_function("one-hot")
 def OneHot(
-    categories: Iterable[str],
+    categories: Iterable[Union[str, int]],
     intercept: bool = False
 ) -> Callable:
     """Convert string labels into one-hot encodings.
@@ -47,6 +55,123 @@ def OneHot(
         ])
 
     return _one_hot
+
+
+@register_function("hash")
+def Hash(
+    ndim: int = 256,
+    hash_name: str = "sha1",
+    dense: Optional[int] = None,
+    normalize: bool = False,
+    seed: int = 42,
+) -> Callable:
+    """
+    Deterministic string hashing featurizer.
+
+    Each input string is hashed to a fixed-length numeric vector in [0,1] or [-1,1].
+    
+    Parameters
+    ==========
+    ndim : int
+        Output feature dimension (number of hash buckets).
+    hash_name : str
+        Hash function to use ('sha1', 'md5', 'blake2b', ...).
+    dense : int, optional
+        Dense projection to this number of dimensions.
+    normalize : bool
+        Whether to normalize vector to unit length (L2 norm = 1).
+    seed : int
+        Seed to vary hash folding (adds reproducible offset).
+
+    Returns
+    =======
+    Callable
+        Function mapping (data, input_column) → np.ndarray [N, n_features]
+
+    Examples
+    ========
+    >>> import numpy as np
+    >>> f = Hash(ndim=8, seed=0)
+    >>> X = f({"assay": ["MIC", "MIC", "binding"]}, "assay")
+    >>> X.shape
+    (3, 8)
+    >>> np.array_equal(X[0], X[1])
+    True
+    >>> np.array_equal(X[0], X[2])
+    False
+
+    Seed changes output:
+    >>> f2 = Hash(ndim=8, seed=1)
+    >>> X2 = f2({"assay": ["MIC"]}, "assay")
+    >>> np.array_equal(X2[0], X[0])
+    False
+
+    Different hash backend changes output:
+    >>> f_md5 = Hash(ndim=8, hash_name="md5", seed=0)
+    >>> np.array_equal(f_md5({"assay": ["MIC"]}, "assay")[0], X[0])
+    False
+
+    Dense projection has the right shape and dtype:
+    >>> g = Hash(ndim=8, dense=4, seed=0)
+    >>> Y = g({"assay": ["MIC", "binding"]}, "assay")
+    >>> Y.shape, Y.dtype == np.float32
+    ((2, 4), True)
+
+    Values are in [-1, 1] before normalization:
+    >>> v = f({"assay": ["MIC"]}, "assay")[0]
+    >>> (v.min() >= -1 - 1e-6 and v.max() <= 1 + 1e-6).item()
+    True
+
+    Non-string values are stringified:
+    >>> f({"assay": [123, None]}, "assay").shape
+    (2, 8)
+
+    """
+    from numpy.random import default_rng
+    if ndim <= 0:
+        raise ValueError("ndim must be > 0")
+    if dense is not None and dense <= 0:
+        raise ValueError("dense must be > 0 when provided")
+
+    if dense is not None:
+        generator = default_rng(seed=seed)
+        projector = generator.normal(
+            scale=1. / np.sqrt(dense), 
+            size=(int(ndim), int(dense)),
+        ).astype(np.float32)
+    else:
+        projector = None
+
+    def _hash_single(s: str) -> np.ndarray:
+        # Stable deterministic hashing per string
+        if not isinstance(s, str):
+            s = str(s)
+        h = hashlib.new(hash_name)
+        h.update((s + str(seed)).encode("utf-8"))
+        digest = np.frombuffer(h.digest(), dtype=np.uint8)
+        # Repeat or truncate digest to reach n_features bytes
+        vec = np.resize(digest, ndim)
+        vec = (2. * vec / 255. - 1.)  # map to [-1, 1]
+        return vec
+    
+
+    def _hash(
+        data: Mapping[str, Iterable],
+        input_column: str
+    ) -> np.ndarray:
+        vectors = np.stack([
+            _hash_single(v) for v in data[input_column]
+        ], axis=0).astype(np.float32)
+
+        if projector is not None:
+            vectors = vectors @ projector
+        if normalize:
+            n = np.linalg.norm(vectors, axis=-1, keepdim=True)
+            nz = n > 0
+            vectors[nz[:, 0]] = vectors[nz[:, 0]] / n[nz]
+        return vectors
+
+    return _hash
     
 
 @register_function("morgan-fingerprint")
@@ -54,6 +179,10 @@ def MorganFingerprint(**kwargs) -> Callable:
     """Get Morgan fingerprint from SMILES.
     
     """
+    try:
+        from schemist.features import calculate_feature
+    except ImportError:
+        raise ImportError(f"schemist not installed! Try `pip install duvidnn[chem]`.")
     feature_calculator = partial(
         calculate_feature,
         feature_type="fp",
@@ -80,6 +209,11 @@ def Descriptors2D(
     """Get 2D descriptors from SMILES, optionally normalized.
     
     """
+    try:
+        from schemist.features import calculate_feature
+    except ImportError:
+        raise ImportError(f"schemist not installed! Try `pip install duvidnn[chem]`.")
+
     feature_calculator = partial(
         calculate_feature,
         feature_type="2d",
@@ -98,6 +232,39 @@ def Descriptors2D(
     return _descriptors_2d
 
 
+@register_function("vectome-fingerprint")
+def VectomeFingerprint(
+    method: str = "countsketch",
+    ndim: int = 2048,
+    check_spelling: bool = True,
+    **kwargs
+) -> Callable:
+    """Get MinHash fingerprint from species name or taxon ID.
+    
+    """
+    try:
+        from vectome.vectorize import vectorize
+    except ImportError:
+        raise ImportError(f"Vectome not installed! Try `pip install duvidnn[bio]`.")
+
+    feature_calculator = cache(partial(
+        vectorize,
+        method=method,
+        dim=ndim,
+        check_spelling=check_spelling,
+        quiet=True,
+        **kwargs,
+    ))
+
+    def _vectome_fingerprint(
+        data: Mapping[str, Iterable],
+        input_column: str
+    ) -> np.ndarray:
+        return feature_calculator(query=tuple(data[input_column]))
+        
+    return _vectome_fingerprint
+
+
 @register_function("chemprop-mol")
 def ChempropData(
     label_column: Optional[Union[str, Iterable[str]]] = None,
@@ -106,6 +273,15 @@ def ChempropData(
     """Convert SMILES to iterable of Chemprop datum.
     
     """
+    try:
+        from chemprop.data import (
+            MoleculeDatapoint, 
+            MoleculeDataset, 
+            MolGraph
+        )
+    except ImportError:
+        raise ImportError("Chemprop not installed. Try `pip install duvidnn[chem]`.")
+
     if isinstance(extra_featurizers, str):
         extra_featurizers = [extra_featurizers]
     if isinstance(label_column, str):

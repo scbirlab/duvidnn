@@ -52,6 +52,7 @@ class LinearStack(Module):
         dropout: float = 0.,
         activation: Callable[..., Module] = _DEFAULT_ACTIVATION,
         layer_class: Callable[..., Module] = Linear,
+        final_activation: Optional[Callable[..., Module]] = None,
         **layer_kwargs
     ) -> Module:
         common_kwargs = {
@@ -76,6 +77,8 @@ class LinearStack(Module):
         layers.append(
             Linear(in_features=n_units, out_features=n_out)
         )
+        if final_activation is not None:
+            layers.append(final_activation())
         return Sequential(*layers)
 
 
@@ -98,6 +101,7 @@ class TorchResidualBlock(LinearStack):
         n_out: int, 
         residual_depth: int = 1,
         n_units: int =_DEFAULT_N_UNITS, 
+        layer_class: Callable[..., Module] = Linear,
         dropout: float = 0., 
         activation: Callable = _DEFAULT_ACTIVATION,  
         batch_norm: bool = False
@@ -109,6 +113,7 @@ class TorchResidualBlock(LinearStack):
         self.dropout = dropout
         self.activation = activation
         self.n_out = n_out
+        self.layer_class = layer_class
         self.batch_norm = batch_norm
         if self.n_input == self.n_out:
             self.projection = Identity()
@@ -125,7 +130,7 @@ class TorchResidualBlock(LinearStack):
             batch_norm=self.batch_norm,
             dropout=self.dropout,
             activation=self.activation,
-            layer_class=Linear,
+            layer_class=self.layer_class,
         )
 
     # @jit  # Fails compile
@@ -157,10 +162,14 @@ class TorchMLPBase(LinearStack):
         n_hidden: int = 1,
         n_units: int = _DEFAULT_N_UNITS, 
         dropout: float = 0., 
-        activation: Callable = _DEFAULT_ACTIVATION,
+        activation: Callable[..., Module] = _DEFAULT_ACTIVATION,
         n_out: int = 1, 
+        layer_class: Callable[..., Module] = Linear,
         batch_norm: bool = False,
-        residual_depth: Optional[int] = None
+        residual_depth: Optional[int] = None,
+        final_activation: Optional[Callable[..., Module]] = None,
+        _init_model: bool = True,
+        *args, **kwargs
     ):
         super().__init__()
         self.n_input = n_input
@@ -169,11 +178,12 @@ class TorchMLPBase(LinearStack):
         self.dropout = dropout
         self.activation = activation
         self.n_out = n_out
+        self.layer_class = layer_class
         self.batch_norm = batch_norm
         if residual_depth is not None and (residual_depth > self.n_hidden):
             print_err(
                 f"""
-                WARNING: Skip length must be greater than number of hidden layers:
+                [WARN] Skip length must be smaller than number of hidden layers:
                 - Skip length: {residual_depth}
                 - Number of hidden layers: {self.n_hidden}
                 Falling back to non-residual.
@@ -190,11 +200,11 @@ class TorchMLPBase(LinearStack):
             self._n_residual_blocks = self.n_hidden // (self.residual_depth or 1)
             self._n_extra_linear = self.n_hidden % (self.residual_depth or 1)
         else:
-            self._layer_class = Linear
+            self._layer_class = self.layer_class
             self._layer_kwargs = {}
             self._n_residual_blocks = 0
             self._n_extra_linear = 0
-        self.model_layers = self.build_model()
+        self.model_layers = self.build_model() if _init_model else None
 
     def build_model(self):
         layers = super().build_model(
@@ -206,6 +216,7 @@ class TorchMLPBase(LinearStack):
             dropout=self.dropout, 
             activation=self.activation,  
             batch_norm=self.batch_norm,
+            final_activation=(None if self._n_extra_linear == 0 else self.final_activation),
             **self._layer_kwargs,
         )
         if self._n_extra_linear > 0:
@@ -218,12 +229,13 @@ class TorchMLPBase(LinearStack):
                 dropout=self.dropout, 
                 activation=self.activation,  
                 batch_norm=self.batch_norm,
+                final_activation=self.final_activation,
             )
             layers = Sequential(layers, extra_layers)
 
         return layers
         
-    @jit
+    # @jit  # lots of autotune complaints
     def forward(self, x: ArrayLike) -> Array:
         return self.model_layers(x)
 
@@ -289,7 +301,7 @@ class TorchMLPEnsemble(TorchEnsembleMixin, TorchMLPLightning):
         reduce_lr_patience: int = 10,
         *args, **kwargs
     ):
-        super().__init__(*args, **kwargs)
+        super().__init__(_init_model=False, *args, **kwargs)
         self.save_hyperparameters()
         self._init_ensemble(ensemble_size)
         self._init_lightning(

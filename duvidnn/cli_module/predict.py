@@ -19,14 +19,11 @@ def _predict(args: Namespace) -> None:
     import torch
     from ..autoclass import AutoModelBox
 
+    
     output = args.output
     out_dir = os.path.dirname(output)
     if len(out_dir) > 0 and not os.path.exists(out_dir):
         os.makedirs(out_dir)
-    preprocessing_args = {
-        "structure_column": args.structure,
-        "input_representation": args.input_representation,
-    }
     common_args = {
         "batch_size": args.batch,
         "cache": args.cache,
@@ -40,6 +37,14 @@ def _predict(args: Namespace) -> None:
         args.checkpoint, 
         cache=args.cache,
     )
+    if hasattr(modelbox, "tanimoto_nn"):
+        preprocessing_args = {
+            "structure_column": args.structure,
+            "input_representation": args.input_representation,
+        }
+    else:
+        preprocessing_args = {}
+
     pprint_dict(
         modelbox._model_config, 
         message=f"Initialized model {modelbox.class_name} with {modelbox.size} parameters",
@@ -55,13 +60,28 @@ def _predict(args: Namespace) -> None:
                     [candidates_ds.column_names[0]]
                 )
             )
+    if args.features is None:
+        if args.x2 is None:
+            features = None
+        else:
+            features = [args.x2]
+    else:
+        if args.x2 is None:
+            features = [args.features]
+        else:
+            features = [args.features, args.x2]
+    if (args.x2 is not None or args.context is not None) and not modelbox.class_name.startswith("bilinear"):
+        print_err("[WARN] Can only use --x2 or --context with --model-class bilinear; concatentating to -x")
+        features = [[_f for f in features for _f in f]]
+    context = args.context
     
     preprocessing_args["_extra_cols_to_keep"] = (args.extras or [])
     modelbox.to("cuda" if torch.cuda.is_available() else "cpu")
     candidates_ds = modelbox.predict(
         data=candidates_ds,
         aggregator="mean",
-        features=args.features,
+        features=features,
+        context=context,
         **preprocessing_args,
         **common_args,
     )
@@ -69,7 +89,8 @@ def _predict(args: Namespace) -> None:
     if args.variance:
         candidates_ds = modelbox.prediction_variance(
             candidates=candidates_ds,
-            features=args.features,
+            features=features,
+            context=context,
             **preprocessing_args,
             **common_args,
         )
@@ -89,8 +110,10 @@ def _predict(args: Namespace) -> None:
         modelbox.model.set_model(0)
         candidates_ds = modelbox.doubtscore(
             candidates=candidates_ds,
-            features=args.features,
+            features=features,
+            context=context,
             preprocessing_args=preprocessing_args,
+            last_layer_only=args.last_layer,
             **common_args,
         )
         preprocessing_args["_extra_cols_to_keep"].append("doubtscore")
@@ -102,10 +125,12 @@ def _predict(args: Namespace) -> None:
             extra_args = {}
         candidates_ds = modelbox.information_sensitivity(
             candidates=candidates_ds,
-            features=args.features,
+            features=features,
+            context=context,
             preprocessing_args=preprocessing_args,
             approximator=args.approx,
             optimality_approximation=args.optimality,
+            last_layer_only=args.last_layer,
             **common_args,
             **extra_args,
         )
@@ -114,7 +139,10 @@ def _predict(args: Namespace) -> None:
     print_err(preprocessing_args)
 
     _save_dataset(
-        candidates_ds.remove_columns([modelbox._in_key, modelbox._out_key]), 
+        candidates_ds.remove_columns([
+            col for col in candidates_ds.column_names 
+            if col.startswith(modelbox._in_key)
+        ] + [modelbox._out_key]), 
         output,
     )
 

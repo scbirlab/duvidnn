@@ -66,6 +66,20 @@ def main() -> None:
         default=None,
         help='Column names from data file that contain features. Required if no checkpoint provided.',
     )
+    feature_cols2 = CLIOption(
+        '--x2',
+        type=str,
+        nargs='*',
+        default=None,
+        help='Column names from data file that contain interacting features.',
+    )
+    context = CLIOption(
+        '--context',
+        type=str,
+        nargs='*',
+        default=None,
+        help='Column names from data file that contain context features.',
+    )
     structure_col = CLIOption(
         '--structure', '-S',
         type=str,
@@ -101,6 +115,13 @@ def main() -> None:
         default=DEFAULT_MODELBOX,
         choices=MODELBOX_NAMES,
         help='Test dataset file.',
+    )
+    fusion_method = CLIOption(
+        '--fusion',
+        type=str,
+        default="product",
+        choices=["product", "sum", "concat"],
+        help='Method for fusing bilinear model.',
     )
     _checkpoint = CLIOption(
         '--checkpoint',
@@ -254,14 +275,19 @@ def main() -> None:
     optimality = CLIOption(
         '--optimality', 
         action="store_true",
-        help='Whether to make the computationally faster assumption that the model parameters were trained to gradient 0.',
+        help='For information sensitivity, make the computationally faster assumption that the model parameters were trained to gradient 0.',
+    )
+    last_layer = CLIOption(
+        '--last-layer',
+        action="store_true",
+        help="Use only the gradients of parameters in the final layer for doubtscore and info. sens. calculations.",
     )
     hess_approx = CLIOption(
         '--approx', 
         type=str,
         default="bekas",
-        choices=["exact", "squared_jacobian", "rough_finite_difference", "bekas"],
-        help='What type of Hessian approximation to perform.',
+        choices=["exact_diagonal", "squared_jacobian", "rough_finite_difference", "bekas"],
+        help='What type of Hessian approximation to perform for information sensitivity.',
     )
     bekas_n = CLIOption(
         '--bekas-n', 
@@ -372,10 +398,13 @@ def main() -> None:
             val_data,
             test_data,
             feature_cols,
+            feature_cols2,
+            context,
             structure_col,
             structure_representation,
             label_cols,
             model_class,
+            fusion_method,
             _checkpoint,
             n_units,
             n_hidden,
@@ -404,6 +433,8 @@ def main() -> None:
             slice_start,
             slice_end,
             feature_cols,
+            feature_cols2,
+            context,
             label_cols,
             structure_col,
             extra_cols,
@@ -416,6 +447,7 @@ def main() -> None:
             doubtscore,
             info_sens,
             optimality,
+            last_layer,
             hess_approx,
             bekas_n,
             batch_size,

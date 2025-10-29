@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
+
 set -euox pipefail
 
-TRAIN="hf://scbirlab/fang-2023-biogen-adme@scaffold-split:train"
-TEST="hf://scbirlab/fang-2023-biogen-adme@scaffold-split:test"
+TRAIN="hf://scbirlab/thomas-2018-spark-wt@Acinetobacter-baumannii:train"
+TEST="hf://scbirlab/thomas-2018-spark-wt@Acinetobacter-baumannii:validation"
 LLM="transformer://scbirlab/lchemme-base-zinc22-lteq300:clean_smiles~mean"
 
 script_dir=$(readlink -f $(dirname "$0"))
-OUTPUT_DIR=$(readlink -f "$script_dir"/..)/outputs/original
+OUTPUT_DIR=$(readlink -f "$script_dir"/..)/outputs/strain
 CACHE="$OUTPUT_DIR/cache"
 OUTPUT="$OUTPUT_DIR/models"
 HYPERPARAMS="$OUTPUT_DIR"/hyperopt.json
@@ -19,16 +20,17 @@ printf \
 | duvidnn hyperprep \
     -o "$HYPERPARAMS"
 
-for class in chemprop fingerprint #chemprop
+for class in fingerprint chemprop
 do
     for i in 0 1
     do
-        HF_HOME="$CACHE" duvidnn train \
+        XDG_CACHE_HOME="$CACHE" HF_HOME="$CACHE" duvidnn train \
             -1 "$TEST" \
             -2 "$TRAIN" \
-            -x clogp \
+            -x clogp mwt:log \
+            --x2 full_strain_name:vectome-fingerprint \
             -S smiles \
-            -y log_rlm \
+            -y pmic \
             -c "$HYPERPARAMS" \
             -k "$class" \
             -i $i \
@@ -36,13 +38,13 @@ do
             --cache "$CACHE" \
             --epochs 2 \
             -z 10 \
-            --learning-rate 0.001 \
+            --learning-rate 0.01 \
             --descriptors \
             --fp
         ls -lah "$OUTPUT"
         ls -lah "$OUTPUT"/"$class-$i"/*
-        outfile="$script_dir"/outputs/predictions/"$class-$i.csv"
-        HF_HOME="$CACHE" duvidnn predict \
+        outfile="$OUTPUT_DIR"/predictions/"$class-$i.csv"
+        XDG_CACHE_HOME="$CACHE" HF_HOME="$CACHE" duvidnn predict \
             --test "$TRAIN" \
             --checkpoint "$OUTPUT"/"$class-$i" \
             --start $START \
@@ -50,10 +52,8 @@ do
             --variance \
             --tanimoto \
             --doubtscore \
-            --information-sensitivity \
-            --last-layer \
             --optimality \
-            -y log_rlm \
+            -y pmic \
             --cache "$CACHE" \
             --output "$outfile"
         output_nlines=$(cat "$outfile" | wc -l)
@@ -66,3 +66,5 @@ do
         fi
     done
 done
+
+rm -r "$CACHE"

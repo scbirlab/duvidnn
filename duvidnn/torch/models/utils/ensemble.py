@@ -9,7 +9,6 @@ from torch import stack
 from torch.nn import Module, ModuleDict
 
 
-
 class TorchEnsembleMixin(ABC):
 
     _module_prefix: str = "ensemble_module"

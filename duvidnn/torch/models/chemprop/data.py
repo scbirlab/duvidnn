@@ -7,9 +7,11 @@ from chemprop.data import Datum, MolGraph, TrainingBatch
 import numpy as np
 import torch
 
+from ....base.data import DataMixinBase
+
 
 @dataclass(repr=False, eq=False, slots=True)
-class DuvidaBatchMolGraph:
+class ChempropBatchMolGraph:
     """A :class:`BatchMolGraph` represents a batch of individual :class:`MolGraph`s.
 
     It has all the attributes of a ``MolGraph`` with the addition of the ``batch`` attribute. This
@@ -82,11 +84,11 @@ class DuvidaBatchMolGraph:
         self.batch = self.batch.to(device)
 
 
-class DuvidaTrainingBatch(TrainingBatch):
+class ChempropTrainingBatch(TrainingBatch):
 
     def to(self, device: Union[str, torch.device]) -> TrainingBatch:
         for p in self:
-            if isinstance(p, (torch.Tensor, DuvidaBatchMolGraph)):
+            if isinstance(p, (torch.Tensor, ChempropBatchMolGraph)):
                 p.to(device)
         return self
 
@@ -94,13 +96,13 @@ class DuvidaTrainingBatch(TrainingBatch):
 def collate_batch(
     batch: Iterable[Datum], 
     device: Optional[Union[str, torch.device]] = None
-) -> DuvidaTrainingBatch:
+) -> ChempropTrainingBatch:
     """
     """
     
     mgs, V_ds, x_ds, ys, weights, lt_masks, gt_masks = zip(*batch)
-    bmg = DuvidaBatchMolGraph(mgs)
-    training_batch = DuvidaTrainingBatch(
+    bmg = ChempropBatchMolGraph(mgs)
+    training_batch = ChempropTrainingBatch(
         bmg,
         None if V_ds[0] is None else torch.concat(V_ds),
         None if x_ds[0] is None else torch.stack(x_ds),
@@ -117,8 +119,8 @@ def collate_batch(
 def _collate_training_batch_for_forward(
     batch: Iterable[Mapping],
     for_dataloader: bool = False,
-    _in_key: str = "inputs",
-    _out_key: str = "labels", 
+    _in_key: str = DataMixinBase._in_key,
+    _out_key: str = DataMixinBase._out_key, 
     device: str = None
 ) -> TrainingBatch:
     new_batch = []
@@ -130,7 +132,13 @@ def _collate_training_batch_for_forward(
             _datum = datum
         for key, val in _datum.items():
             if isinstance(val, dict):
-                new_val = MolGraph(**val)
+                try:
+                    new_val = MolGraph(**val)
+                except TypeError as e:
+                    print(f">>>> {new_val=}")
+                    print(batch)
+                    raise e
+                
             else:
                 new_val = val
             new_datum[key] = new_val

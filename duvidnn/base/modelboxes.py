@@ -6,7 +6,7 @@ import os
 
 from carabiner import print_err
 from datasets import Dataset
-from numpy import ndarray
+from numpy import ndarray, asarray
 from pandas import DataFrame
 
 from .aggregators import get_aggregator, AggFunction
@@ -82,6 +82,7 @@ class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
         self, 
         data: Optional[DataLike] = None,
         features: Optional[FeatureLike] = None,
+        context: Optional[FeatureLike] = None,
         labels: Optional[StrOrIterableOfStr] = None,
         batch_size: int = 16,
         dataloader: bool = False,
@@ -95,16 +96,23 @@ class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
         else:
             *_, dataset = self._ingest_data(
                 features=features,
+                context=context,
                 labels=labels,
                 data=data,
                 batch_size=batch_size,
                 cache=cache,
                 **preprocessing_args,
             )
-        essential_keys = set([self._in_key, self._out_key])
+        print(f">>> {dataset}")
+        essential_keys = set([self._out_key])
         missing_keys = sorted(essential_keys - set(dataset.column_names))
+        if len([col for col in dataset.column_names if col.startswith(self._in_key)]) == 0:
+            missing_keys.append(self._in_key)
         if len(missing_keys) > 0:
-            raise KeyError(f"Dataset is missing essential columns: {', '.join(missing_keys)}.")
+            raise KeyError(
+                f"Dataset is missing essential columns: {', '.join(missing_keys)}. "
+                f"Dataset colulmn names are: {', '.join(dataset.column_names)}"
+            )
         if dataloader_kwargs is None:
             dataloader_kwargs = {}
         if dataloader:
@@ -135,8 +143,10 @@ class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
         training_data: Optional[DataLike] = None,
         val_data: Optional[DataLike] = None,
         features: Optional[FeatureLike] = None,
+        context: Optional[FeatureLike] = None,
         labels: Optional[StrOrIterableOfStr] = None,
         val_features: Optional[FeatureLike] = None,
+        val_context: Optional[FeatureLike] = None,
         val_labels: Optional[StrOrIterableOfStr] = None,
         epochs: int = 1, 
         batch_size: int = 16,
@@ -156,6 +166,7 @@ class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
         } | preprocessing_args
         training_data = self._prepare_data(
             features=features,
+            context=context,
             labels=labels,
             data=training_data,
             shuffle=True,
@@ -165,10 +176,13 @@ class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
             raise ValueError("No validation data provided!")
         if val_features is None:
             val_features = features
+        if val_context is None:
+            val_context = context
         if val_labels is None:
             val_labels = labels
         val_data = self._prepare_data(
             features=val_features,
+            context=val_context,
             labels=val_labels,
             data=val_data,
             **preparation_kwargs,
@@ -204,12 +218,17 @@ class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
     def _predict(
         x: Mapping[str, Any],
         model: Callable,
-        _in_key: str,
+        _in_key: Union[str, Iterable[str]],
         _prediction_column: str,
-        detacher_fn: Callable,
-        aggregator: Optional[Callable] = None
+        detacher_fn: Callable
     ) -> Dict[str, Any]:
-        prediction = model(x[_in_key])
+        if isinstance(_in_key, str):
+            inputs = x[_in_key]
+        elif len(_in_key) == 1:
+            inputs = x[_in_key[0]]
+        else:
+            inputs = [x[k] for k in _in_key]
+        prediction = model(inputs)
         x[_prediction_column] = detacher_fn(prediction)
         return x
 
@@ -227,6 +246,7 @@ class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
         self, 
         data: Optional[DataLike] = None,
         features: Optional[FeatureLike] = None,
+        context: Optional[FeatureLike] = None,
         labels: Optional[StrOrIterableOfStr] = None,
         batch_size: int = 16,
         aggregator: Optional[Union[str, AggFunction]] = None,
@@ -246,6 +266,7 @@ class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
         )
         data = self._prepare_data(
             features=features,
+            context=context,
             labels=labels,
             data=data,
             batch_size=batch_size,
@@ -254,12 +275,16 @@ class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
         )
             
         self.eval_mode()
+        _in_key = tuple(sorted(
+            col for col in data.column_names 
+            if col.startswith(self.__class__._in_key)
+        ))
         predictions = data.map(
             self._predict,
             fn_kwargs={
                 "model": self.model,
                 "detacher_fn": self.detach_tensor,
-                "_in_key": self.__class__._in_key,
+                "_in_key": _in_key,
                 "_prediction_column": _prediction_column,
             },
             batched=True, 
@@ -290,6 +315,7 @@ class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
         self, 
         data: Optional[DataLike] = None,
         features: Optional[FeatureLike] = None,
+        context: Optional[FeatureLike] = None,
         labels: Optional[StrOrIterableOfStr] = None,
         metrics: Optional[Union[Callable, Iterable[Callable], Mapping[str, Callable]]] = None,
         batch_size: int = 16,
@@ -305,6 +331,7 @@ class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
         eval_prediction_col = self.__class__._prediction_key
         predictions = self.predict(
             features=features,
+            context=context,
             labels=labels, 
             data=data, 
             batch_size=batch_size,
@@ -329,7 +356,7 @@ class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
         print(y_vals.shape, preds.shape)
         if isinstance(metrics, Mapping):
             metrics = {
-                name: metric(preds, y_vals).tolist()
+                name: asarray(metric(preds, y_vals)).tolist()
                 for name, metric in dict(metrics).items()
             }
         elif isinstance(metrics, (Iterable, Callable)):
@@ -423,9 +450,12 @@ class FingerprintModelBoxBase(ChemMixinBase, ModelBoxWithVarianceBase):
         else:
             featurizer = []
         if features is not None:
-            featurizer += self._resolve_featurizers(features)
+            new_features = [self._resolve_featurizers(f) for f in features]
+            featurizer.extend(new_features[0])
+            featurizer = [featurizer] + new_features[1:]
+        print(f">>> {featurizer=}")
         return super().load_training_data(
-            features=self._resolve_featurizers(featurizer),
+            features=[self._resolve_featurizers(f) for f in featurizer],
             **kwargs,
             **self._default_preprocessing_args,
             smiles_column=self.smiles_column,
@@ -540,20 +570,26 @@ class ChempropModelBoxBase(FingerprintModelBoxBase):
             _allow_no_features=True,
         )
         if features is not None:
-            featurizer += features
+            featurizer = [featurizer] + features
+            featurizer = [_f for f in featurizer for _f in f]
+        print(f"!!!! {featurizer=}")
         featurizer = self._resolve_featurizers(featurizer)
-        featurizer += [{
+        chemprop_feat = {
             "name": "chemprop-mol",
             "input_column": self.smiles_column,
             "kwargs": {
                 "label_column": labels,
-                "extra_featurizers": [f.output_column for f in featurizer],
+                "extra_featurizers": [
+                    _f.output_column for _f in featurizer #for _f in f
+                ],
             },
-        }]
-        self._special_args["chemprop_input_column"] = Preprocessor.from_dict(featurizer[-1]).output_column
+        }
+        self._special_args["chemprop_input_column"] = Preprocessor.from_dict(chemprop_feat).output_column
+        featurizer.append(chemprop_feat)
+        featurizer = self._resolve_featurizers(featurizer)
         super().load_training_data(
             labels=labels,
-            features=self._resolve_featurizers(featurizer),
+            features=[featurizer],
             _run_featurizer_constructor_first=False,
             **kwargs,
         )

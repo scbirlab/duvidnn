@@ -3,13 +3,14 @@ from argparse import Namespace
 from collections import defaultdict
 import os
 
-from carabiner import pprint_dict
+from carabiner import pprint_dict, print_err
 from carabiner.cliutils import clicommand
 
 from .eval import _evaluate_modelbox_and_save_metrics
-from .utils import _dict_to_pandas, _init_modelbox
+from .utils import _dict_to_pandas, _init_modelbox, _overwrite_config
 from ..checkpoint_utils import _load_json, save_json
 
+STRUCTURE_COLUMN_DEFAULT: str = "smiles"
 
 def _load_modelbox_training_data(
     modelbox,
@@ -26,12 +27,16 @@ def _load_modelbox_training_data(
             "data": overrides.get("training"), 
             "cache": cache,
             # command-line takes precedent:
-            "features": overrides.get("features") or modelbox._input_featurizers,
-            "labels": overrides.get("labels") or modelbox._label_cols, 
+            "features": overrides.get("features"),
+            "labels": overrides.get("labels"),
+            "context": overrides.get("context"),
         }
         if hasattr(modelbox, "tanimoto_column"):  # i.e., is for chemistry
             # command-line takes precedent:
-            load_data_args["structure_column"] = overrides.get("structure") or modelbox.structure_column
+            load_data_args["structure_column"] = overrides.get("structure") or modelbox._default_preprocessing_args.get("structure_column")
+            if load_data_args["structure_column"] is None:
+                print_err(f"Structure column not provided, falling back to {STRUCTURE_COLUMN_DEFAULT}.")
+                load_data_args["structure_column"] = STRUCTURE_COLUMN_DEFAULT
         pprint_dict(
             load_data_args,
             message="Data-loading configuration",
@@ -57,11 +62,16 @@ def _init_modelbox_and_load_training_data(
         **overrides,
     )
 
+    cli_config = _overwrite_config(
+        cli_config, 
+        config_file=config_file, 
+        config_idx=config_idx,
+    )
     modelbox, load_data_args = _load_modelbox_training_data(
         modelbox=modelbox,
         checkpoint=checkpoint,
         cache=cache,
-        **overrides,
+        **(overrides | cli_config),
     )
 
     if checkpoint is None:  # model not instantiated yet
@@ -129,6 +139,7 @@ def _train(args: Namespace) -> None:
 
     cli_config = {
         "class_name": args.model_class.casefold(),
+        "merge_method": args.fusion.casefold(),
         "use_2d": args.descriptors,
         "use_fp": args.fp,
         "n_hidden": args.hidden,
@@ -138,6 +149,20 @@ def _train(args: Namespace) -> None:
         "ensemble_size": args.ensemble_size,
         "learning_rate": args.learning_rate,
     }
+    if args.features is None:
+        if args.x2 is None:
+            features = None
+        else:
+            features = [args.x2]
+    else:
+        if args.x2 is None:
+            features = [args.features]
+        else:
+            features = [args.features, args.x2]
+
+    if (args.x2 is not None or args.context is not None) and not args.model_class.casefold().startswith("bilinear"):
+        print_err("[WARN] Can only use --x2 or --context with --model-class bilinear; concatentating to -x")
+        features = [[_f for f in features for _f in f]]
 
     modelbox, load_data_args = _init_modelbox_and_load_training_data(
         cli_config=cli_config,
@@ -150,7 +175,8 @@ def _train(args: Namespace) -> None:
         structure=args.structure,
         structure_representation=args.input_representation,
         labels=args.labels,
-        features=args.features,
+        features=features,
+        context=args.context,
     )
 
     pprint_dict(

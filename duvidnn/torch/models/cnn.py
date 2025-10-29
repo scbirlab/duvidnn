@@ -35,7 +35,7 @@ class CNNStack(LinearStack):
         in_features: int,
         out_features: int,
         layers: Optional[Iterable[Module]] = None,
-        layer_class = Linear,
+        layer_class: Callable[..., Module] = Linear,
         batch_norm: bool = False,
         dropout: float = 0.0,
         activation = _DEFAULT_ACTIVATION,

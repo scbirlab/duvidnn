@@ -25,7 +25,7 @@ class DoubtMixinBase(ABC):
         index = 0
         output = {}
         for name, param in d.items():
-            end_index = index + param.numel()
+            end_index = index + param.size
             output[name] = p[index:end_index].reshape(*param.shape)
             index = end_index
         return output
@@ -118,7 +118,7 @@ class DoubtMixinBase(ABC):
     
     @staticmethod
     def _process_information(
-        data: Mapping[str, ArrayLike],
+        x: Mapping[str, ArrayLike],
         grad_fns: Iterable[Callable],
         _in_key: str = "inputs",
         _out_key: str = "labels"
@@ -127,8 +127,14 @@ class DoubtMixinBase(ABC):
             ('fisher_score', 'fisher_information_diagonal'),
             [[]] * len(grad_fns),
         ))
+        if isinstance(_in_key, str):
+            inputs = x[_in_key]
+        elif len(_in_key) == 1:
+            inputs = x[_in_key[0]]
+        else:
+            inputs = [x[k] for k in _in_key]
         for key, f in zip(grads_hessians, grad_fns):
-            f_result = f(x_true=data[_in_key], y_true=data[_out_key])
+            f_result = f(x_true=inputs, y_true=x[_out_key])
             grads_hessians[key].append(f_result)
         return grads_hessians
 
@@ -137,26 +143,31 @@ class DoubtMixinBase(ABC):
         model: Optional[Callable] = None,
         dataset: Optional[Dataset] = None,
         hessian: bool = False, 
+        last_layer_only: bool = False,
         batch_size: int = 16,
         **kwargs
     ) -> Dataset:
         if dataset is None:  
             dataset = self._check_training_data()
-        fn = (self.fisher_score,)
+        fn = (partial(self.fisher_score, last_layer_only=last_layer_only),)
         if hessian:
             fn += (partial(
-                self.fisher_information_diagonal, 
+                self.fisher_information_diagonal,
+                last_layer_only=last_layer_only,
                 **kwargs,
             ),)
         
         grad_fns = tuple(f(model) for f in fn)
+        _in_key = tuple(sorted(
+            col for col in dataset.column_names if col.startswith(self._in_key)
+        ))
         dataset = (
             dataset
             .map(
                 self._process_information, 
                 fn_kwargs={
                     "grad_fns": grad_fns,
-                    "_in_key": self._in_key,
+                    "_in_key": _in_key,
                     "_out_key": self._out_key,
                 },
                 batch_size=batch_size,
@@ -174,66 +185,88 @@ class DoubtMixinBase(ABC):
             for col in columns
         )
 
+    @staticmethod
     def _doubtscore(
-        self, 
-        data: Mapping[str, ArrayLike], 
+        x: Mapping[str, ArrayLike], 
         param_grad_fn: Callable, 
         param_hessian_fn: Callable,
         fisher_score: Mapping[str, ArrayLike], 
+        doubtscore_fn: Callable,
+        _in_key: str = "inputs",
+        _out_key: str = "score",
         loss_hessian: Optional[Mapping[str, ArrayLike]] = None,
-        aggregator: Union[str, AggFunction] = 'rms'
+        aggregator: Union[str, AggFunction] = "rms",
+        device: str = "cpu"
     ) -> Dict[str, ndarray]:
         
+        if isinstance(_in_key, str):
+            inputs = x[_in_key]
+        elif len(_in_key) == 1:
+            inputs = x[_in_key[0]]
+        else:
+            inputs = [x[k] for k in _in_key]
+
         aggregator = get_aggregator(aggregator, axis=-1)
-        param_gradient = param_grad_fn(data[self._in_key])
+        param_gradient = param_grad_fn(inputs)
         doubtscore = aggregator(
             concatenate([
-                self.doubtscore_core(
+                doubtscore_fn(
                     fisher_score[name], 
                     param_gradient[name], 
-                    device=self.device,
+                    device=device,
                 ) 
                 for name in fisher_score
             ], axis=-1), 
         )
-        data["score"] = doubtscore
-        return data
+        x[_out_key] = doubtscore
+        return x
 
+    @staticmethod
     def _information_sensitivity(
-        self, 
-        data: Mapping[str, ArrayLike], 
+        x: Mapping[str, ArrayLike], 
         param_grad_fn: Callable, 
         param_hessian_fn: Callable,
         fisher_score: Mapping[str, ArrayLike], 
         loss_hessian: Mapping[str, ArrayLike],
+        info_sens_fn: Callable,
         optimality_approximation: bool = False,
-        aggregator: Union[str, AggFunction] = 'rms'
+        _in_key: Union[str, Iterable[str]] = "inputs",
+        _out_key: Union[str, Iterable[str]] = "score",
+        aggregator: Union[str, AggFunction] = "rms",
+        device: str = "cpu"
     ) -> Dict[str, ndarray]:
+
+        if isinstance(_in_key, str):
+            inputs = x[_in_key]
+        elif len(_in_key) == 1:
+            inputs = x[_in_key[0]]
+        else:
+            inputs = [x[k] for k in _in_key]
 
         aggregator = get_aggregator(aggregator, axis=-1)
         if optimality_approximation:
             param_gradient, param_hessian = (
-                param_grad_fn(data[self._in_key]), 
+                param_grad_fn(inputs), 
                 {name: None for name in fisher_score}
             )
         else:
             param_gradient, param_hessian = (
-                fn(data[self._in_key]) for fn in (param_grad_fn, param_hessian_fn)
+                fn(inputs) for fn in (param_grad_fn, param_hessian_fn)
             )
         infosens = aggregator(
             concatenate([
-                self.information_sensitivity_core(
+                info_sens_fn(
                     fisher_score[name], 
                     loss_hessian[name], 
                     param_gradient[name], 
                     param_hessian[name],
                     optimality_approximation=optimality_approximation,
-                    device=self.device,
+                    device=device,
                 ) for name in fisher_score
             ], axis=-1), 
         )
-        data["score"] = infosens
-        return data
+        x[_out_key] = infosens
+        return x
 
     def _get_info_score(
         self, 
@@ -243,16 +276,21 @@ class DoubtMixinBase(ABC):
         batch_size: int = 16,
         model: Optional[Callable] = None,
         optimality_approximation: bool = False,
+        last_layer_only: bool = False,  # TODO: implement
         **kwargs,
     ) -> Dataset:
 
         if score_type == "information sensitivity":
-            inner_fn = partial(
-                self._information_sensitivity, 
-                optimality_approximation=optimality_approximation,
-            )
+            map_fn = self._information_sensitivity
+            extra_kwargs = {
+                "info_sens_fn": self.information_sensitivity_core,
+                "optimality_approximation": optimality_approximation,
+            }
         elif score_type == "doubtscore":
-            inner_fn = self._doubtscore
+            map_fn = self._doubtscore
+            extra_kwargs = {
+                "doubtscore_fn": self.doubtscore_core,
+            }
         else:
             raise NotImplementedError(f"Score '{score_type}' not yet implemented.")
             
@@ -261,6 +299,7 @@ class DoubtMixinBase(ABC):
         fisher_score_and_info = self._information_scores(
             model=model,
             hessian=use_hessian,
+            last_layer_only=last_layer_only,
             batch_size=batch_size, 
             **kwargs,
         )
@@ -268,28 +307,44 @@ class DoubtMixinBase(ABC):
             fisher_score, fisher_info_diag = fisher_score_and_info
         else:
             fisher_score, fisher_info_diag = next(fisher_score_and_info), None
-
+        
+        param_grad_fn = self.parameter_gradient(
+            model=model, 
+            last_layer_only=last_layer_only,
+        )
         if use_param_hessian:
             param_hessian_fn = self.parameter_hessian_diagonal(
                 model=model,
+                last_layer_only=last_layer_only,
                 **kwargs,
             )
         else:
             param_hessian_fn = None            
-
+        
+        _in_key = tuple(sorted(
+            col for col in candidates.column_names
+            if col.startswith(self._in_key)
+        ))
+        fn_kwargs = {
+            "param_grad_fn": param_grad_fn, 
+            "param_hessian_fn": param_hessian_fn,
+            "fisher_score": fisher_score,
+            "loss_hessian": fisher_info_diag,
+            "_in_key": _in_key,
+            "_out_key": score_type,
+            "device": self.device,
+        } | extra_kwargs
         score = candidates.map(
-            inner_fn,
-            fn_kwargs={
-                "param_grad_fn": self.parameter_gradient(model=model), 
-                "param_hessian_fn": param_hessian_fn,
-                "fisher_score": fisher_score,
-                "loss_hessian": fisher_info_diag,
-            },
+            map_fn,
+            fn_kwargs=fn_kwargs,
             batched=True, 
             batch_size=batch_size,
-            desc=f"Calculating parameter gradients{' and Hessians' if use_hessian and not optimality_approximation else ''}",
-        )#.select_columns(['score'])
-        return score.rename_column('score', score_type)
+            desc=(
+                "Calculating parameter gradients"
+                + (' and Hessians' if use_param_hessian else '')
+            )
+        )
+        return score
 
     def _check_training_data(self):
         if hasattr(self, "training_data"):
@@ -305,6 +360,7 @@ class DoubtMixinBase(ABC):
         score_type: str,
         candidates: Union[ArrayLike, Dataset],
         features: Optional[str] = None,
+        context: Optional[str] = None,
         labels: Optional[str] = None,
         training_dataset: Optional[Dataset] = None,
         batch_size: int = 16,
@@ -322,6 +378,7 @@ class DoubtMixinBase(ABC):
             candidates = self._prepare_data(
                 data=candidates,
                 features=features,
+                context=context,
                 labels=labels,
                 batch_size=batch_size,
                 cache=cache,
@@ -339,6 +396,7 @@ class DoubtMixinBase(ABC):
     def doubtscore(
         self, 
         features: Optional[str] = None,
+        context: Optional[str] = None,
         preprocessing_args: Optional[Mapping] = None,
         **info_score_kwargs
     ) -> Dataset:
@@ -350,6 +408,7 @@ class DoubtMixinBase(ABC):
         return self._info_score_entrypoint(
             score_type="doubtscore",
             features=features,
+            context=context,
             preprocessing_args=preprocessing_args,
             **info_score_kwargs
         )
@@ -357,6 +416,7 @@ class DoubtMixinBase(ABC):
     def information_sensitivity(
         self, 
         features: Optional[str] = None,
+        context: Optional[str] = None,
         preprocessing_args: Optional[Mapping] = None,
         **info_score_kwargs
     ) -> Dataset:
@@ -368,6 +428,7 @@ class DoubtMixinBase(ABC):
         return self._info_score_entrypoint(
             score_type="information sensitivity",
             features=features,
+            context=context,
             preprocessing_args=preprocessing_args,
             **info_score_kwargs
         )

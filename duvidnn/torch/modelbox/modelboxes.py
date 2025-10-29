@@ -17,7 +17,7 @@ from ...base.modelboxes import (
 from ...base.modelbox_registry import register_modelbox
 from ...checkpoint_utils import load_checkpoint_file
 
-from ..models import ChempropEnsemble, TorchMLPEnsemble, TorchCNN2DEnsemble
+from ..models import ChempropEnsemble, TorchBilinearEnsemble, TorchMLPEnsemble, TorchCNN2DEnsemble
 from .data import ChempropDataMixin, DataMixin, TorchChemMixin
 from .information import DoubtMixin, ChempropDoubtMixin
 from .training import ModelTrainer
@@ -108,8 +108,48 @@ class TorchMLPModelBox(TorchModelBoxBase, ModelBoxWithVarianceBase):
         return TorchMLPEnsemble(
             n_input=self.input_shape[-1],
             n_out=self.output_shape[-1], 
-            *args, **self._model_config,
+            *args, 
+            **self._model_config,
         )
+
+
+@register_modelbox("bilinear")
+class TorchBilinearModelBox(TorchModelBoxBase, ModelBoxWithVarianceBase):
+
+    """ModelBox for pytorch bilinear multilayer perceptron ensemble.
+
+    Examples
+    ========
+    >>> mb = TorchBilinearModelBox(ensemble_size=3) 
+    >>> mb.input_shape, mb.output_shape = [(4,)], (1,) # usually set by .load_training_data() 
+    >>> mb.model = mb.create_model()
+    >>> mb.model.n_input, mb.model.n_out 
+    ([4], 1)
+    >>> mb.input_shape, mb.output_shape, mb.context_shape = [(4,), (2,)], (1,), (5,) # usually set by .load_training_data() 
+    >>> mb.model = mb.create_model()
+    >>> mb.model.n_input, mb.model.n_context, mb.model.n_out 
+    ([4, 2], 5, 1)
+
+    """
+
+    def create_model(self, *args, **kwargs) -> TorchBilinearEnsemble:
+        self._model_config.update(kwargs)
+        if not isinstance(self.input_shape[-1], int):
+            n_input = [s[-1] for s in self.input_shape]
+        else:
+            n_input = self.input_shape[-1]
+        return TorchBilinearEnsemble(
+            n_input=n_input,
+            n_out=self.output_shape[-1],
+            n_context=(getattr(self, "context_shape", None) or [None])[-1],
+            *args, 
+            **self._model_config,
+        )
+
+
+@register_modelbox("bilinear-fp")
+class TorchBilinearFingerprintModelBox(TorchChemMixin, FingerprintModelBoxBase, TorchBilinearModelBox):
+    pass
 
 
 @register_modelbox("fingerprint")
@@ -129,8 +169,10 @@ class ChempropModelBox(ChempropDataMixin, ChempropDoubtMixin, ChempropModelBoxBa
         return ChempropEnsemble(
             n_input=self.input_shape[-1],
             n_out=self.output_shape[-1], 
+            *args,
             **self._model_config,
         )
+
 
 @register_modelbox("cnn")
 class TorchCNN2DModelBox(TorchModelBoxBase, ModelBoxWithVarianceBase):

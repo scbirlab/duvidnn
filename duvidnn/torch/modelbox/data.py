@@ -13,8 +13,6 @@ import torch
 from torch.utils.data import DataLoader
 
 from ...base.data import ChemMixinBase, DataMixinBase
-
-
 from ..models.chemprop.data import _collate_training_batch_for_forward
 
 _DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
