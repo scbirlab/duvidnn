@@ -40,7 +40,15 @@ def _normalize_dims(
 
     # x, y = np.asarray(x), np.asarray(y)
 
-    if x.shape[:-1] != y.shape[:(x.ndim - 1)]:
+    try:
+        yshape = y.shape
+    except AttributeError as e:
+        from carabiner import print_err
+        # y is a list!
+        print_err(f"[WARN] y is a {type(y)}! {y=}")
+        print_err(f"{x=}")
+        raise e
+    if x.shape[:-1] != yshape[:(x.ndim - 1)]:
         raise ValueError(
             f"Leading dimensions of x and y (shapes {x.shape} and {y.shape}) are not compatible!"
         )   

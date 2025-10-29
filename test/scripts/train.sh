@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-#!/usr/bin/env bash
-
 set -euox pipefail
 
 TRAIN="hf://scbirlab/fang-2023-biogen-adme@scaffold-split:train"
