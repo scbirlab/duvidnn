@@ -5,6 +5,8 @@ from typing import TYPE_CHECKING, Any, Callable, Dict, Iterable, List, Mapping, 
 from abc import abstractmethod, ABC
 from functools import partial
 import os
+import hashlib, time
+from pathlib import Path
 
 from carabiner import cast, print_err
 
@@ -25,6 +27,11 @@ from .preprocessing import Preprocessor
 from .typing import DataLike, FeatureLike, StrOrIterableOfStr
 
 _DEFAULT_BATCH_SIZE: int = 128
+
+
+def _lock_path(cache_dir: str, key: str) -> str:
+    h = hashlib.sha256(key.encode("utf-8")).hexdigest()[:16]
+    return str(Path(cache_dir) / ".locks" / f"{h}.lock")
 
 
 class DataMixinBase(ABC):
@@ -53,7 +60,8 @@ class DataMixinBase(ABC):
 
     def save_data_checkpoint(
         self, 
-        checkpoint_dir: str
+        checkpoint_dir: str,
+        save_data: bool = False
     ):
         keys = (
             "_in_key",
@@ -73,7 +81,7 @@ class DataMixinBase(ABC):
         }
         if not os.path.exists(checkpoint_dir):
             os.makedirs(checkpoint_dir)
-        if self._input_training_data is not None:
+        if self._input_training_data is not None and save_data:
             self._input_training_data.save_to_disk(
                 os.path.join(os.path.join(checkpoint_dir, "input-data.hf")),
             )
@@ -100,6 +108,7 @@ class DataMixinBase(ABC):
         )
         for key, val in data_config.items():
             setattr(self, key, val)
+        
         self._input_training_data = load_checkpoint_file(
             checkpoint, 
             filename="input-data.hf",
@@ -107,6 +116,7 @@ class DataMixinBase(ABC):
             none_on_error=True,
             cache_dir=cache_dir,
         )
+
         training_data = load_checkpoint_file(
             checkpoint, 
             filename="training-data.hf",
@@ -221,10 +231,7 @@ class DataMixinBase(ABC):
         return columns
     
     @staticmethod
-    def _load_from_csv(
-        filename: str,
-        cache: Optional[str] = None
-    ) -> Dataset:
+    def _load_from_csv(filename: str, cache: Optional[str] = None) -> Dataset:
         from datasets import Dataset
 
         if filename.endswith((".csv", ".tsv", ".txt", ".csv.gz", ".tsv.gz", ".txt.gz")):
@@ -233,15 +240,31 @@ class DataMixinBase(ABC):
                 cache_dir=cache,
                 sep="," if filename.endswith((".csv", ".csv.gz")) else "\t",
             )
+            lock_key = f"from_csv::{os.path.abspath(filename)}::{read_f.keywords.get('sep')}"
         elif filename.endswith(".parquet"):
             read_f = partial(Dataset.from_parquet, cache_dir=cache)
+            lock_key = f"from_parquet::{os.path.abspath(filename)}"
         elif filename.endswith(".hf"):
             read_f = Dataset.load_from_disk
+            lock_key = f"load_from_disk::{os.path.abspath(filename)}"
         elif filename.endswith(".arrow"):
             read_f = Dataset.from_file
+            lock_key = f"from_file::{os.path.abspath(filename)}"
         else:
             raise IOError(f"Could not infer how to open '{filename}' from its extension.")
-        return read_f(filename)
+
+        # If no cache, nothing sensible to lock on
+        if cache is None:
+            return read_f(filename)
+
+        # Cross-task lock on the shared filesystem
+        from filelock import FileLock
+        locks_dir = Path(cache) / ".locks"
+        locks_dir.mkdir(parents=True, exist_ok=True)
+
+        lockfile = _lock_path(cache, lock_key)
+        with FileLock(lockfile, timeout=60 * 60):
+            return read_f(filename)
 
     @classmethod
     def _load_from_dataframe(
@@ -285,12 +308,14 @@ class DataMixinBase(ABC):
             elif featurizer.startswith(transformer_prefix):
                 ref = featurizer.split(transformer_prefix)[-1]
                 try:
+                    print_err(f">>>>> {ref=}")
                     ref, col = ref.split(":")
+                    print_err(f">>>>> {ref=}, {col=}")
                 except ValueError:
                     raise ValueError(
                         f"""
                         Transformers models should be provided in the format 
-                        {transformer_prefix}<ref>:<input-column>[~agg1,agg2]
+                        {transformer_prefix}<input-column>:<ref>[~agg1,agg2]
 
                         But got: "{featurizer}"
                         """
@@ -299,9 +324,10 @@ class DataMixinBase(ABC):
                 try:
                     col, aggs = col.split("~")
                 except ValueError:
-                    col, aggs = ref, ["mean"]
+                    col, aggs = col, ["mean"]
                 else:
                     aggs = aggs.split(",")
+                print_err(f">>>>> {ref=}, {col=}")
 
                 featurizer = Preprocessor(
                     name="hf-bart", 
@@ -422,6 +448,10 @@ class DataMixinBase(ABC):
                 fill_value = 0.
             elif this_type in ("string", "large_string"):
                 fill_value = ""
+            elif this_type in ("bool", ):
+                fill_value = False
+            else:
+                raise ValueError(f"Column `{key}` type `{this_type}` is not supported.")
             
             x[key] = [fill_value if v is None else v for v in x[key]]
 
@@ -489,8 +519,8 @@ class DataMixinBase(ABC):
         else:
             n_context = 0
 
-        dataset = self._resolve_data(data)
-        print(f">>> {features=}")
+        dataset = self._resolve_data(data, cache=cache)
+        #print(f">>> {features=}")
         featurizers = [self._resolve_featurizers(f) for f in features]
         featurizers_dicts = tuple(tuple(_f.to_dict() for _f in f) for f in featurizers)
         input_columns = [
@@ -688,7 +718,8 @@ class ChemMixinBase(DataMixinBase):
     def _featurizer_constructor(
         smiles_column: str,
         use_fp: bool = True,
-        use_2d: bool = True,
+        use_2d: bool = False,
+        use_3d: bool = False,
         extra_featurizers: Optional[FeatureLike] = None,
         _allow_no_features: bool = False
     ) -> Iterable[Preprocessor]:
@@ -696,6 +727,7 @@ class ChemMixinBase(DataMixinBase):
         if all([
             not use_fp, 
             not use_2d,
+            not use_3d,
             extra_featurizers is None or len(extra_featurizers) == 0,
             not _allow_no_features,
         ]):
@@ -709,6 +741,11 @@ class ChemMixinBase(DataMixinBase):
         if use_2d:
             featurizer.append(Preprocessor(
                 name="descriptors-2d",
+                input_column=smiles_column,
+            ))
+        if use_3d:
+            featurizer.append(Preprocessor(
+                name="descriptors-3d",
                 input_column=smiles_column,
             ))
         if extra_featurizers is not None:

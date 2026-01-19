@@ -36,6 +36,7 @@ dependencies = [
   "carabiner-tools[pd,mpl]>=0.0.4",
   "datasets<4,>=3.0.0",
   "duvida[torch]>=0.0.3.post1",
+  "filelock",
   "huggingface_hub",
   "numpy",
   "platformdirs>=4.4.0",
@@ -49,10 +50,10 @@ dependencies = [
 
 [project.optional-dependencies]
 transformers = ["torch>=2.4", "torchvision", "transformers"]
-chem = ["chemprop>=2.1.0", "schemist>=0.0.4.post1", "scikit-learn>=1.7"]
-bio = ["vectome>=0.0.4"]
-splits = ["umap-learn", "scipy", "schemist>=0.0.4.post1", "tdigest>=0.5", "faiss-cpu>=1.11"]
-splits_gpu = ["umap-learn", "scipy", "schemist>=0.0.4.post1", "tdigest>=0.5", "faiss-gpu"]
+chem = ["chemprop>=2.1.0", "schemist>=0.0.6", "scikit-learn>=1.7"]
+bio = ["vectome>=0.0.6"]
+splits = ["umap-learn", "scipy", "schemist>=0.0.6, "tdigest>=0.5", "faiss-cpu>=1.11"]
+splits_gpu = ["umap-learn", "scipy", "schemist>=0.0.6", "tdigest>=0.5", "faiss-gpu"]
 dev = ["duvidnn[chem,bio,splits,transformers]", "pytest", "flake8"]
 
 [project.urls]

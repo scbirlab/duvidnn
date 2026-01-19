@@ -10,13 +10,13 @@ from numpy import ndarray, asarray
 from pandas import DataFrame
 
 from .aggregators import get_aggregator, AggFunction
-from .data import DataMixinBase, ChemMixinBase
+from .data import DataMixinBase, ChemMixinBase, _DEFAULT_BATCH_SIZE
 from .evaluation import rmse, pearson_r, spearman_r
 from .information import DoubtMixinBase
 from .preprocessing import Preprocessor
 from .training import ModelTrainerBase
 from .typing import DataLike, FeatureLike, StrOrIterableOfStr
-from ..checkpoint_utils import save_json, _load_json
+from ..checkpoint_utils import load_checkpoint_file, save_json
 
 
 class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
@@ -40,12 +40,13 @@ class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
 
     def save_checkpoint(
         self,
-        checkpoint: str
+        checkpoint: str,
+        save_data: bool = False
     ) -> None:
         print_err(f"Saving checkpoint at {checkpoint}")
         if not os.path.exists(checkpoint):
             os.makedirs(checkpoint)
-        self.save_data_checkpoint(checkpoint)
+        self.save_data_checkpoint(checkpoint, save_data=save_data)
         init_kwargs = {
             "class_name": self.class_name,
         }
@@ -63,11 +64,11 @@ class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
     ) -> None:
         print_err(f"Loading checkpoint from {checkpoint}")
         self.load_data_checkpoint(checkpoint, cache_dir=cache_dir)
-        self._model_config = _load_json(checkpoint, self.__class__._model_config_filename)
-        self._special_args = _load_json(checkpoint, self.__class__._special_args_filename)
-        if self.training_data is not None:
+        self._model_config = load_checkpoint_file(checkpoint, self.__class__._model_config_filename, cache_dir=cache_dir)
+        self._special_args = load_checkpoint_file(checkpoint, self.__class__._special_args_filename, cache_dir=cache_dir, allow_none=True)
+        if self.model is None:
             self.model = self.create_model()
-            self.load_weights(checkpoint, cache_dir=cache_dir)
+        self.load_weights(checkpoint, cache_dir=cache_dir)
         return None
 
     @abstractmethod
@@ -84,7 +85,7 @@ class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
         features: Optional[FeatureLike] = None,
         context: Optional[FeatureLike] = None,
         labels: Optional[StrOrIterableOfStr] = None,
-        batch_size: int = 16,
+        batch_size: int = _DEFAULT_BATCH_SIZE,
         dataloader: bool = False,
         shuffle: bool = False,
         cache: Optional[str] = None,
@@ -149,7 +150,7 @@ class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
         val_context: Optional[FeatureLike] = None,
         val_labels: Optional[StrOrIterableOfStr] = None,
         epochs: int = 1, 
-        batch_size: int = 16,
+        batch_size: int = _DEFAULT_BATCH_SIZE,
         # learning_rate: float = .01,
         callbacks: Optional[Iterable[Callable]] = None,
         trainer_opts: Mapping[str, Union[str, int, bool]] = None,
@@ -248,7 +249,7 @@ class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
         features: Optional[FeatureLike] = None,
         context: Optional[FeatureLike] = None,
         labels: Optional[StrOrIterableOfStr] = None,
-        batch_size: int = 16,
+        batch_size: int = _DEFAULT_BATCH_SIZE,
         aggregator: Optional[Union[str, AggFunction]] = None,
         cache: Optional[str] = None,
         agg_kwargs: Optional[Mapping] = None,
@@ -318,7 +319,7 @@ class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
         context: Optional[FeatureLike] = None,
         labels: Optional[StrOrIterableOfStr] = None,
         metrics: Optional[Union[Callable, Iterable[Callable], Mapping[str, Callable]]] = None,
-        batch_size: int = 16,
+        batch_size: int = _DEFAULT_BATCH_SIZE,
         aggregator: Optional[Union[str, AggFunction]] = None,
         agg_kwargs: Optional[Mapping] = None,
         cache: Optional[str] = None,
@@ -388,7 +389,7 @@ class ModelBoxWithVarianceBase(ModelBoxBase):
     def prediction_variance(
         self, 
         candidates: Optional[DataLike] = None,
-        batch_size: int = 16,
+        batch_size: int = _DEFAULT_BATCH_SIZE,
         cache: Optional[str] = None,
         **kwargs
     ) -> ndarray:
@@ -414,12 +415,14 @@ class FingerprintModelBoxBase(ChemMixinBase, ModelBoxWithVarianceBase):
         self, 
         use_fp: bool = False,
         use_2d: bool = False,
+        use_3d: bool = False,
         extra_featurizers: Optional[FeatureLike] = None,
         *args, **kwargs
     ):
         super().__init__(*args, **kwargs)
         self.use_fp = use_fp
         self.use_2d = use_2d
+        self.use_3d = use_3d
         if extra_featurizers is not None:
             if isinstance(extra_featurizers, (str, Mapping)):
                 extra_featurizers = [extra_featurizers]
@@ -445,6 +448,7 @@ class FingerprintModelBoxBase(ChemMixinBase, ModelBoxWithVarianceBase):
                 smiles_column=self.smiles_column,
                 use_fp=self.use_fp,
                 use_2d=self.use_2d,
+                use_3d=self.use_3d,
                 extra_featurizers=self.extra_featurizers,
             )
         else:

@@ -83,6 +83,7 @@ def _train_and_save_modelbox(
     modelbox,
     early_stopping: Optional[int] = None,
     output_name: Optional[str] = None,
+    save_data: bool = False,
     **training_args
 ):
     from datasets.fingerprint import Hasher
@@ -127,7 +128,7 @@ def _train_and_save_modelbox(
         max_version,
         os.path.join(checkpoint_path, "training-log")
     )
-    modelbox.save_checkpoint(checkpoint_path)
+    modelbox.save_checkpoint(checkpoint_path, save_data=save_data)
         
     return checkpoint_path, training_args
 
@@ -140,7 +141,8 @@ def _train(args: Namespace) -> None:
     cli_config = {
         "class_name": args.model_class.casefold(),
         "merge_method": args.fusion.casefold(),
-        "use_2d": args.descriptors,
+        "use_2d": getattr(args, "2d"),
+        "use_3d": getattr(args, "3d"),
         "use_fp": args.fp,
         "n_hidden": args.hidden,
         "residual_depth": args.residual,
@@ -201,6 +203,7 @@ def _train(args: Namespace) -> None:
         batch_size=args.batch,
         val_data=args.validation,
         output_name=args.output,
+        save_data=args.save_data,
     )
     for obj, f in zip((training_args, load_data_args), ("training-args.json", "load-data-args.json")):
         save_json(obj, os.path.join(checkpoint_path, f))
@@ -214,8 +217,6 @@ def _train(args: Namespace) -> None:
     for name in ("training", "validation", "test"):
         dataset = getattr(args, name)
         if dataset is not None:  # skip optional extra datasets, e.g. "test"
-            if name == "training":
-                dataset = None  # Use cached training data
             metrics = _evaluate_modelbox_and_save_metrics(
                 modelbox,
                 metric_filename=os.path.join(checkpoint_path, f"eval-metrics_{name}.json"),

@@ -4,6 +4,7 @@ from duvida.config import config
 config.set_backend('torch', precision='float')
 from lightning import LightningModule, Trainer
 from lightning.pytorch.plugins.environments import LightningEnvironment
+from lightning.pytorch.callbacks import TQDMProgressBar
 from torch.utils.data import DataLoader
 
 from ...base.training import ModelTrainerBase
@@ -13,7 +14,10 @@ class ModelTrainer(ModelTrainerBase):
     _trainer: Trainer = None
 
     def create_trainer(self) -> None:
-        kwargs = {"plugins": LightningEnvironment()} | self._kwargs
+        kwargs = {
+            "plugins": LightningEnvironment(),
+            "callbacks": [TQDMProgressBar(leave=True)],
+        } | self._kwargs
         self._trainer = Trainer(
             max_epochs=self.epochs,
             **kwargs,

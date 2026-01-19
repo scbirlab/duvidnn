@@ -26,6 +26,7 @@ def _save_dataset(
     output: str
 ) -> None:
     print_err("INFO: Saving dataset:\n" + str(dataset) + "\n" + f"at {output} as", end=" ")
+    dataset = dataset.with_format(None)
     if output.endswith((".csv", ".csv.gz", ".tsv", ".tsv.gz", ".txt", ".txt.gz")):
         print_err("CSV.")
         dataset.to_csv(
