@@ -37,7 +37,7 @@ do
             --epochs 1 \
             -z 3 \
             --learning-rate 0.001 \
-            --descriptors \
+            --2d \
             --fp
         ls -lah "$OUTPUT"
         ls -lah "$OUTPUT"/"$class-$i"/*
