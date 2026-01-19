@@ -148,14 +148,24 @@ def main() -> None:
         help='Depth of residual blocks. Default: Do not use residual blocks.',
     )
     _2d = CLIOption(
-        '--descriptors', 
+        '--2d', 
         action="store_true",
         help='Use 2d descriptors (needs a SMILES input feature).',
+    )
+    _3d = CLIOption(
+        '--3d', 
+        action="store_true",
+        help='Use 3d descriptors (needs a SMILES input feature).',
     )
     _fp = CLIOption(
         '--fp', 
         action="store_true",
         help='Use chemical fingerprints (needs a SMILES input feature).',
+    )
+    save_data = CLIOption(
+        '--save-data', 
+        action="store_true",
+        help='Whether to save data artefacts with model. Required for downstream information metrics, but requires additional disk space.',
     )
     dropout = CLIOption(
         '--dropout', '-d',
@@ -406,10 +416,12 @@ def main() -> None:
             model_class,
             fusion_method,
             _checkpoint,
+            save_data,
             n_units,
             n_hidden,
             residual_depth,
-            _2d, 
+            _2d,
+            _3d,
             _fp,
             dropout,
             batch_size,

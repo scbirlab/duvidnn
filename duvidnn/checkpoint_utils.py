@@ -56,11 +56,11 @@ def load_checkpoint_file(
     filename: str,
     callback: Union[str, Callable] = "json",
     none_on_error: bool = False,
+    allow_none: bool = False,
     cache_dir: Optional[str] = None,
     allow_empty: bool = False,
     *args, **kwargs
 ) -> Union[Any, None]:
-    from huggingface_hub import snapshot_download
     cache_dir = cache_dir or CACHE_DIR
     obj = None
     if isinstance(callback, str):
@@ -73,8 +73,16 @@ def load_checkpoint_file(
                 """
             )
     if os.path.exists(checkpoint):
-        obj = callback(checkpoint, filename)
+        try:
+            obj = callback(checkpoint, filename)
+        except Exception as e:
+            print_err(e)
+            if none_on_error:
+                return None
+            else:
+                raise e
     elif checkpoint.startswith("hf://"):
+        from huggingface_hub import snapshot_download
         checkpoint = checkpoint.split("hf://")[-1]
         if filename.endswith(".hf"):
             filename_pattern = [filename + '/*.arrow', filename + '/*.json']
@@ -98,7 +106,11 @@ def load_checkpoint_file(
                     raise e
             else:
                 obj = callback(tmpdirname, filename)
+<<<<<<< HEAD
     if allow_empty or obj is not None:
+=======
+    if obj is not None or allow_none:
+>>>>>>> 745bb4f (Bug fixes)
         return obj
     else:
         raise AttributeError(

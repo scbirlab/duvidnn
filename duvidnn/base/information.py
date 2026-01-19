@@ -11,6 +11,7 @@ from numpy.typing import ArrayLike
 
 from .aggregators import get_aggregator, AggFunction
 from ..utils.package_data import CACHE_DIR
+from .data import _DEFAULT_BATCH_SIZE
 
 
 class DoubtMixinBase(ABC):
@@ -145,7 +146,7 @@ class DoubtMixinBase(ABC):
         dataset: Optional[Dataset] = None,
         hessian: bool = False, 
         last_layer_only: bool = False,
-        batch_size: int = 16,
+        batch_size: int = _DEFAULT_BATCH_SIZE,
         **kwargs
     ) -> Dataset:
         if dataset is None:  
@@ -274,7 +275,7 @@ class DoubtMixinBase(ABC):
         score_type: str,
         dataset: Dataset,
         candidates: Dataset,
-        batch_size: int = 16,
+        batch_size: int = _DEFAULT_BATCH_SIZE,
         model: Optional[Callable] = None,
         optimality_approximation: bool = False,
         last_layer_only: bool = False,  # TODO: implement
@@ -364,7 +365,7 @@ class DoubtMixinBase(ABC):
         context: Optional[str] = None,
         labels: Optional[str] = None,
         training_dataset: Optional[Dataset] = None,
-        batch_size: int = 16,
+        batch_size: int = _DEFAULT_BATCH_SIZE,
         preprocessing_args: Optional[Mapping] = None,
         cache: Optional[str] = None,
         **info_score_kwargs

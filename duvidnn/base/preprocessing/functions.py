@@ -18,7 +18,7 @@ def Identity() -> Callable:
         data: Mapping[str, Iterable],
         input_column: str
     ) -> np.ndarray:
-        return np.asarray(data[input_column])
+        return data[input_column]
     return _identity
 
 
@@ -232,11 +232,40 @@ def Descriptors2D(
     return _descriptors_2d
 
 
+@register_function("descriptors-3d")
+def Descriptors3D() -> Callable:
+    """Get 3D descriptors from SMILES.
+    
+    """
+    try:
+        from schemist.features import calculate_feature
+    except ImportError:
+        raise ImportError(f"schemist not installed! Try `pip install duvidnn[chem]`.")
+
+    feature_calculator = partial(
+        calculate_feature,
+        feature_type="3d",
+        return_dataframe=False,
+    )
+    
+    def _descriptors_3d(
+        data: Mapping[str, Iterable],
+        input_column: str
+    ) -> np.ndarray:
+        desc_3d, _ = feature_calculator(strings=data[input_column])
+        return desc_3d
+
+    return _descriptors_3d
+
+
 @register_function("vectome-fingerprint")
 def VectomeFingerprint(
-    method: str = "countsketch",
-    ndim: int = 2048,
+    method: str = "landmark",
+    k: int = 21,
+    n: int = 10_000,
+    group: int = 2594,
     check_spelling: bool = True,
+    seed: int = 42,
     **kwargs
 ) -> Callable:
     """Get MinHash fingerprint from species name or taxon ID.
@@ -250,9 +279,12 @@ def VectomeFingerprint(
     feature_calculator = cache(partial(
         vectorize,
         method=method,
-        dim=ndim,
+        group=group,
         check_spelling=check_spelling,
         quiet=True,
+        seed=seed,
+        k=k,
+        n=n,
         **kwargs,
     ))
 

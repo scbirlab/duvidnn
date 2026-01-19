@@ -39,6 +39,7 @@ dependencies = [
   "datasets>=3.5.0",
   "dill>=0.3.9",
   "duvida[torch]>=0.0.3.post1",
+  "filelock",
   "huggingface_hub",
   "numpy",
   "platformdirs>=4.4.0",
