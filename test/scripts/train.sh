@@ -32,6 +32,7 @@ do
             -c "$HYPERPARAMS" \
             -k "$class" \
             -i $i \
+            --save-data \
             --output "$OUTPUT/$class-$i" \
             --cache "$CACHE" \
             --epochs 2 \
