@@ -1,96 +1,187 @@
-# 🧐 duvidnn
+# duvidnn
 
 ![GitHub Workflow Status (with branch)](https://img.shields.io/github/actions/workflow/status/scbirlab/duvidnn/python-publish.yml)
 ![PyPI - Python Version](https://img.shields.io/pypi/pyversions/duvidnn)
 ![PyPI](https://img.shields.io/pypi/v/duvidnn)
 
-**duvidnn** is a suite of python tools for calculating confidence and information metrics 
-for deep learning. It provides a higher-level framework for calculating confidence and information metrics
-of general purpose, taxonomic and chemistry-specific neural networks. 
+**duvidnn** is a Python toolkit for calculating confidence and information metrics
+for deep learning models. It wraps general-purpose, chemistry-specific, and taxonomic
+neural networks in a `ModelBox` abstraction that keeps every model co-located with
+its training data, so that uncertainty measures that depend on what the model has
+already seen can be computed in one place.
 
-As a bonus, **duvidnn** also provides an easy command-line interface for training and testing models.
+As a bonus, **duvidnn** provides a command-line interface for training, predicting,
+data splitting, and hyperparameter search.
 
 - [Installation](#installation)
+- [Quick start](#quick-start)
 - [Command-line interface](#command-line-interface)
 - [Python API](#python-api)
-    - [Neural networks](#neural-networks)
-    - [More advanced API](#more-advanced-python-api-implementing-a-new-modelbox)
+    - [ModelBox overview](#modelbox-overview)
+    - [Training](#training)
+    - [Saving and loading checkpoints](#saving-and-loading-checkpoints)
+    - [Prediction and evaluation](#prediction-and-evaluation)
+    - [Uncertainty and information metrics](#uncertainty-and-information-metrics)
+- [Architecture](#architecture)
+    - [Package layout](#package-layout)
+    - [Class hierarchy](#class-hierarchy)
+    - [Preprocessing pipeline](#preprocessing-pipeline)
+    - [Information metric internals](#information-metric-internals)
+- [Extending duvidnn](#extending-duvidnn)
+    - [Adding a new ModelBox](#adding-a-new-modelbox)
+    - [Adding a new preprocessing function](#adding-a-new-preprocessing-function)
+- [Known issues](#known-issues)
 - [Issues, problems, suggestions](#issues-problems-suggestions)
-- [Documentation](#documentation)
 
 ## Installation
 
-### The easy way
-
-You can install the precompiled version directly using `pip`.
+### From PyPI
 
 ```bash
-$ pip install duvidnn
+pip install duvidnn
 ```
 
-If you want to use duvidnn for chemistry machine learning and AI, use:
+Optional extras for chemistry ML:
 
 ```bash
-$ pip install duvidnn[chem]
+pip install duvidnn[chem]
 ```
 
-For integrating taxonomic information with [vectome](https://github.com/scbirlab/vectome), use:
+For taxonomic embeddings via [vectome](https://github.com/scbirlab/vectome):
 
 ```bash
-$ pip install duvidnn[bio]
+pip install duvidnn[bio]
 ```
 
-You can install both:
+For dataset splitting utilities (scaffold, FAISS):
 
 ```bash
-$ pip install duvidnn[bio,chem]
+pip install duvidnn[splits]
+```
+
+You can combine extras:
+
+```bash
+pip install duvidnn[bio,chem,splits]
 ```
 
 ### From source
 
-Clone the repository, then `cd` into it. Then run:
-
 ```bash
-$ pip install -e .
+git clone https://github.com/scbirlab/duvidnn.git
+cd duvidnn
+pip install -e ".[dev]"
+```
+
+## Quick start
+
+```python
+from duvidnn.autoclass import AutoModelBox
+
+# Create a fingerprint model
+modelbox = AutoModelBox("fingerprint", n_units=16, n_hidden=2, ensemble_size=10)._instance
+
+# Load data (HuggingFace dataset, local CSV, or pandas DataFrame)
+modelbox.load_training_data(
+    data="hf://scbirlab/fang-2023-biogen-adme@scaffold-split:train",
+    structure_column="smiles",
+    labels="clogp",
+)
+
+# Train
+modelbox.train(
+    val_data="hf://scbirlab/fang-2023-biogen-adme@scaffold-split:test",
+    epochs=10,
+    batch_size=128,
+)
+
+# Predict with uncertainty
+predictions = modelbox.predict(
+    data="hf://scbirlab/fang-2023-biogen-adme@scaffold-split:test"
+)
+doubtscore = modelbox.doubtscore(
+    candidates="hf://scbirlab/fang-2023-biogen-adme@scaffold-split:test"
+)
 ```
 
 ## Command-line interface
 
-**duvidnn** has a command-line interface for training and checkpointing the built-in models. 
+**duvidnn** provides five subcommands:
 
-```bash
-$ duvidnn --help
-usage: duvidnn [-h] [--version] {hyperprep,train,predict,split,percentiles} ...
-
-Calculating exact and approximate confidence and information metrics for deep learning on general purpose and chemistry tasks.
-
-options:
-  -h, --help            show this help message and exit
-  --version, -v         show program's version number and exit
-
-Sub-commands:
-  {hyperprep,train,predict,split,percentiles}
-                        Use these commands to specify the tool you want to use.
-    hyperprep           Prepare inputs for hyperparameter search.
-    train               Train a PyTorch model.
-    predict             Make predictions and calculate uncertainty using a duvidnn checkpoint.
-    split               Make chemical train-test-val splits on out-of-core datasets.
-    percentiles         Add columns indicating whether rows are in a percentile.
+```
+duvidnn [-h] [--version] {hyperprep,train,predict,split,percentiles} ...
 ```
 
-In all cases, you can get further options with `duvidnn <command> --help`, for example:
+Get help for any subcommand with `duvidnn <command> --help`.
+
+### Model training
 
 ```bash
-duvidnn train --help
+duvidnn train \
+    -1 hf://scbirlab/fang-2023-biogen-adme@scaffold-split:train \
+    -2 hf://scbirlab/fang-2023-biogen-adme@scaffold-split:test \
+    --model-class fingerprint \
+    --structure smiles \
+    --labels clogp \
+    --ensemble-size 10 \
+    --epochs 10 \
+    --learning-rate 0.001 \
+    --output model.dv
 ```
 
-### Annotating top percentiles
+Available model classes: `mlp`, `fingerprint`, `bilinear`, `bilinear-fp`, `chemprop`, `cnn`.
 
-You can add columns to datasets which annotate the top percentiles of named columns. This is compatible
-with extremely large datasets that don't fit in memory.
+### Prediction with uncertainty
 
 ```bash
-$ duvidnn percentiles \
+duvidnn predict \
+    --test hf://scbirlab/fang-2023-biogen-adme@scaffold-split:test \
+    --checkpoint model.dv \
+    --labels clogp \
+    --variance \
+    --doubtscore \
+    --output predictions.parquet
+```
+
+Uncertainty options:
+
+| Flag | Description |
+|------|-------------|
+| `--variance` | Ensemble prediction variance |
+| `--tanimoto` | Tanimoto nearest-neighbor distance to training set (chemistry models) |
+| `--doubtscore` | Doubtscore |
+| `--information-sensitivity` | Information sensitivity |
+| `--last-layer` | Restrict gradient computation to the output layer (large speed-up) |
+| `--optimality` | Assume model is trained to gradient zero (faster information sensitivity) |
+| `--approx` | Hessian approximation method: `bekas`, `exact_diagonal`, `squared_jacobian`, `rough_finite_difference` |
+
+Output format is inferred from the `--output` file extension (CSV, Parquet, Arrow, HF Dataset).
+
+Use `--start` and `--end` to restrict prediction to a row range, which is useful for
+parallelizing across chunks.
+
+### Data splitting
+
+Out-of-memory scaffold and approximate spectral (FAISS) splitting:
+
+```bash
+duvidnn split \
+    hf://scbirlab/fang-2023-biogen-adme@scaffold-split:train \
+    --train .7 --validation .15 \
+    --structure smiles \
+    --type faiss \
+    --seed 1 \
+    --output faiss.csv \
+    --plot faiss.png
+```
+
+### Percentile annotation
+
+Tag rows that fall in the top percentiles of specified columns. Works on datasets
+that do not fit in memory.
+
+```bash
+duvidnn percentiles \
     hf://scbirlab/fang-2023-biogen-adme@scaffold-split:train \
     --columns clogp tpsa \
     --percentiles 1 5 10 \
@@ -99,303 +190,368 @@ $ duvidnn percentiles \
     --structure smiles
 ```
 
-In all cases, input data can be:
-- Path to a _local_ file in CSV, Parquet, Arrow or HF Dataset format
-- _or_ a remote dataset hosted on [🤗 Datasets](https://huggingface.co/datasets), 
-indicated by `hf://` followed by the repository name
+### Hyperparameter preparation
 
-### Data splitting
-
-There are utilities for out-of-memory scaffold and (approximate using FAISS) spectral splitting of datasets
-that don't fit in memory. Make it random but reproducible with `--seed`, otherwise a deterministic bin-packing
-algorithm is used.
+Generate all combinations of hyperparameters, then index into them for systematic
+or parallel search:
 
 ```bash
-$ duvidnn split hf://scbirlab/fang-2023-biogen-adme@scaffold-split:train \
-    --train .7 \
-    --validation .15 \
-    --structure smiles \
-    --type faiss \
-    --seed 1 \
-    --output faiss.csv \
-    --plot faiss.png
-  ```
+printf '{"model_class": "fingerprint", "use_2d": [true, false], "n_units": 16}' \
+    | duvidnn hyperprep -o hyperopt.json
 
-### Model training and evaluation
-
-To train:
-
-```bash
-$ duvidnn train -1 hf://scbirlab/fang-2023-biogen-adme@scaffold-split:train \
-    -2 hf://scbirlab/fang-2023-biogen-adme@scaffold-split:test \
-    --class fingerprint \
-    --structure smiles \
-    --ensemble-size 10 \
-    --epochs 10 \
-    --learning-rate 0.001 \
-    --output model.dv
-```
-
-Different model classes can be specified:
-
-
-### Hyperparameters
-
-There is also a simple hyperparameter utility.
-
-```bash
-$ printf '{"model_class": "fingerprint", use_2d": [true, false], "n_units": 16, "n_hidden": 3}' | duvidnn hyperprep -o hyperopt.json
-```
-
-This generates a file containing all combinations. It can be indexed (0-based) 
-with the `-i <int>` option to supply a specific training configuration like so:
-
-```bash
-$ duvidnn train \
+duvidnn train \
     -1 hf://scbirlab/fang-2023-biogen-adme@scaffold-split:train \
     -2 hf://scbirlab/fang-2023-biogen-adme@scaffold-split:test \
-    -c hyperopt.json \
-    -i 0 \
+    -c hyperopt.json -i 0 \
     --output model.dv
 ```
 
-In this way, you can generate all the hyperparameter combinations, then systematically test them one by one 
-(or in parallel using HPC or other methods).
+### Input data formats
 
-### Predictions
-
-You can make predictions on datasets using `duvidnn predict`. Optionally, you can restrict prediction to only a chunk of the
-dataset using `--start` and `--stop`. This can be useful to parallelize prediction across chunks.
-
-When predicting, there is also the option to calculate uncertainty metrics like ensemble variance (`--variance`), 
-Tanimoto nearest neighbor distance to training set (`--tanimoto`, for chemistry models), doubtscore (`--doubtscore`), 
-and information sensitivity (`--information-sensitivity`). 
-
-```bash
-$ duvidnn predict \
-    --test hf://scbirlab/fang-2023-biogen-adme@scaffold-split:test \
-    --checkpoint model.dv \
-    --start 100 \
-    --end 200 \
-    --variance \
-    --tanimoto \
-    --doubtscore \
-    -y clogp \
-    --output predictions.parquet
-```
-
-Outputs can be made in CSV, Parquet, Arrow, or HF Dataset format. This is inferred from the file extension of
-the filename provided for `--output`. 
-
-Note that information sensitivity using default parameters can be very slow for large models with large
-training data, since it must calculate second-order parameter gradients for every training example. There are 
-approximations which can speed it up substantially, at the cost of exactness:
-- The `--last-layer` option gives the biggest speed-up, since it restricts the calculation to only the output layer of the model. 
-- Using `--optimality` assumes the model has been trained to an optimum (i.e. gradient of loss is zero). 
-- The `--approx bekas` option uses a fast approximation of second-order gradients.
+In all CLI commands, input data can be:
+- A local file in CSV, Parquet, Arrow, or HF Dataset format
+- A remote HuggingFace dataset, indicated by the `hf://` prefix (e.g.
+  `hf://scbirlab/fang-2023-biogen-adme@scaffold-split:train`, where `@` selects
+  the configuration and `:` selects the split)
 
 ## Python API
 
-**duvidnn** provides python classes and functions for custom analysis.
+### ModelBox overview
 
-### Neural networks
-
-The core of **duvidnn** is the `ModelBox`, which is a container for a trainable model and its training data.
-These are connected because measures of confidence and information gain depend directly on the information
-or evidence already seen by the model.
-
-There are several `ModelBox` classes for specific deep learning architechtures in pytorch. 
+The central abstraction is the `ModelBox`: a container that keeps a model together
+with its training data. This coupling is fundamental because uncertainty metrics
+like doubtscore and information sensitivity depend on the training data distribution.
 
 ```python
->>> from duvidnn.autoclass import MODELBOX_REGISTRY
->>> from pprint import pprint
->>> pprint(MODELBOX_REGISTRY)
-{'bilinear': <class 'duvidnn.torch.modelbox.modelboxes.TorchBilinearModelBox'>,
- 'bilinear-fp': <class 'duvidnn.torch.modelbox.modelboxes.TorchBilinearFingerprintModelBox'>,
- 'chemprop': <class 'duvidnn.torch.modelbox.modelboxes.ChempropModelBox'>,
- 'cnn': <class 'duvidnn.torch.modelbox.modelboxes.TorchCNN2DModelBox'>,
- 'fingerprint': <class 'duvidnn.torch.modelbox.modelboxes.TorchFingerprintModelBox'>,
- 'mlp': <class 'duvidnn.torch.modelbox.modelboxes.TorchMLPModelBox'>}
+from duvidnn.autoclass import AutoModelBox, MODELBOX_REGISTRY
+from pprint import pprint
+
+pprint(MODELBOX_REGISTRY)
+# {'bilinear': TorchBilinearModelBox,
+#  'bilinear-fp': TorchBilinearFingerprintModelBox,
+#  'chemprop': ChempropModelBox,
+#  'cnn': TorchCNN2DModelBox,
+#  'fingerprint': TorchFingerprintModelBox,
+#  'mlp': TorchMLPModelBox}
 ```
 
-The modelboxes `chemprop`, `fingerprint`, and `bilinear-fp` featurize SMILES representations of chemical 
-structures. The modelbox `mlp` is a general purpose multilayer perceptron.
+| ModelBox | Input | Description |
+|----------|-------|-------------|
+| `mlp` | Numeric features | General-purpose multilayer perceptron ensemble |
+| `fingerprint` | SMILES | MLP on Morgan fingerprints and/or 2D descriptors |
+| `bilinear` | Multiple numeric feature groups | Multi-tower bilinear MLP with optional FiLM conditioning |
+| `bilinear-fp` | SMILES + numeric features | Bilinear model with chemical fingerprints |
+| `chemprop` | SMILES | Message-passing neural network (wraps chemprop v2) |
+| `cnn` | Images | 2D convolutional neural network ensemble |
 
-You can set up your model with various training parameters.
-
-```python
-from duvidnn.autoclass import AutoClass
-modelbox = AutoClass(
-    "fingerprint",
-    n_units=16,
-    n_hidden=2,
-    ensemble_size=10,
-    structure_column="smiles",
-)
-```
-
-The internal neural network is instantiated on loading training data.
+### Training
 
 ```python
+from duvidnn.autoclass import AutoModelBox
+
+modelbox = AutoModelBox("fingerprint", n_units=16, n_hidden=2, ensemble_size=10)._instance
+
 modelbox.load_training_data(
     data="hf://scbirlab/fang-2023-biogen-adme@scaffold-split:train",
-    inputs="smiles", # column name of the predictor values
-    labels="clogp",  # column name of the values to predict
+    structure_column="smiles",
+    labels="clogp",
 )
-```
 
-The `data` can be a remote 🤗 dataset, in which case it is automatically downloaded. The `"@"`
-indicates the dataset configuration, and the `":"` indicates the specific data split.
-
-Alternatively, the training data can be a local CSV or TSV file, or in-memory Pandas dataframes 
-or dictionaries.
-
-With training data loaded, the model can be trained!
-
-```python
 modelbox.train(
-    val_filename="hf://scbirlab/fang-2023-biogen-adme@scaffold-split:test",
+    val_data="hf://scbirlab/fang-2023-biogen-adme@scaffold-split:test",
     epochs=10,
     batch_size=128,
 )
 ```
 
-The `ModelBox.train()` method uses pytorch Lightning under the hood, so other options such as callbacks
-for this framework should be accepted.
+`ModelBox.train()` uses PyTorch Lightning under the hood. You can pass Lightning
+callbacks and trainer options via the `callbacks` and `trainer_opts` parameters.
 
-#### Saving and sharing a trained model
-
-**duvidnn** provides a basic checkpointing mechanism to save model weights and training data to later reload.
+### Saving and loading checkpoints
 
 ```python
 modelbox.save_checkpoint("checkpoint.dv")
-modelbox.load_checkpoint("checkpoint.dv")
+
+# Later...
+from duvidnn.autoclass import AutoModelBox
+modelbox = AutoModelBox.from_pretrained("checkpoint.dv")
 ```
 
-#### Evaluating and predicting on new data
+Checkpoints are directories containing model weights (`params.pt`), model
+configuration JSON, and the training dataset (as a HuggingFace Dataset on disk).
+Checkpoints can also be loaded from HuggingFace Hub repositories using the
+`hf://` prefix.
 
-**duvidnn** `ModelBox`es provide methods for evaluating predictions on new data.
+### Prediction and evaluation
 
 ```python
-predictions, metrics = modelbox.evaluate(
+# Raw predictions (returns HuggingFace Dataset)
+predictions = modelbox.predict(
     data="hf://scbirlab/fang-2023-biogen-adme@scaffold-split:test",
+)
+
+# Predictions + metrics (returns DataFrame, dict)
+predictions_df, metrics = modelbox.evaluate(
+    data="hf://scbirlab/fang-2023-biogen-adme@scaffold-split:test",
+)
+# metrics = {"rmse": ..., "pearson_r": ..., "spearman_rho": ...}
+```
+
+### Uncertainty and information metrics
+
+**Ensemble variance** requires `ensemble_size > 1`:
+
+```python
+variance = modelbox.prediction_variance(
+    candidates="hf://scbirlab/fang-2023-biogen-adme@scaffold-split:test",
 )
 ```
 
-#### Calculating uncertainty and information metrics
-
-**duvidnn** `ModelBox`es provide methods for calculating prediction variance of ensembles,
-doubtscore, and information sensitivity.
+**Doubtscore** measures how much a single test point would shift each model
+parameter, normalized by the Fisher score of the training data:
 
 ```python
 doubtscore = modelbox.doubtscore(
-    data="hf://scbirlab/fang-2023-biogen-adme@scaffold-split:test"
+    candidates="hf://scbirlab/fang-2023-biogen-adme@scaffold-split:test",
 )
+```
+
+**Information sensitivity** additionally accounts for second-order curvature of
+the loss landscape:
+
+```python
 info_sens = modelbox.information_sensitivity(
-    data="hf://scbirlab/fang-2023-biogen-adme@scaffold-split:test",
-    approx="bekas",  # approximate Hessian diagonals
+    candidates="hf://scbirlab/fang-2023-biogen-adme@scaffold-split:test",
+    approx="bekas",
     n=10,
 )
 ```
 
-To avoid storing large datasets in memory, **duvidnn** uses [🤗 datasets](https://huggingface.co/docs/datasets/) under the hood
-to cache data. Results can be instantiated in memory with a little effort. For example:
+Speed/accuracy trade-offs for information sensitivity:
+
+| Option | Effect |
+|--------|--------|
+| `last_layer_only=True` | Restrict to output-layer parameters (biggest speed-up) |
+| `optimality_approximation=True` | Assume gradient of loss is zero at trained parameters |
+| `approx="bekas"` | Stochastic Hessian diagonal approximation |
+
+Results are returned as HuggingFace Datasets, which can be materialized in memory:
 
 ```python
-doubtscore = doubtscore.to_pandas()
+doubtscore_df = doubtscore.to_pandas()
 ```
 
-See the [🤗 datasets documentation](https://huggingface.co/docs/datasets/) for more.
+## Architecture
 
-## More advanced Python API: Implementing a new `ModelBox`
+### Package layout
 
-Bringing a new pytorch model to **duvidnn** is relatively straightforward. First, write your model,
-adding Lighning logic and a `create_model()` method:
+```
+duvidnn/
+    __init__.py                 # Version, app name
+    autoclass.py                # AutoModelBox factory and MODELBOX_REGISTRY
+    checkpoint_utils.py         # Save/load JSON, HF datasets, PyTorch weights
+    hyperparameters.py          # Hyperparameter grid generation
 
-```python
-from typing import Callable, Iterable, List, Mapping, Optional
+    base/                       # Framework-agnostic base classes
+        modelboxes.py           # ModelBoxBase, ModelBoxWithVarianceBase,
+                                #   FingerprintModelBoxBase, ChempropModelBoxBase
+        modelbox_registry.py    # @register_modelbox decorator, MODELBOX_REGISTRY
+        information.py          # DoubtMixinBase (doubtscore, info sensitivity logic)
+        data.py                 # DataMixinBase, ChemMixinBase (data loading, ingestion)
+        training.py             # ModelTrainerBase (abstract trainer)
+        evaluation.py           # rmse, mae, pearson_r, spearman_r
+        aggregators.py          # Aggregator functions (mean, var, rms, etc.)
+        typing.py               # Type aliases (DataLike, FeatureLike, etc.)
+        preprocessing/
+            registry.py         # @register_function decorator, FUNCTION_REGISTRY
+            serializing.py      # Preprocessor (JSON-serializable featurizer config)
+            functions.py        # Built-in featurizers: Identity, Log, OneHot, Hash,
+                                #   MorganFingerprint, Descriptors2D, VectomeFingerprint,
+                                #   ChempropData
+            deep_functions.py   # HfBART (HuggingFace transformer featurizer)
 
-from torch.nn import BatchNorm1d, Dropout, Linear, Module, SiLU, Sequential
-from duvidnn.torch import TorchEnsembleMixin
-from duvidnn.torch.models.utils.lt import LightningMixin
-from torch import nn
-from torch.optim import Adam, Optimizer
+    torch/                      # PyTorch implementations
+        functions.py            # Loss functions (mse_loss, mae_loss, cosine_loss)
+        models/
+            mlp.py              # TorchMLPBase, TorchMLPLightning, TorchMLPEnsemble
+            bilinear.py         # TorchBilinearBase, TorchBilinearEnsemble
+            cnn.py              # TorchCNN2DEnsemble
+            chemprop/           # Chemprop v2 integration
+            utils/
+                ensemble.py     # TorchEnsembleMixin
+                lt.py           # LightningMixin
+        modelbox/
+            modelboxes.py       # Concrete ModelBox classes (TorchMLPModelBox, etc.)
+            data.py             # DataMixin, ChempropDataMixin
+            information.py      # DoubtMixin, ChempropDoubtMixin (PyTorch grad logic)
+            training.py         # ModelTrainer (Lightning Trainer wrapper)
 
-class SimpleMLP(nn.Module, LightningMixin):
+    cli_module/                 # Command-line interface
+        cli.py                  # Argument definitions and CLIApp setup
+        train.py                # Training entrypoint
+        predict.py              # Prediction entrypoint
+        split.py                # Data splitting entrypoint
+        percentile.py           # Percentile annotation entrypoint
+        hyperprep.py            # Hyperparameter grid entrypoint
+        eval.py                 # Evaluation helper (not yet registered as CLI command)
+        io.py                   # I/O helpers
+        utils.py                # CLI utility functions
 
-    def __init__(
-        self, 
-        n_input: int, 
-        n_units: int = 16, 
-        n_out: int = 1,
-        activation: Callable = nn.SiLU,  # Smooth activation to prevent vanishing gradient
-        learning_rate: float = .01,
-        optimizer: Optimizer = Adam,
-        *args, **kwargs
-    ):
-        super().__init__(*args, **kwargs)
-        self.n_input = n_input
-        self.n_units = n_units
-        self.activation = activation
-        self.n_out = n_out
-        self.model_layers = nn.Sequential([
-            nn.Linear(self.n_input, self.n_units),
-            self.activation(),
-            nn.Linear(self.n_units, self.n_out),
-        ])
-        # Lightning logic
-        self._init_lightning(
-            optimizer=optimizer, 
-            learning_rate=learning_rate, 
-            model_attr='model_layers',  # the attribute containing the model
-        )
-
-    def forward(self, x):
-        return self.model_layers(x)
+    utils/                      # Shared utilities
+        splitting/              # Scaffold, FAISS, and bin-packing splitters
+        datasets.py             # Dataset loading helpers
+        lightning.py            # Lightning utility functions
+        plotting.py             # Plotting helpers
+        package_data.py         # Cache directory management
 ```
 
-Then subclass `duvidnn.torch.modelbox.TorchModelBoxBase` and implement the `create_model()` method, which should
-simply return your instantiated model. If you want to preprocess input data on the fly, then
-add a `preprocess_data()` method which takes a data dictionary and returns a data dictionary.
+### Class hierarchy
+
+The `ModelBox` hierarchy separates concerns into composable mixins:
+
+```
+ModelBoxBase (base/modelboxes.py)
+    Inherits: DataMixinBase, DoubtMixinBase, ABC
+    Provides: train, predict, evaluate, save/load_checkpoint, create_model (abstract)
+    |
+    +-- ModelBoxWithVarianceBase
+    |       Adds: prediction_variance (ensemble variance)
+    |       |
+    |       +-- TorchModelBoxBase (torch/modelbox/modelboxes.py)
+    |       |       Mixes in: DataMixin, DoubtMixin
+    |       |       Adds: save/load_weights, eval_mode, create_trainer
+    |       |       |
+    |       |       +-- TorchMLPModelBox          ("mlp")
+    |       |       +-- TorchBilinearModelBox      ("bilinear")
+    |       |       +-- TorchCNN2DModelBox         ("cnn")
+    |       |
+    |       +-- FingerprintModelBoxBase
+    |       |       Mixes in: ChemMixinBase
+    |       |       Adds: chemical featurizer construction, SMILES handling
+    |       |       |
+    |       |       +-- TorchFingerprintModelBox   ("fingerprint")
+    |       |       +-- TorchBilinearFingerprintModelBox ("bilinear-fp")
+    |       |
+    |       +-- ChempropModelBoxBase
+    |               Adds: Chemprop data pipeline integration
+    |               |
+    |               +-- ChempropModelBox           ("chemprop")
+```
+
+Each concrete `ModelBox` is decorated with `@register_modelbox("name")`, which
+adds it to `MODELBOX_REGISTRY` and makes it available via `AutoModelBox`.
+
+### Preprocessing pipeline
+
+Input features are transformed through a pipeline of registered preprocessing
+functions. Each function is registered with the `@register_function("name")`
+decorator and returns a callable that maps `(data_dict, input_column) -> ndarray`.
+
+Built-in preprocessors:
+
+| Name | Extras needed | Description |
+|------|---------------|-------------|
+| `identity` | - | Pass-through |
+| `log` | - | Log10 transform |
+| `one-hot` | - | One-hot encoding of categorical labels |
+| `hash` | - | Deterministic string hashing to fixed-length vectors |
+| `morgan-fingerprint` | `chem` | Morgan fingerprint from SMILES (via schemist) |
+| `descriptors-2d` | `chem` | 2D molecular descriptors (via schemist) |
+| `vectome-fingerprint` | `bio` | Taxonomic embedding from species name (via vectome) |
+| `chemprop-mol` | `chem` | Chemprop MoleculeDatapoint from SMILES |
+| `hf-bart` | `transformers` | HuggingFace BART encoder features |
+
+Preprocessors are serializable: a `Preprocessor` wraps a function name and its
+kwargs into a JSON-compatible dict, so preprocessing pipelines are fully
+reproducible and saved alongside checkpoints.
+
+### Information metric internals
+
+Doubtscore and information sensitivity are computed in three stages:
+
+1. **Fisher score** over the training set: for each model parameter, compute
+   the gradient of the loss with respect to that parameter, averaged across all
+   training examples. For information sensitivity, the diagonal of the Fisher
+   information matrix (Hessian of the loss) is also computed.
+
+2. **Parameter gradient** (and optionally Hessian diagonal) for each candidate
+   test point.
+
+3. **Score computation**: doubtscore divides the candidate's parameter gradient
+   by the training Fisher score. Information sensitivity additionally uses the
+   second-order terms.
+
+The heavy lifting is done by the [duvida](https://github.com/scbirlab/duvida)
+library, which provides `vmap`-based functional gradient and Hessian
+computations via `torch.func`. The `DoubtMixin` class
+(`torch/modelbox/information.py`) creates stateless model closures using
+`torch.func.functional_call`, then passes them to duvida's `fisher_score`,
+`parameter_gradient`, `fisher_information_diagonal`, and
+`parameter_hessian_diagonal` functions.
+
+For models with non-standard forward passes (e.g. Chemprop), the `_unrolled`
+variants of gradient functions are used, which iterate per-example rather than
+vectorizing with `vmap`.
+
+## Extending duvidnn
+
+### Adding a new ModelBox
+
+Subclass `TorchModelBoxBase` (or `FingerprintModelBoxBase` for chemistry models)
+and implement `create_model()`:
 
 ```python
-from typing import Dict
-
 from duvidnn.torch.modelbox import TorchModelBoxBase
-import numpy as np
+from duvidnn.base.modelbox_registry import register_modelbox
+from duvidnn.base.modelboxes import ModelBoxWithVarianceBase
 
-class MLPModelBox(TorchModelBoxBase):
-    
-    def __init__(self, *args, **kwargs):
-        super().__init__()
-        self._mlp_kwargs = kwargs
+@register_modelbox("my-model")
+class MyModelBox(TorchModelBoxBase, ModelBoxWithVarianceBase):
 
     def create_model(self, *args, **kwargs):
-        self._model_config.update(kwargs)  # makes sure model checkpointing saves the keyword args
-        return SimpleMLP(
-            n_input=self.input_shape[-1],  # defined on data loading
-            n_out=self.output_shape[-1], 
-            *args, 
+        self._model_config.update(kwargs)
+        return MyEnsembleModel(
+            n_input=self.input_shape[-1],
+            n_out=self.output_shape[-1],
             **self._model_config,
-            **self._mlp_kwargs,  # if init kwargs are relevant to model creation
         )
-
-    # Define this method if your data needs preprocessing
-    @staticmethod
-    def preprocess_data(data: Dict[str, np.ndarray], _in_key, _out_key, **kwargs) -> Dict[str, np.ndarray]:
-        return {
-            _in_key: your_featurizer(data[_in_key]), 
-            _out_key: np.asarray(data[_out_key])
-        }
 ```
 
-If you want to build `ModelBox`es based on a framework other than pytorch, you can subclass 
-the `duvidnn.base.ModelBoxBase` abstract class, making sure to implement its abstract methods.
+Your model class should mix in `TorchEnsembleMixin` (for ensemble support) and
+`LightningMixin` (for training). See `duvidnn/torch/models/mlp.py` for a
+complete example.
+
+If your data needs preprocessing, implement a static `preprocess_data()` method
+on the ModelBox.
+
+### Adding a new preprocessing function
+
+Use the `@register_function` decorator:
+
+```python
+from duvidnn.base.preprocessing.registry import register_function
+
+@register_function("my-featurizer")
+def MyFeaturizer(some_param: int = 10):
+    def _featurize(data, input_column):
+        import numpy as np
+        return np.stack([transform(v, some_param) for v in data[input_column]])
+    return _featurize
+```
+
+The function will be available by name in preprocessing pipelines and
+serializable into checkpoint configs.
+
+## Known issues
+
+| Issue | Severity | Location |
+|-------|----------|----------|
+| `cosine_loss` calls `torch.cos(y_pred, y_true)` but `torch.cos` is unary; should use `torch.nn.functional.cosine_similarity` | Critical | `torch/functions.py:98` |
+| `"rms"` aggregator uses L2 norm (`np.linalg.norm(ord=2)`), not root-mean-square (`sqrt(mean(x**2))`) | Medium | `base/aggregators.py:17` |
+| `eval` subcommand exists in code but is not registered in the CLI app | Medium | `cli_module/eval.py`, `cli_module/cli.py:514-520` |
+| `training_dataset` parameter in `_info_score_entrypoint` is accepted but never used; the method always falls back to `self._check_training_data()` | Medium | `base/information.py:365` |
+| Batch normalization breaks doubtscore and information sensitivity calculations (chemprop models) | Medium | `torch/models/chemprop/models.py:66-68` |
 
 ## Issues, problems, suggestions
 
 Add to the [issue tracker](https://www.github.com/scbirlab/duvidnn/issues).
-
-## Documentation
-
-(To come at [ReadTheDocs](https://duvidnn.readthedocs.org).)
