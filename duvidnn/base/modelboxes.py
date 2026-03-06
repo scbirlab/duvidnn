@@ -489,6 +489,16 @@ class FingerprintModelBoxBase(ChemMixinBase, ModelBoxWithVarianceBase):
             new_features = [self._resolve_featurizers(f) for f in features]
             featurizer.extend(new_features[0])
             featurizer = [featurizer] + new_features[1:]
+<<<<<<< HEAD
+=======
+        if not isinstance(featurizer, (list, tuple)):
+            featurizer = [featurizer]
+        else:
+            if len(featurizer) > 0:
+                featurizer = [f if isinstance(f, (list, tuple)) else [f] for f in featurizer]
+
+        print(f">>> {featurizer=}")
+>>>>>>> c2bc129 (Bug fixes and tidy up)
         return super().load_training_data(
             features=[self._resolve_featurizers(f) for f in featurizer],
             **kwargs,

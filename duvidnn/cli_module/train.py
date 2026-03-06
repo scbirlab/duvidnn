@@ -21,20 +21,19 @@ def _load_modelbox_training_data(
     cache: Optional[str] = None,
     **overrides
 ):
-    cache = cache or CACHE_DIR
+    load_data_args = {
+        "data": overrides.get("training"), 
+        "cache": cache or CACHE_DIR,
+    }
     if any([
         overrides.get("training") is not None,  # override checkpoint training data
         checkpoint is None,  # no checkpoint
         modelbox.training_data is None,  # checkpoint without training data
     ]):
-        load_data_args = {
-            "data": overrides.get("training"), 
-            "cache": cache,
-            # command-line takes precedent:
-            "features": overrides.get("features"),
-            "labels": overrides.get("labels"),
-            "context": overrides.get("context"),
-        }
+        # command-line takes precedent:
+        for key in ("features", "labels", "context"):
+            if key in overrides:
+                load_data_args[key] = overrides[key]
         if hasattr(modelbox, "tanimoto_column"):  # i.e., is for chemistry
             # command-line takes precedent:
             load_data_args["structure_column"] = overrides.get("structure") or modelbox._default_preprocessing_args.get("structure_column")
@@ -46,6 +45,7 @@ def _load_modelbox_training_data(
             message="Data-loading configuration",
         )
         modelbox.load_training_data(**load_data_args)
+
     return modelbox, load_data_args
 
 
