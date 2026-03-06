@@ -162,10 +162,11 @@ class ChempropModelBox(ChempropDataMixin, ChempropDoubtMixin, ChempropModelBoxBa
 
     def create_model(self, *args, **kwargs) -> ChempropEnsemble:
         self._model_config.update(kwargs)
-        if self.training_example[self._in_key][0]["x_d"] is None:
-            self.input_shape = (0,)
-        else:
-            self.input_shape = self.training_example[self._in_key][0]["x_d"].shape
+        if self.training_example is not None:
+            if self.training_example[self._in_key][0]["x_d"] is None:
+                self.input_shape = (0,)
+            else:
+                self.input_shape = self.training_example[self._in_key][0]["x_d"].shape
         return ChempropEnsemble(
             n_input=self.input_shape[-1],
             n_out=self.output_shape[-1], 

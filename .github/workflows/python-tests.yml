@@ -33,12 +33,17 @@ jobs:
         flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
         # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
         flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
-    - name: Test with pytest
+    - name: Test with pytest (stable)
       run: |
         # run doctests as individual packages
         pytest duvidnn --doctest-modules
-        # run other tests
-        pytest test/test_evaluation.py
+        # run stable unit + integration tests
+        pytest test/test_evaluation.py test/test_modelbox_mlp.py test/test_modelbox_chemprop.py -v
+
+    - name: Test with pytest (new interfaces — expected failures until refactor)
+      continue-on-error: true
+      run: |
+        pytest test/test_output_transform.py test/test_data_pipeline.py -v
     - name: Test CLI bilinear model with fingerprints
       run: |
         bash test/scripts/train-hash-fp.sh
