@@ -17,7 +17,7 @@ from ...base.modelboxes import (
 from ...base.modelbox_registry import register_modelbox
 from ...checkpoint_utils import load_checkpoint_file
 
-from ..models import ChempropEnsemble, TorchBilinearEnsemble, TorchMLPEnsemble, TorchCNN2DEnsemble
+from ..models import ChempropEnsemble, TorchBilinearEnsemble, TorchLassoEnsemble, TorchMLPEnsemble, TorchCNN2DEnsemble
 from .data import ChempropDataMixin, DataMixin, TorchChemMixin
 from .information import DoubtMixin, ChempropDoubtMixin
 from .training import ModelTrainer
@@ -113,6 +113,31 @@ class TorchMLPModelBox(TorchModelBoxBase, ModelBoxWithVarianceBase):
         )
 
 
+@register_modelbox("lasso")
+class TorchLassoModelBox(TorchModelBoxBase, ModelBoxWithVarianceBase):
+
+    """ModelBox for pytorch Lasso ensemble.
+
+    Examples
+    ========
+    >>> mb = TorchMLPModelBox(ensemble_size=3) 
+    >>> mb.input_shape, mb.output_shape = (4,), (1,) # usually set by .load_training_data() 
+    >>> mb.model = mb.create_model() 
+    >>> mb.model.n_input, mb.model.n_out 
+    (4, 1)
+
+    """
+
+    def create_model(self, *args, **kwargs) -> TorchLassoEnsemble:
+        self._model_config.update(kwargs)
+        return TorchLassoEnsemble(
+            n_input=self.input_shape[-1],
+            n_out=self.output_shape[-1], 
+            *args, 
+            **self._model_config,
+        )
+
+
 @register_modelbox("bilinear")
 class TorchBilinearModelBox(TorchModelBoxBase, ModelBoxWithVarianceBase):
 
@@ -146,6 +171,10 @@ class TorchBilinearModelBox(TorchModelBoxBase, ModelBoxWithVarianceBase):
             **self._model_config,
         )
 
+@register_modelbox("lasso-fp")
+class TorchLassoFingerprintModelBox(TorchChemMixin, FingerprintModelBoxBase, TorchLassoModelBox):
+    pass
+
 
 @register_modelbox("bilinear-fp")
 class TorchBilinearFingerprintModelBox(TorchChemMixin, FingerprintModelBoxBase, TorchBilinearModelBox):
@@ -162,10 +191,14 @@ class ChempropModelBox(ChempropDataMixin, ChempropDoubtMixin, ChempropModelBoxBa
 
     def create_model(self, *args, **kwargs) -> ChempropEnsemble:
         self._model_config.update(kwargs)
-        if self.training_example[self._in_key][0]["x_d"] is None:
-            self.input_shape = (0,)
+        input_example = self.training_example[self._in_key]
+        if input_example is not None:
+            if input_example[0]["x_d"] is None:
+                self.input_shape = (0,)
+            else:
+                self.input_shape = input_example[0]["x_d"].shape
         else:
-            self.input_shape = self.training_example[self._in_key][0]["x_d"].shape
+            raise AttributeError("Chemprop needs input data before initializing!")
         return ChempropEnsemble(
             n_input=self.input_shape[-1],
             n_out=self.output_shape[-1], 

@@ -91,6 +91,11 @@ class DataMixinBase(ABC):
                     .with_format("numpy", dtype="float")
                     .save_to_disk(os.path.join(checkpoint_dir, "training-data.hf")),
                 )
+        (
+            self.training_example
+            .with_format("numpy", dtype="float")
+            .save_to_disk(os.path.join(checkpoint_dir, "training-example.hf")),
+        )
         save_json(data_config, os.path.join(checkpoint_dir, "data-config.json"))
         return None
 
@@ -109,6 +114,14 @@ class DataMixinBase(ABC):
         for key, val in data_config.items():
             setattr(self, key, val)
         
+        self.training_example = load_checkpoint_file(
+            checkpoint, 
+            filename="training-example.hf",
+            callback="hf-dataset",
+            none_on_error=False,
+            cache_dir=cache_dir,
+        )
+
         self._input_training_data = load_checkpoint_file(
             checkpoint, 
             filename="input-data.hf",
@@ -201,6 +214,8 @@ class DataMixinBase(ABC):
         featurizers: Iterable[Mapping[str, Any]]
     ) -> Dict[str, np.ndarray]:
 
+        if not isinstance(featurizers, (list, tuple)):
+            featurizers = [featurizers]
         for featurizer in featurizers:
             if isinstance(featurizer, Mapping):
                 featurizer = Preprocessor.from_dict(featurizer)
@@ -224,8 +239,8 @@ class DataMixinBase(ABC):
         if len(absent_columns) > 0:
             raise ValueError(
                 f"""
-                Requested columns ({', '.join(columns)}) not present in 
-                {type(data)}: {', '.join(absent_columns)}.
+                Requested columns ({', '.join(map(str, columns))}) not present in 
+                {type(data)}: {', '.join(map(str, absent_columns))}.
                 """
             )
         return columns
@@ -233,7 +248,7 @@ class DataMixinBase(ABC):
     @staticmethod
     def _load_from_csv(filename: str, cache: Optional[str] = None) -> Dataset:
         from datasets import Dataset
-
+        cache = cache or CACHE_DIR
         if filename.endswith((".csv", ".tsv", ".txt", ".csv.gz", ".tsv.gz", ".txt.gz")):
             read_f = partial(
                 Dataset.from_csv,
@@ -377,8 +392,9 @@ class DataMixinBase(ABC):
             features = [features]
         resolved_featurizers = []
         for featurizer in features:
-            featurizer = self._resolve_featurizer(featurizer, transformer_prefix)
-            resolved_featurizers.append(featurizer)
+            if featurizer is not None:
+                featurizer = self._resolve_featurizer(featurizer, transformer_prefix)
+                resolved_featurizers.append(featurizer)
         return resolved_featurizers
 
     @staticmethod
@@ -548,7 +564,7 @@ class DataMixinBase(ABC):
                 desc="Preprocessing",
             )
         )
-        flat_input_columns = sorted(set([item for outer in input_columns for item in outer]))
+        flat_input_columns = sorted(set([item for outer in input_columns for item in outer if item is not None]))
         self._check_column_presence(
             flat_input_columns, 
             labels, 
