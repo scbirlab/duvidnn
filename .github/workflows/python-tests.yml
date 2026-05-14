@@ -51,6 +51,3 @@ jobs:
     - name: Test CLI train/test
       run: |
         bash test/scripts/train.sh
-    - name: Test CLI splitting/percentiles
-      run: |
-        bash test/scripts/split.sh

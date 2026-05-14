@@ -4,6 +4,8 @@
 ![PyPI - Python Version](https://img.shields.io/pypi/pyversions/duvidnn)
 ![PyPI](https://img.shields.io/pypi/v/duvidnn)
 
+<img src="docs/source/_static/logo.svg" width="200">
+
 **duvidnn** is a suite of python tools for calculating confidence and information metrics 
 for deep learning. It provides a higher-level framework for calculating confidence and information metrics
 of general purpose, taxonomic and chemistry-specific neural networks. 
