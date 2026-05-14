@@ -12,7 +12,7 @@ from duvida import vmap
 import torch
 from torch.utils.data import DataLoader
 
-from ...base.data import ChemMixinBase, DataMixinBase
+from ...base.data import ChemMixinBase, DataMixinBase, _DEFAULT_BATCH_SIZE
 from ..models.chemprop.data import _collate_training_batch_for_forward
 
 _DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -29,7 +29,7 @@ class DataMixin(DataMixinBase):
     @staticmethod
     def make_dataloader(
         dataset: Union[Dataset, IterableDataset],
-        batch_size: int = 16, 
+        batch_size: int = _DEFAULT_BATCH_SIZE, 
         shuffle: bool = False,
         **kwargs
     ) -> DataLoader:
@@ -75,7 +75,7 @@ class ChempropDataMixin(TorchChemMixin):
     @staticmethod
     def make_dataloader(
         dataset: Dataset, 
-        batch_size: int = 16, 
+        batch_size: int = _DEFAULT_BATCH_SIZE, 
         shuffle: bool = False
     ) -> DataLoader:
         return DataLoader(

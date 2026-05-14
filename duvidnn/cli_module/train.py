@@ -18,19 +18,19 @@ def _load_modelbox_training_data(
     cache: Optional[str] = None,
     **overrides
 ):
+    load_data_args = {
+        "data": overrides.get("training"), 
+        "cache": cache,
+    }
     if any([
         overrides.get("training") is not None,  # override checkpoint training data
         checkpoint is None,  # no checkpoint
         modelbox.training_data is None,  # checkpoint without training data
     ]):
-        load_data_args = {
-            "data": overrides.get("training"), 
-            "cache": cache,
-            # command-line takes precedent:
-            "features": overrides.get("features"),
-            "labels": overrides.get("labels"),
-            "context": overrides.get("context"),
-        }
+        # command-line takes precedent:
+        for key in ("features", "labels", "context"):
+            if key in overrides:
+                load_data_args[key] = overrides[key]
         if hasattr(modelbox, "tanimoto_column"):  # i.e., is for chemistry
             # command-line takes precedent:
             load_data_args["structure_column"] = overrides.get("structure") or modelbox._default_preprocessing_args.get("structure_column")
@@ -42,6 +42,7 @@ def _load_modelbox_training_data(
             message="Data-loading configuration",
         )
         modelbox.load_training_data(**load_data_args)
+
     return modelbox, load_data_args
 
 
@@ -83,6 +84,7 @@ def _train_and_save_modelbox(
     modelbox,
     early_stopping: Optional[int] = None,
     output_name: Optional[str] = None,
+    save_data: bool = False,
     **training_args
 ):
     from datasets.fingerprint import Hasher
@@ -127,7 +129,7 @@ def _train_and_save_modelbox(
         max_version,
         os.path.join(checkpoint_path, "training-log")
     )
-    modelbox.save_checkpoint(checkpoint_path)
+    modelbox.save_checkpoint(checkpoint_path, save_data=save_data)
         
     return checkpoint_path, training_args
 
@@ -140,7 +142,8 @@ def _train(args: Namespace) -> None:
     cli_config = {
         "class_name": args.model_class.casefold(),
         "merge_method": args.fusion.casefold(),
-        "use_2d": args.descriptors,
+        "use_2d": getattr(args, "2d"),
+        "use_3d": getattr(args, "3d"),
         "use_fp": args.fp,
         "n_hidden": args.hidden,
         "residual_depth": args.residual,
@@ -201,6 +204,7 @@ def _train(args: Namespace) -> None:
         batch_size=args.batch,
         val_data=args.validation,
         output_name=args.output,
+        save_data=args.save_data,
     )
     for obj, f in zip((training_args, load_data_args), ("training-args.json", "load-data-args.json")):
         save_json(obj, os.path.join(checkpoint_path, f))
@@ -214,8 +218,6 @@ def _train(args: Namespace) -> None:
     for name in ("training", "validation", "test"):
         dataset = getattr(args, name)
         if dataset is not None:  # skip optional extra datasets, e.g. "test"
-            if name == "training":
-                dataset = None  # Use cached training data
             metrics = _evaluate_modelbox_and_save_metrics(
                 modelbox,
                 metric_filename=os.path.join(checkpoint_path, f"eval-metrics_{name}.json"),

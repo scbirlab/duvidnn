@@ -69,7 +69,7 @@ class _TorchBilinearBase(Module):
         batch_norm: bool = False,
         residual_depth: Optional[int] = None,
         final_activation: Optional[Callable[..., Module]] = None,
-        tower_classes: Union[Callable[..., Module], Iterable[Callable[..., Module]]]  = TorchMLPBase,
+        tower_classes: Union[Callable[..., Module], Iterable[Callable[..., Module]]] = TorchMLPBase,
         *args, **kwargs
     ):
         super().__init__()

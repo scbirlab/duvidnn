@@ -32,12 +32,13 @@ do
             -c "$HYPERPARAMS" \
             -k "$class" \
             -i $i \
+            --save-data \
             --output "$OUTPUT/$class-$i" \
             --cache "$CACHE" \
             --epochs 2 \
             -z 10 \
             --learning-rate 0.001 \
-            --descriptors \
+            --2d \
             --fp
         ls -lah "$OUTPUT"
         ls -lah "$OUTPUT"/"$class-$i"/*
