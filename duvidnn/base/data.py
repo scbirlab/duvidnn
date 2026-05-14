@@ -23,7 +23,6 @@ from schemist.converting import convert_string_representation
 from .. import app_name, __version__
 from ..checkpoint_utils import load_checkpoint_file, save_json
 from ..utils.package_data import CACHE_DIR
-from .preprocessing import Preprocessor
 from .typing import DataLike, FeatureLike, StrOrIterableOfStr
 
 _DEFAULT_BATCH_SIZE: int = 128
