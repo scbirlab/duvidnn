@@ -17,7 +17,7 @@ from .preprocessing import Preprocessor
 from .training import ModelTrainerBase
 from .typing import DataLike, FeatureLike, StrOrIterableOfStr
 from ..checkpoint_utils import save_json, _load_json
-
+from ..utils.package_data import CACHE_DIR
 
 class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
 
@@ -61,6 +61,7 @@ class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
         checkpoint: str,
         cache_dir: Optional[str] = None
     ) -> None:
+        cache_dir = cache_dir or CACHE_DIR
         print_err(f"Loading checkpoint from {checkpoint}")
         self.load_data_checkpoint(checkpoint, cache_dir=cache_dir)
         self._model_config = _load_json(checkpoint, self.__class__._model_config_filename)
@@ -91,6 +92,7 @@ class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
         dataloader_kwargs: Optional[Mapping] = None,
         **preprocessing_args
     ) -> Union[Dataset, Iterable[Mapping[str, Any]]]:  
+        cache = cache or CACHE_DIR
         if data is None:
             dataset = self._check_training_data()  # from DataMixinBase
         else:
@@ -259,7 +261,7 @@ class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
         """Make predictions on new data.
     
         """
-        
+        cache = cache or CACHE_DIR
         _prediction_column = (
             _prediction_column 
             or self.__class__._prediction_key
@@ -328,6 +330,7 @@ class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
         """Calculate metrics on training data or new data.
     
         """
+        cache = cache or CACHE_DIR
         eval_prediction_col = self.__class__._prediction_key
         predictions = self.predict(
             features=features,
@@ -353,7 +356,7 @@ class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
         preds = predictions[eval_prediction_col]
         # if len(y_vals.shape) == 1 and len(preds.shape) == 2:
         #     y_vals = y_vals[...,None]
-        print(y_vals.shape, preds.shape)
+        print(y_vals[:].shape, preds[:].shape)
         if isinstance(metrics, Mapping):
             metrics = {
                 name: asarray(metric(preds, y_vals)).tolist()
@@ -368,9 +371,9 @@ class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
             )
         
         predictions = {
-            key: predictions[key].flatten().tolist()
-            if len(predictions[key].shape) > 1 and predictions[key].shape[-1] == 1 
-            else predictions[key].tolist()
+            key: predictions[key][:].flatten().tolist()
+            if len(predictions[key][:].shape) > 1 and predictions[key][:].shape[-1] == 1 
+            else predictions[key][:].tolist()
             for key in predictions.column_names
         }
         predictions = {
@@ -396,6 +399,7 @@ class ModelBoxWithVarianceBase(ModelBoxBase):
         """Make predictions on new data.
     
         """
+        cache = cache or CACHE_DIR
         predictions = self.predict(
             data=candidates, 
             aggregator="var", 

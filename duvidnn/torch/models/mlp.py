@@ -204,6 +204,7 @@ class TorchMLPBase(LinearStack):
             self._layer_kwargs = {}
             self._n_residual_blocks = 0
             self._n_extra_linear = 0
+        self.final_activation = final_activation
         self.model_layers = self.build_model() if _init_model else None
 
     def build_model(self):

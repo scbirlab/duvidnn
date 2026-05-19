@@ -10,6 +10,7 @@ from numpy import concatenate, ndarray
 from numpy.typing import ArrayLike
 
 from .aggregators import get_aggregator, AggFunction
+from ..utils.package_data import CACHE_DIR
 
 
 class DoubtMixinBase(ABC):
@@ -368,6 +369,7 @@ class DoubtMixinBase(ABC):
         cache: Optional[str] = None,
         **info_score_kwargs
     ) -> Dataset:
+        cache = cache or CACHE_DIR
         self.release_memory()
         if preprocessing_args is None:
             preprocessing_args = {}

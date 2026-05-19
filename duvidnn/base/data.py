@@ -91,6 +91,7 @@ class DataMixinBase(ABC):
         checkpoint: str,
         cache_dir: Optional[str] = None
     ):
+        cache_dir = cache_dir or self._default_cache,
         data_config = load_checkpoint_file(
             checkpoint, 
             filename="data-config.json",
@@ -226,7 +227,7 @@ class DataMixinBase(ABC):
         cache: Optional[str] = None
     ) -> Dataset:
         from datasets import Dataset
-
+        cache = cache or CACHE_DIR
         if filename.endswith((".csv", ".tsv", ".txt", ".csv.gz", ".tsv.gz", ".txt.gz")):
             read_f = partial(
                 Dataset.from_csv,
@@ -361,7 +362,7 @@ class DataMixinBase(ABC):
         cache: str,
     ) -> Dataset:
         from datasets import concatenate_datasets, load_dataset, DatasetDict
-
+        cache = cache or CACHE_DIR
         hf_ref_full = ref.split("hf://")[-1]
         hf_ref = hf_ref_full.split("@")[0] if "@" in ref else hf_ref_full
         if ":" in hf_ref_full:
@@ -382,7 +383,7 @@ class DataMixinBase(ABC):
     ) -> Union[Dataset, IterableDataset]:
         from datasets import Dataset, IterableDataset
         from pandas import DataFrame
-
+        cache = cache or cls._default_cache
         if isinstance(data, (Dataset, IterableDataset)):
             dataset = data
         elif isinstance(data, (DataFrame, Mapping)):
@@ -445,7 +446,6 @@ class DataMixinBase(ABC):
         Dataset, 
         Dataset
     ]:
-
         """Process data to be consistent with training data.
         
         """
@@ -489,7 +489,7 @@ class DataMixinBase(ABC):
         else:
             n_context = 0
 
-        dataset = self._resolve_data(data)
+        dataset = self._resolve_data(data, cache=cache)
         print(f">>> {features=}")
         featurizers = [self._resolve_featurizers(f) for f in features]
         featurizers_dicts = tuple(tuple(_f.to_dict() for _f in f) for f in featurizers)
@@ -653,10 +653,10 @@ class DataMixinBase(ABC):
             .with_format("numpy")
         )
         if len(input_towers) == 1:
-            self.input_shape = self.training_example[input_towers[0]].shape[1:]
+            self.input_shape = self.training_example[input_towers[0]][:].shape[1:]
         else:
             input_shape = tuple(
-                self.training_example[key].shape[1:] for key in input_towers
+                self.training_example[key][:].shape[1:] for key in input_towers
             )
             if self._use_context:
                 self.input_shape = input_shape[:-1]
@@ -665,7 +665,7 @@ class DataMixinBase(ABC):
                 self.input_shape = input_shape
                 self.context_shape = None
 
-        self.output_shape = self.training_example[self._out_key].shape[1:]
+        self.output_shape = self.training_example[self._out_key][:].shape[1:]
         return None
 
     @staticmethod
@@ -776,7 +776,7 @@ class ChemMixinBase(DataMixinBase):
         _sim_fn: Callable[[ArrayLike, ArrayLike], float],
     ) -> Dict[str, np.ndarray]:
         query_fps = x[_in_key]
-        refs = refs_data[_in_key]
+        refs = refs_data[_in_key][:]
         results = [_sim_fn(q, refs) for q in query_fps]
         results = np.stack(results, axis=0)
         x[results_column] = results
@@ -794,6 +794,7 @@ class ChemMixinBase(DataMixinBase):
         """Get Tanimoto similarity of nearest training set data.
     
         """
+        cache = cache or self._default_cache
         if query_structure_column is None:
             query_structure_column = self._default_preprocessing_args["structure_column"]
         if query_input_representation is None:

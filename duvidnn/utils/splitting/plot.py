@@ -105,7 +105,7 @@ def plot_chemical_splits(
         on_bits=True,
         return_dataframe=False,
     )
-    fps = [sorted(map(int, fp.split(";"))) for fp in fps]
+    fps = [sorted(map(int, fp[0].split(";"))) for fp in fps]
     fp_matrix = scipy.sparse.lil_matrix(
         (len(fps), 2048), 
         dtype=np.float32,

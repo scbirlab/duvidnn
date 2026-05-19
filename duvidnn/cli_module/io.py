@@ -2,17 +2,23 @@ from typing import Mapping, Optional, Union
 
 from carabiner import print_err
 
+from ..utils.package_data import CACHE_DIR
+
 
 def _resolve_and_slice_data(
     data: str,
     start: Optional[int] = None,
     end: Optional[int] = None,
-    batch_size: int = 1024
+    batch_size: int = 1024,
+    cache: Optional[str] = None
 ):
     from ..base.data import DataMixinBase
     # from .utils.datasets import to_dataset
-
-    candidates_ds = DataMixinBase._resolve_data(data)
+    cache = cache or CACHE_DIR
+    candidates_ds = DataMixinBase._resolve_data(
+        data,
+        cache=cache,
+    )
     nrows = candidates_ds.num_rows
     skip = start or 0
     take = (end or nrows) - skip

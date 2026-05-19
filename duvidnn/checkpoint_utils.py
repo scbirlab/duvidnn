@@ -12,6 +12,8 @@ if TYPE_CHECKING:
 else:
     Dataset, IterableDataset = Any, Any
 
+from .utils.package_data import CACHE_DIR
+
 
 def _load_json(checkpoint: str, filename: str) -> Dict[str, Any]:
     with open(os.path.join(checkpoint, filename), "r") as f:
@@ -58,7 +60,7 @@ def load_checkpoint_file(
     *args, **kwargs
 ) -> Union[Any, None]:
     from huggingface_hub import snapshot_download
-
+    cache_dir = CACHE_DIR
     obj = None
     if isinstance(callback, str):
         try:

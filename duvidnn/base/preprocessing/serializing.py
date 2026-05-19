@@ -2,6 +2,8 @@
 
 from typing import Any, Dict, Iterable, Mapping, Union
 from dataclasses import asdict, dataclass, field
+import hashlib
+import json
 
 import numpy as np
 
@@ -27,9 +29,10 @@ class Preprocessor:
         self.output_column = self._get_output_column()
         self.function = self.closure(**self.kwargs)
 
-    def _get_hash(self):
-        from datasets.fingerprint import Hasher
-        return Hasher.hash(self.to_dict())
+    def _get_hash(self) -> str:
+        return hashlib.md5(
+            json.dumps(self.to_dict(), sort_keys=True).encode()
+        ).hexdigest()
 
     def _get_output_column(self):
         return f"{app_name}/{__version__}/feat:{self.input_column}:{self.name}={self.hash_stub}"
