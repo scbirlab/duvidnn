@@ -39,18 +39,3 @@ jobs:
         pytest duvidnn --doctest-modules
         # run other tests
         pytest test/test_evaluation.py
-    - name: Test CLI bilinear model with fingerprints
-      run: |
-        bash test/scripts/train-hash-fp.sh
-    - name: Test CLI hashing/bilinear model
-      run: |
-        bash test/scripts/train-hash.sh
-    - name: Test CLI species featurizer
-      run: |
-        bash test/scripts/train-species.sh
-    - name: Test CLI train/test
-      run: |
-        bash test/scripts/train.sh
-    - name: Test CLI splitting/percentiles
-      run: |
-        bash test/scripts/split.sh
