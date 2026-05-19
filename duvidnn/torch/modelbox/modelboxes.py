@@ -198,7 +198,7 @@ class ChempropModelBox(ChempropDataMixin, ChempropDoubtMixin, ChempropModelBoxBa
             else:
                 self.input_shape = input_example[0]["x_d"].shape
         else:
-            self.input_shape = self.training_example[self._in_key][0]["x_d"][:].shape
+            self.input_shape = np.asarray(self.training_example[self._in_key][0]["x_d"]).shape
         return ChempropEnsemble(
             n_input=self.input_shape[-1],
             n_out=self.output_shape[-1], 
