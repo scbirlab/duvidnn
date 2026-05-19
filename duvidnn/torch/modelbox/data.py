@@ -65,7 +65,7 @@ class TorchChemMixin(ChemMixinBase, DataMixin):
     ) -> Dict[str, Array]:
         query_fps = x[_in_key]
         refs = refs_data[_in_key]
-        results = vmap(_sim_fn, in_axes=(0, None))(query_fps, refs)
+        results = vmap(_sim_fn, in_axes=(0, None))(query_fps, refs[:])
         x[results_column] = results
         return x
 
