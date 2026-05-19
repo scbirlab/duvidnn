@@ -184,7 +184,11 @@ def plot_chemical_splits(
                 try:
                     fig.colorbar(sc, ax=ax)
                 except ValueError as e:
+<<<<<<< HEAD
                     print_err("[WARN]", e)
+=======
+                    print_err(e)
+>>>>>>> c8f9314 (Fix bugs)
         ax.set(title=col)
         ax.set_axis_off()
     

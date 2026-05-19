@@ -64,7 +64,6 @@ class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
         cache_dir: Optional[str] = None
     ) -> None:
         cache_dir = cache_dir or CACHE_DIR
-<<<<<<< HEAD
         print_err(f"[INFO] Loading checkpoint from {checkpoint}")
         self._model_config = load_checkpoint_file(
             checkpoint, 
@@ -77,17 +76,8 @@ class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
             allow_empty=True,
             cache_dir=cache_dir,
         )
-=======
-        print_err(f"Loading checkpoint from {checkpoint}")
->>>>>>> 2c0ec40 (MAke caching more robust)
         self.load_data_checkpoint(checkpoint, cache_dir=cache_dir)
-<<<<<<< HEAD
         if self.training_data is not None:
-=======
-        self._model_config = load_checkpoint_file(checkpoint, self.__class__._model_config_filename, cache_dir=cache_dir)
-        self._special_args = load_checkpoint_file(checkpoint, self.__class__._special_args_filename, cache_dir=cache_dir, allow_none=True)
-        if self.model is None:
->>>>>>> 745bb4f (Bug fixes)
             self.model = self.create_model()
         self.load_weights(checkpoint, cache_dir=cache_dir)
         return None
@@ -409,10 +399,14 @@ class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
         
         predictions = {
 <<<<<<< HEAD
+<<<<<<< HEAD
             key: predictions[key][:].flatten().tolist()
 =======
             key: predictions[key].flatten().tolist()
 >>>>>>> 2c0ec40 (MAke caching more robust)
+=======
+            key: predictions[key][:].flatten().tolist()
+>>>>>>> c8f9314 (Fix bugs)
             if len(predictions[key][:].shape) > 1 and predictions[key][:].shape[-1] == 1 
             else predictions[key][:].tolist()
             for key in predictions.column_names
