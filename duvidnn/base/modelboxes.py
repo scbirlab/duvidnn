@@ -371,7 +371,7 @@ class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
             )
         
         predictions = {
-            key: predictions[key].flatten().tolist()
+            key: predictions[key][:].flatten().tolist()
             if len(predictions[key][:].shape) > 1 and predictions[key][:].shape[-1] == 1 
             else predictions[key][:].tolist()
             for key in predictions.column_names
