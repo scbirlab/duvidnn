@@ -653,10 +653,10 @@ class DataMixinBase(ABC):
             .with_format("numpy")
         )
         if len(input_towers) == 1:
-            self.input_shape = self.training_example[input_towers[0]].shape[1:]
+            self.input_shape = np.array(self.training_example[input_towers[0]]).shape[1:]
         else:
             input_shape = tuple(
-                self.training_example[key].shape[1:] for key in input_towers
+                np.array(self.training_example[key]).shape[1:] for key in input_towers
             )
             if self._use_context:
                 self.input_shape = input_shape[:-1]
@@ -665,7 +665,7 @@ class DataMixinBase(ABC):
                 self.input_shape = input_shape
                 self.context_shape = None
 
-        self.output_shape = self.training_example[self._out_key].shape[1:]
+        self.output_shape = np.array(self.training_example[self._out_key]).shape[1:]
         return None
 
     @staticmethod
