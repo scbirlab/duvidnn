@@ -560,6 +560,7 @@ class DataMixinBase(ABC):
                 batched=True,
                 batch_size=batch_size,
                 desc="Preprocessing",
+                cache_dir=cache,
             )
         )
         flat_input_columns = sorted(set([item for outer in input_columns for item in outer if item is not None]))
@@ -583,6 +584,7 @@ class DataMixinBase(ABC):
                 batched=True,
                 batch_size=batch_size,
                 desc="Filling NaN values",
+                cache_dir=cache,
             )
             .with_format(None)  # guard against tensors
             .map(
@@ -593,6 +595,7 @@ class DataMixinBase(ABC):
                 batched=True,
                 batch_size=batch_size,
                 desc="Featurizing",
+                cache_dir=cache,
             )
         )
         if one_column_input is not None:
@@ -619,6 +622,7 @@ class DataMixinBase(ABC):
                 batched=True,
                 batch_size=batch_size,
                 desc="Collating features and labels",
+                cache_dir=cache,
             )
         )
         processed_dataset = (
@@ -879,11 +883,13 @@ class ChemMixinBase(DataMixinBase):
                 },
                 **common_map_opts,
                 desc="Converting to clean SMILES",
+                cache_dir=cache,
             )
             .map(
                 **fp_map_opts,
                 **common_map_opts,
                 desc="Calculating query fingerprints",
+                cache_dir=cache,
             )
             .rename_column(query_fp_col, self.common_fp_column)
             .with_format(
@@ -908,6 +914,7 @@ class ChemMixinBase(DataMixinBase):
                     **fp_map_opts,
                     **common_map_opts,
                     desc="Calculating reference fingerprints",
+                    cache_dir=cache,
                 )
             )
         else:
@@ -928,6 +935,7 @@ class ChemMixinBase(DataMixinBase):
                 "results_column": self.tanimoto_column,
                 "_in_key": self.common_fp_column, 
                 "_sim_fn": self._get_max_sim,
+                cache_dir=cache,
             },
             **common_map_opts,
             desc="Calculating Tanimoto similarity to nearest training neighbor",
