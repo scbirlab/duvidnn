@@ -883,8 +883,8 @@ class ChemMixinBase(DataMixinBase):
                 "results_column": self.tanimoto_column,
                 "_in_key": self.common_fp_column, 
                 "_sim_fn": self._get_max_sim,
-                cache_dir=cache,
             },
+            cache_dir=cache,
             **common_map_opts,
             desc="Calculating Tanimoto similarity to nearest training neighbor",
         ).remove_columns(self.common_fp_column)
