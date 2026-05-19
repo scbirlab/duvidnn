@@ -776,7 +776,7 @@ class ChemMixinBase(DataMixinBase):
         _sim_fn: Callable[[ArrayLike, ArrayLike], float],
     ) -> Dict[str, np.ndarray]:
         query_fps = x[_in_key]
-        refs = refs_data[_in_key]
+        refs = refs_data[_in_key][:]
         results = [_sim_fn(q, refs) for q in query_fps]
         results = np.stack(results, axis=0)
         x[results_column] = results
