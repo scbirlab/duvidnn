@@ -19,6 +19,7 @@ from .typing import DataLike, FeatureLike, StrOrIterableOfStr
 from ..checkpoint_utils import save_json, _load_json, load_checkpoint_file
 from ..utils.package_data import CACHE_DIR
 
+
 class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
 
     """Container class for models and their training datasets.
@@ -63,6 +64,7 @@ class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
         cache_dir: Optional[str] = None
     ) -> None:
         cache_dir = cache_dir or CACHE_DIR
+<<<<<<< HEAD
         print_err(f"[INFO] Loading checkpoint from {checkpoint}")
         self._model_config = load_checkpoint_file(
             checkpoint, 
@@ -75,6 +77,9 @@ class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
             allow_empty=True,
             cache_dir=cache_dir,
         )
+=======
+        print_err(f"Loading checkpoint from {checkpoint}")
+>>>>>>> 2c0ec40 (MAke caching more robust)
         self.load_data_checkpoint(checkpoint, cache_dir=cache_dir)
 <<<<<<< HEAD
         if self.training_data is not None:
@@ -385,6 +390,10 @@ class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
         preds = predictions[eval_prediction_col]
         # if len(y_vals.shape) == 1 and len(preds.shape) == 2:
         #     y_vals = y_vals[...,None]
+<<<<<<< HEAD
+=======
+        print(y_vals[:].shape, preds[:].shape)
+>>>>>>> 2c0ec40 (MAke caching more robust)
         if isinstance(metrics, Mapping):
             metrics = {
                 name: asarray(metric(preds, y_vals)).tolist()
@@ -399,7 +408,11 @@ class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
             )
         
         predictions = {
+<<<<<<< HEAD
             key: predictions[key][:].flatten().tolist()
+=======
+            key: predictions[key].flatten().tolist()
+>>>>>>> 2c0ec40 (MAke caching more robust)
             if len(predictions[key][:].shape) > 1 and predictions[key][:].shape[-1] == 1 
             else predictions[key][:].tolist()
             for key in predictions.column_names

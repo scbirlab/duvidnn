@@ -10,8 +10,8 @@ from numpy import concatenate, ndarray
 from numpy.typing import ArrayLike
 
 from .aggregators import get_aggregator, AggFunction
-from ..utils.package_data import CACHE_DIR
 from .data import _DEFAULT_BATCH_SIZE
+from ..utils.package_data import CACHE_DIR
 
 
 class DoubtMixinBase(ABC):
