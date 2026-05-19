@@ -19,6 +19,8 @@ def _predict(args: Namespace) -> None:
     import torch
     from ..autoclass import AutoModelBox
 
+    if args.cache:
+        os.environ["HF_DATASETS_CACHE"] = os.path.abspath(args.cache)
     
     output = args.output
     out_dir = os.path.dirname(output)

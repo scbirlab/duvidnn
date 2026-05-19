@@ -136,6 +136,8 @@ def _train_and_save_modelbox(
 def _train(args: Namespace) -> None:
 
     from ..autoclass import AutoModelBox
+    if args.cache:
+        os.environ["HF_DATASETS_CACHE"] = os.path.abspath(args.cache)
 
     cli_config = {
         "class_name": args.model_class.casefold(),
