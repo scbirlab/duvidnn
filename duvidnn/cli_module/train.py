@@ -10,7 +10,10 @@ from .eval import _evaluate_modelbox_and_save_metrics
 from .utils import _dict_to_pandas, _init_modelbox, _overwrite_config
 from ..checkpoint_utils import _load_json, save_json
 
+from ..utils.package_data import CACHE_DIR
+
 STRUCTURE_COLUMN_DEFAULT: str = "smiles"
+
 
 def _load_modelbox_training_data(
     modelbox,
@@ -18,6 +21,7 @@ def _load_modelbox_training_data(
     cache: Optional[str] = None,
     **overrides
 ):
+    cache = cache or CACHE_DIR
     if any([
         overrides.get("training") is not None,  # override checkpoint training data
         checkpoint is None,  # no checkpoint
@@ -53,6 +57,7 @@ def _init_modelbox_and_load_training_data(
     cache: Optional[str] = None,
     **overrides
 ):
+    cache = cache or CACHE_DIR
     modelbox = _init_modelbox(
         cli_config=cli_config,
         checkpoint=checkpoint,

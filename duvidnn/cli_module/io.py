@@ -2,6 +2,8 @@ from typing import Mapping, Optional, Union
 
 from carabiner import print_err
 
+from ..utils.package_data import CACHE_DIR
+
 
 def _resolve_and_slice_data(
     data: str,
@@ -12,7 +14,7 @@ def _resolve_and_slice_data(
 ):
     from ..base.data import DataMixinBase
     # from .utils.datasets import to_dataset
-
+    cache = cache or CACHE_DIR
     candidates_ds = DataMixinBase._resolve_data(
         data,
         cache=cache,

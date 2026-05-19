@@ -2,6 +2,8 @@ from typing import Mapping, Optional, Union
 
 from carabiner import pprint_dict
 
+from ..utils.package_data import CACHE_DIR
+
 def _overwrite_config(
     config: Mapping, 
     config_file: Optional[str] = None, 
@@ -36,6 +38,7 @@ def _init_modelbox(
     **overrides
 ):
     from ..autoclass import AutoModelBox
+    cache = cache or CACHE_DIR
     if checkpoint is None:
         if any(
             overrides.get(key) is None for key in ("training", "labels")

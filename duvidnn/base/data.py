@@ -362,7 +362,7 @@ class DataMixinBase(ABC):
         cache: str,
     ) -> Dataset:
         from datasets import concatenate_datasets, load_dataset, DatasetDict
-
+        cache = cache or CACHE_DIR
         hf_ref_full = ref.split("hf://")[-1]
         hf_ref = hf_ref_full.split("@")[0] if "@" in ref else hf_ref_full
         if ":" in hf_ref_full:
