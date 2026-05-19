@@ -32,6 +32,7 @@ def _predict(args: Namespace) -> None:
         args.test,
         start=args.start,
         end=args.end,
+        cache=args.cache,
     )
     modelbox = AutoModelBox.from_pretrained(
         args.checkpoint, 

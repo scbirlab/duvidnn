@@ -91,6 +91,7 @@ class DataMixinBase(ABC):
         checkpoint: str,
         cache_dir: Optional[str] = None
     ):
+        cache_dir = cache_dir or self._default_cache,
         data_config = load_checkpoint_file(
             checkpoint, 
             filename="data-config.json",
@@ -226,7 +227,7 @@ class DataMixinBase(ABC):
         cache: Optional[str] = None
     ) -> Dataset:
         from datasets import Dataset
-
+        cache = cache or CACHE_DIR
         if filename.endswith((".csv", ".tsv", ".txt", ".csv.gz", ".tsv.gz", ".txt.gz")):
             read_f = partial(
                 Dataset.from_csv,
@@ -382,7 +383,7 @@ class DataMixinBase(ABC):
     ) -> Union[Dataset, IterableDataset]:
         from datasets import Dataset, IterableDataset
         from pandas import DataFrame
-
+        cache = cache or cls._default_cache
         if isinstance(data, (Dataset, IterableDataset)):
             dataset = data
         elif isinstance(data, (DataFrame, Mapping)):
@@ -445,7 +446,6 @@ class DataMixinBase(ABC):
         Dataset, 
         Dataset
     ]:
-
         """Process data to be consistent with training data.
         
         """
@@ -489,7 +489,7 @@ class DataMixinBase(ABC):
         else:
             n_context = 0
 
-        dataset = self._resolve_data(data)
+        dataset = self._resolve_data(data, cache=cache)
         print(f">>> {features=}")
         featurizers = [self._resolve_featurizers(f) for f in features]
         featurizers_dicts = tuple(tuple(_f.to_dict() for _f in f) for f in featurizers)
@@ -516,6 +516,7 @@ class DataMixinBase(ABC):
                 batched=True,
                 batch_size=batch_size,
                 desc="Preprocessing",
+                cache_dir=cache,
             )
         )
         flat_input_columns = sorted(set([item for outer in input_columns for item in outer]))
@@ -539,6 +540,7 @@ class DataMixinBase(ABC):
                 batched=True,
                 batch_size=batch_size,
                 desc="Filling NaN values",
+                cache_dir=cache,
             )
             .map(
                 self._featurize,
@@ -546,6 +548,7 @@ class DataMixinBase(ABC):
                 batched=True,
                 batch_size=batch_size,
                 desc="Featurizing",
+                cache_dir=cache,
             )
         )
         if one_column_input is not None:
@@ -573,6 +576,7 @@ class DataMixinBase(ABC):
                 batched=True,
                 batch_size=batch_size,
                 desc="Collating features and labels",
+                cache_dir=cache,
             )
         )
         processed_dataset = (
@@ -794,6 +798,7 @@ class ChemMixinBase(DataMixinBase):
         """Get Tanimoto similarity of nearest training set data.
     
         """
+        cache = cache or self._default_cache
         if query_structure_column is None:
             query_structure_column = self._default_preprocessing_args["structure_column"]
         if query_input_representation is None:
@@ -826,11 +831,13 @@ class ChemMixinBase(DataMixinBase):
                 },
                 **common_map_opts,
                 desc="Converting to clean SMILES",
+                cache_dir=cache,
             )
             .map(
                 **fp_map_opts,
                 **common_map_opts,
                 desc="Calculating query fingerprints",
+                cache_dir=cache,
             )
             .rename_column(query_fp_col, self.common_fp_column)
             .with_format(
@@ -855,6 +862,7 @@ class ChemMixinBase(DataMixinBase):
                     **fp_map_opts,
                     **common_map_opts,
                     desc="Calculating reference fingerprints",
+                    cache_dir=cache,
                 )
             )
         else:
@@ -875,6 +883,7 @@ class ChemMixinBase(DataMixinBase):
                 "results_column": self.tanimoto_column,
                 "_in_key": self.common_fp_column, 
                 "_sim_fn": self._get_max_sim,
+                cache_dir=cache,
             },
             **common_map_opts,
             desc="Calculating Tanimoto similarity to nearest training neighbor",
