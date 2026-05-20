@@ -25,8 +25,10 @@ else:
     from .base.modelboxes import ModelBoxBase
     from .base.modelbox_registry import DEFAULT_MODELBOX, MODELBOX_REGISTRY
 
-class AutoModelBox:
+from .utils.package_data import CACHE_DIR
 
+
+class AutoModelBox:
     _init_kwargs_file: str = ModelBoxBase._init_kwargs_filename
     _model_config_file: str = ModelBoxBase._model_config_filename
     _model_class_key: str = "class_name"
@@ -49,6 +51,7 @@ class AutoModelBox:
         cache_dir: Optional[str] = None,
         **kwargs
     ) -> ModelBoxBase:
+        cache_dir = cache_dir or CACHE_DIR
         config_file = cls._init_kwargs_file
         config = load_checkpoint_file(
             checkpoint=checkpoint,
