@@ -25,6 +25,7 @@ def _get_data_path(
     Copies it from the package resources if not present.
 
     """
+    from carabiner import print_err
     cache_dir = os.environ.get(
         env_key, 
         os.path.expanduser(default),
@@ -32,4 +33,5 @@ def _get_data_path(
     os.makedirs(cache_dir, exist_ok=True)
     os.environ["HF_HOME"] = cache_dir
     os.environ["HF_DATASETS_CACHE"] = cache_dir
+    print_err(f"[INFO] Cache directory set to HF_HOME={os.environ['HF_HOME']}, HF_DATASETS_CACHE={os.environ['HF_DATASETS_CACHE']}.")
     return cache_dir, os.path.join(cache_dir, filename)
