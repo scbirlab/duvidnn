@@ -16,7 +16,7 @@ from .information import DoubtMixinBase
 from .preprocessing import Preprocessor
 from .training import ModelTrainerBase
 from .typing import DataLike, FeatureLike, StrOrIterableOfStr
-from ..checkpoint_utils import save_json, _load_json
+from ..checkpoint_utils import save_json, _load_json, load_checkpoint_file
 from ..utils.package_data import CACHE_DIR
 
 class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
@@ -63,9 +63,18 @@ class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
     ) -> None:
         cache_dir = cache_dir or CACHE_DIR
         print_err(f"Loading checkpoint from {checkpoint}")
+        self._model_config = load_checkpoint_file(
+            checkpoint, 
+            self.__class__._model_config_filename, 
+            cache_dir=cache_dir,
+        )
+        self._special_args = load_checkpoint_file(
+            checkpoint, 
+            self.__class__._special_args_filename, 
+            allow_empty=True,
+            cache_dir=cache_dir,
+        )
         self.load_data_checkpoint(checkpoint, cache_dir=cache_dir)
-        self._model_config = _load_json(checkpoint, self.__class__._model_config_filename)
-        self._special_args = _load_json(checkpoint, self.__class__._special_args_filename)
         if self.training_data is not None:
             self.model = self.create_model()
             self.load_weights(checkpoint, cache_dir=cache_dir)
@@ -230,6 +239,8 @@ class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
             inputs = x[_in_key[0]]
         else:
             inputs = [x[k] for k in _in_key]
+        if not isinstance(inputs[0], dict):
+            print_err(">>>>>>", [_x.shape for _x in inputs])
         prediction = model(inputs)
         x[_prediction_column] = detacher_fn(prediction)
         return x
@@ -279,8 +290,12 @@ class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
         self.eval_mode()
         _in_key = tuple(sorted(
             col for col in data.column_names 
-            if col.startswith(self.__class__._in_key)
+            if "/inputs:0" in col
+        )) + tuple(sorted(
+            col for col in data.column_names 
+            if col.endswith("/inputs:context")
         ))
+        
         predictions = data.map(
             self._predict,
             fn_kwargs={

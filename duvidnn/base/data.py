@@ -540,9 +540,12 @@ class DataMixinBase(ABC):
                 batch_size=batch_size,
                 desc="Filling NaN values",
             )
+            .with_format(None)  # guard against tensors
             .map(
                 self._featurize,
-                fn_kwargs={"featurizers": tuple(item for f in featurizers_dicts for item in f)},
+                fn_kwargs={
+                    "featurizers": tuple(item for f in featurizers_dicts for item in f)
+                },
                 batched=True,
                 batch_size=batch_size,
                 desc="Featurizing",
@@ -557,24 +560,27 @@ class DataMixinBase(ABC):
             )
         print_err(f"{input_columns=}")
         print_err(f"{concat_label=}")
+        concat_kwargs = {
+            "inputs": concat_label[:-1] if n_context > 0 else concat_label,
+            "context": concat_label[-1] if n_context > 0 else tuple(),
+            "labels": labels,
+            "_in_key": self._in_key,
+            "_out_key": self._out_key,
+            "_context_key": self._context_key,
+        }
+        print_err(f"{concat_kwargs=}")
         processed_dataset = (
             input_dataset
             .with_format(None)  # guard against tensors
             .map(
                 self._concat_features,
-                fn_kwargs={
-                    "inputs": concat_label[:-1] if n_context > 0 else concat_label,
-                    "context": concat_label[-1] if n_context > 0 else tuple(),
-                    "labels": labels,
-                    "_in_key": self._in_key,
-                    "_out_key": self._out_key,
-                    "_context_key": self._context_key,
-                },
+                fn_kwargs=concat_kwargs,
                 batched=True,
                 batch_size=batch_size,
                 desc="Collating features and labels",
             )
         )
+        print_err(f"{processed_dataset=}")
         processed_dataset = (
             processed_dataset
             .select_columns(
@@ -582,7 +588,7 @@ class DataMixinBase(ABC):
                 + labels
                 + [
                     c for c in processed_dataset.column_names 
-                    if c.startswith(f"{self._in_key}")
+                    if c.startswith((f"{self._in_key}", f"{self._context_key}"))
                 ]
                 + [self._out_key]
             )

@@ -17,7 +17,7 @@ from .utils.package_data import CACHE_DIR
 
 def _load_json(checkpoint: str, filename: str) -> Dict[str, Any]:
     with open(os.path.join(checkpoint, filename), "r") as f:
-            obj = json.load(f)
+        obj = json.load(f)
     return obj
    
 
@@ -57,10 +57,11 @@ def load_checkpoint_file(
     callback: Union[str, Callable] = "json",
     none_on_error: bool = False,
     cache_dir: Optional[str] = None,
+    allow_empty: bool = False,
     *args, **kwargs
 ) -> Union[Any, None]:
     from huggingface_hub import snapshot_download
-    cache_dir = CACHE_DIR
+    cache_dir = cache_dir or CACHE_DIR
     obj = None
     if isinstance(callback, str):
         try:
@@ -97,7 +98,7 @@ def load_checkpoint_file(
                     raise e
             else:
                 obj = callback(tmpdirname, filename)
-    if obj is not None:
+    if allow_empty or obj is not None:
         return obj
     else:
         raise AttributeError(
