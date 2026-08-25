@@ -239,8 +239,6 @@ class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
             inputs = x[_in_key[0]]
         else:
             inputs = [x[k] for k in _in_key]
-        if not isinstance(inputs[0], dict):
-            print_err(">>>>>>", [_x.shape for _x in inputs])
         prediction = model(inputs)
         x[_prediction_column] = detacher_fn(prediction)
         return x
