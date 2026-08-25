@@ -106,11 +106,8 @@ def load_checkpoint_file(
                     raise e
             else:
                 obj = callback(tmpdirname, filename)
-<<<<<<< HEAD
+
     if allow_empty or obj is not None:
-=======
-    if obj is not None or allow_none:
->>>>>>> 745bb4f (Bug fixes)
         return obj
     else:
         raise AttributeError(
