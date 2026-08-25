@@ -263,6 +263,7 @@ class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
         aggregator: Optional[Union[str, AggFunction]] = None,
         cache: Optional[str] = None,
         agg_kwargs: Optional[Mapping] = None,
+        one_column_input: Optional[str] = None,
         _prediction_column: Optional[str] = None,
         **kwargs
     ) -> Dataset:
@@ -282,17 +283,21 @@ class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
             data=data,
             batch_size=batch_size,
             cache=cache,
+            one_column_input=one_column_input,
             **kwargs
         )
             
         self.eval_mode()
-        _in_key = tuple(sorted(
-            col for col in data.column_names 
-            if "/inputs:0" in col
-        )) + tuple(sorted(
-            col for col in data.column_names 
-            if col.endswith("/inputs:context")
-        ))
+        if one_column_input is None:
+            _in_key = tuple(sorted(
+                col for col in data.column_names 
+                if "/inputs:0" in col
+            )) + tuple(sorted(
+                col for col in data.column_names 
+                if col.endswith("/inputs:context")
+            ))
+        else:
+            _in_key = (one_column_input,)
         
         predictions = data.map(
             self._predict,
