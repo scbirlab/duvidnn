@@ -13,8 +13,10 @@ from carabiner import cast, print_err
 if TYPE_CHECKING:
     from datasets import Dataset, DatasetDict, IterableDataset
     from pandas import DataFrame
+    from .preprocessing.serializing import Preprocessor
 else:
     Dataset, DatasetDict, IterableDataset, DataFrame = Any, Any, Any, Any
+    Preprocessor = Any
 
 import numpy as np
 from numpy.typing import ArrayLike
@@ -103,7 +105,7 @@ class DataMixinBase(ABC):
         checkpoint: str,
         cache_dir: Optional[str] = None
     ):
-        cache_dir = cache_dir or self._default_cache,
+        cache_dir = cache_dir or self._default_cache
         data_config = load_checkpoint_file(
             checkpoint, 
             filename="data-config.json",

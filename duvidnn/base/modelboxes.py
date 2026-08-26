@@ -10,7 +10,7 @@ from numpy import ndarray, asarray
 from pandas import DataFrame
 
 from .aggregators import get_aggregator, AggFunction
-from .data import DataMixinBase, ChemMixinBase, _DEFAULT_BATCH_SIZE
+from .data import DataMixinBase, ChemMixinBase
 from .evaluation import rmse, pearson_r, spearman_r
 from .information import DoubtMixinBase
 from .preprocessing import Preprocessor
@@ -41,13 +41,12 @@ class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
 
     def save_checkpoint(
         self,
-        checkpoint: str,
-        save_data: bool = False
+        checkpoint: str
     ) -> None:
         print_err(f"[INFO] Saving checkpoint at {checkpoint}")
         if not os.path.exists(checkpoint):
             os.makedirs(checkpoint)
-        self.save_data_checkpoint(checkpoint, save_data=save_data)
+        self.save_data_checkpoint(checkpoint)
         init_kwargs = {
             "class_name": self.class_name,
         }
@@ -79,7 +78,7 @@ class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
         self.load_data_checkpoint(checkpoint, cache_dir=cache_dir)
         if self.training_data is not None:
             self.model = self.create_model()
-        self.load_weights(checkpoint, cache_dir=cache_dir)
+            self.load_weights(checkpoint, cache_dir=cache_dir)
         return None
 
     @abstractmethod
@@ -96,7 +95,7 @@ class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
         features: Optional[FeatureLike] = None,
         context: Optional[FeatureLike] = None,
         labels: Optional[StrOrIterableOfStr] = None,
-        batch_size: int = _DEFAULT_BATCH_SIZE,
+        batch_size: int = 16,
         dataloader: bool = False,
         shuffle: bool = False,
         cache: Optional[str] = None,
@@ -161,7 +160,7 @@ class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
         val_context: Optional[FeatureLike] = None,
         val_labels: Optional[StrOrIterableOfStr] = None,
         epochs: int = 1, 
-        batch_size: int = _DEFAULT_BATCH_SIZE,
+        batch_size: int = 16,
         # learning_rate: float = .01,
         callbacks: Optional[Iterable[Callable]] = None,
         trainer_opts: Mapping[str, Union[str, int, bool]] = None,
@@ -240,8 +239,6 @@ class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
             inputs = x[_in_key[0]]
         else:
             inputs = [x[k] for k in _in_key]
-        if not isinstance(inputs[0], dict):
-            print_err(">>>>>>", [_x.shape for _x in inputs])
         prediction = model(inputs)
         x[_prediction_column] = detacher_fn(prediction)
         return x
@@ -262,7 +259,7 @@ class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
         features: Optional[FeatureLike] = None,
         context: Optional[FeatureLike] = None,
         labels: Optional[StrOrIterableOfStr] = None,
-        batch_size: int = _DEFAULT_BATCH_SIZE,
+        batch_size: int = 16,
         aggregator: Optional[Union[str, AggFunction]] = None,
         cache: Optional[str] = None,
         agg_kwargs: Optional[Mapping] = None,
@@ -291,7 +288,6 @@ class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
         )
             
         self.eval_mode()
-
         if one_column_input is None:
             _in_key = tuple(sorted(
                 col for col in data.column_names 
@@ -347,7 +343,7 @@ class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
         context: Optional[FeatureLike] = None,
         labels: Optional[StrOrIterableOfStr] = None,
         metrics: Optional[Union[Callable, Iterable[Callable], Mapping[str, Callable]]] = None,
-        batch_size: int = _DEFAULT_BATCH_SIZE,
+        batch_size: int = 16,
         aggregator: Optional[Union[str, AggFunction]] = None,
         agg_kwargs: Optional[Mapping] = None,
         cache: Optional[str] = None,
@@ -383,13 +379,6 @@ class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
         preds = predictions[eval_prediction_col]
         # if len(y_vals.shape) == 1 and len(preds.shape) == 2:
         #     y_vals = y_vals[...,None]
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
-        print(y_vals[:].shape, preds[:].shape)
->>>>>>> 2c0ec40 (MAke caching more robust)
-=======
->>>>>>> 53be2e3 (Tidy up print statements)
         if isinstance(metrics, Mapping):
             metrics = {
                 name: asarray(metric(preds, y_vals)).tolist()
@@ -404,15 +393,7 @@ class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
             )
         
         predictions = {
-<<<<<<< HEAD
-<<<<<<< HEAD
             key: predictions[key][:].flatten().tolist()
-=======
-            key: predictions[key].flatten().tolist()
->>>>>>> 2c0ec40 (MAke caching more robust)
-=======
-            key: predictions[key][:].flatten().tolist()
->>>>>>> c8f9314 (Fix bugs)
             if len(predictions[key][:].shape) > 1 and predictions[key][:].shape[-1] == 1 
             else predictions[key][:].tolist()
             for key in predictions.column_names
@@ -432,7 +413,7 @@ class ModelBoxWithVarianceBase(ModelBoxBase):
     def prediction_variance(
         self, 
         candidates: Optional[DataLike] = None,
-        batch_size: int = _DEFAULT_BATCH_SIZE,
+        batch_size: int = 16,
         cache: Optional[str] = None,
         **kwargs
     ) -> ndarray:
@@ -464,14 +445,12 @@ class FingerprintModelBoxBase(ChemMixinBase, ModelBoxWithVarianceBase):
         self, 
         use_fp: bool = False,
         use_2d: bool = False,
-        use_3d: bool = False,
         extra_featurizers: Optional[FeatureLike] = None,
         *args, **kwargs
     ):
         super().__init__(*args, **kwargs)
         self.use_fp = use_fp
         self.use_2d = use_2d
-        self.use_3d = use_3d
         if extra_featurizers is not None:
             if isinstance(extra_featurizers, (str, Mapping)):
                 extra_featurizers = [extra_featurizers]
@@ -493,7 +472,6 @@ class FingerprintModelBoxBase(ChemMixinBase, ModelBoxWithVarianceBase):
                 smiles_column=self.smiles_column,
                 use_fp=self.use_fp,
                 use_2d=self.use_2d,
-                use_3d=self.use_3d,
                 extra_featurizers=self.extra_featurizers,
             )
         else:
@@ -502,24 +480,6 @@ class FingerprintModelBoxBase(ChemMixinBase, ModelBoxWithVarianceBase):
             new_features = [self._resolve_featurizers(f) for f in features]
             featurizer.extend(new_features[0])
             featurizer = [featurizer] + new_features[1:]
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
-=======
->>>>>>> 53be2e3 (Tidy up print statements)
-        if not isinstance(featurizer, (list, tuple)):
-            featurizer = [featurizer]
-        else:
-            if len(featurizer) > 0:
-                featurizer = [f if isinstance(f, (list, tuple)) else [f] for f in featurizer]
-
-        print(f">>> {featurizer=}")
-<<<<<<< HEAD
->>>>>>> c2bc129 (Bug fixes and tidy up)
-=======
-=======
->>>>>>> b00e0d8 (Tidy up print statements)
->>>>>>> 53be2e3 (Tidy up print statements)
         return super().load_training_data(
             features=[self._resolve_featurizers(f) for f in featurizer],
             **kwargs,
