@@ -64,11 +64,7 @@ class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
         cache_dir: Optional[str] = None
     ) -> None:
         cache_dir = cache_dir or CACHE_DIR
-<<<<<<< HEAD
         print_err(f"[INFO] Loading checkpoint from {checkpoint}")
-=======
-        print_err(f"Loading checkpoint from {checkpoint}")
->>>>>>> 2008aeb (Bug fixing)
         self._model_config = load_checkpoint_file(
             checkpoint, 
             self.__class__._model_config_filename, 
@@ -81,17 +77,7 @@ class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
             cache_dir=cache_dir,
         )
         self.load_data_checkpoint(checkpoint, cache_dir=cache_dir)
-<<<<<<< HEAD
         if self.training_data is not None:
-=======
-<<<<<<< HEAD
-        self._model_config = load_checkpoint_file(checkpoint, self.__class__._model_config_filename, cache_dir=cache_dir)
-        self._special_args = load_checkpoint_file(checkpoint, self.__class__._special_args_filename, cache_dir=cache_dir, allow_none=True)
-        if self.model is None:
-=======
-        if self.training_data is not None:
->>>>>>> 584020a (Bug fixing)
->>>>>>> 2008aeb (Bug fixing)
             self.model = self.create_model()
         self.load_weights(checkpoint, cache_dir=cache_dir)
         return None
@@ -326,6 +312,7 @@ class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
             "_in_key": _in_key,
             "_prediction_column": _prediction_column,
         }
+<<<<<<< HEAD
 =======
         _in_key = tuple(sorted(
             col for col in data.column_names 
@@ -335,6 +322,9 @@ class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
             if col.endswith("/inputs:context")
         ))
 >>>>>>> 2008aeb (Bug fixing)
+=======
+        print_err("!!!!!!!!!!!!!!!!\n!!!!!!!!!", f"{prediction_kwargs=}")
+>>>>>>> 7a8463b (Fix chemprop round trip)
         
         predictions = data.map(
             self._predict,
