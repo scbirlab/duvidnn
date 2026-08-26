@@ -8,7 +8,7 @@ from .checkpoint_utils import load_checkpoint_file
 try:
     from .torch.modelbox import *
 except ImportError as e:
-    print_err(e)
+    print_err("[ERROR]", e)
     raise ImportError(
         """
         Modelling is not installed. Try reinstalling duvida with:

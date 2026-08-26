@@ -77,8 +77,8 @@ def _tokenize_for_embedding(
     try:
         tokenized = tokenizer(inputs, **tokenizer_args)
     except (ValueError, TypeError) as e:
-        print_err(e)
-        print_err(f"Tokenizing this batch failed: {inputs}")
+        print_err("[WARN]", e)
+        print_err(f"[WARN] Tokenizing this batch failed: {inputs}")
         tokenized = tokenizer(
             ['<unk>'] * len(inputs), 
             **tokenizer_args,

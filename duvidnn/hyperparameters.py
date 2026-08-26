@@ -179,7 +179,7 @@ class HyperOpt(dict):
         iterator = product(*(self.get(key) for key in self.keys()))
         configs = tuple(dict(zip(self.keys(), args)) for args in iterator)
         if not silent:
-            print_err(f"There are {len(configs)} configurations to test.")
+            print_err(f"[INFO] There are {len(configs)} configurations to test.")
         self._ranges = tuple(_ranges or []) + configs
         self._keys = tuple(self._ranges[0])
 

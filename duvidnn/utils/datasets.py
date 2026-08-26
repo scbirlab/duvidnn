@@ -156,7 +156,7 @@ def split_3way(
         ds_potential_test = ds_stream.skip(n_train_and_val)#.take(ds_shuffled.num_rows - n_train_and_val)
         ds_potential_test_nrows = initial_subsample - n_train_and_val
         n_hits = int(np.ceil(hit_frac * n_test))
-        print_err(f">> Getting hit cutoff from {sample_for_cutoff} / {ds_potential_test_nrows} rows")
+        print_err(f"[INFO] Getting hit cutoff from {sample_for_cutoff} / {ds_potential_test_nrows} rows")
 
         hit_cutoff = _get_cutoff(
             ds=ds_potential_test,
@@ -165,8 +165,8 @@ def split_3way(
             n_hits=n_hits,
             subsample=sample_for_cutoff
         )
-        print_err(f">>> Hit cutoff is {hit_cutoff:.2f}")
-        print_err(f">> Taking {n_hits} rows with {filter_column} < {hit_cutoff:.2f}")
+        print_err(f"[INFO] Hit cutoff is {hit_cutoff:.2f}")
+        print_err(f"[INFO] Taking {n_hits} rows with {filter_column} < {hit_cutoff:.2f}")
         ds_hits = (
             ds_potential_test
             # .with_format("numpy")
@@ -267,7 +267,7 @@ def split_al_pools(
         
     if filter_column is not None:        
         ds_potential_candidates_nrows = initial_subsample - n_noncandidates
-        print_err(f">> Getting hit cutoff from {sample_for_cutoff} / {ds_potential_candidates_nrows} rows")
+        print_err(f"[INFO] Getting hit cutoff from {sample_for_cutoff} / {ds_potential_candidates_nrows} rows")
         n_hits = int(np.ceil(hit_frac * n_test))
 
         hit_cutoff = _get_cutoff(
@@ -277,8 +277,8 @@ def split_al_pools(
             n_hits=n_hits,
             subsample=sample_for_cutoff
         )
-        print_err(f">>> Hit cutoff is {hit_cutoff:.2f}")
-        print_err(f">> Taking {n_hits} rows with {filter_column} < {hit_cutoff:.2f}")
+        print_err(f"[INFO] Hit cutoff is {hit_cutoff:.2f}")
+        print_err(f"[INFO] Taking {n_hits} rows with {filter_column} < {hit_cutoff:.2f}")
         ds_hits = (
             ds_potential_candidates
             # .with_format("numpy")

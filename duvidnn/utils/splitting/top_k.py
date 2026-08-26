@@ -50,7 +50,7 @@ def get_percentile(
     else:
         cutoff = digest.percentile(p)
     k = np.ceil(count * p / 100.).astype(int)
-    print_err(f"Approx cutoff={cutoff:.4f}; need top {k} of {count} examples")
+    print_err(f"[INFO] Approx cutoff={cutoff:.4f}; need top {k} of {count} examples")
 
     top_col = f"{column}_top_{int(p)}_pc"
     if isinstance(ds, Dataset):
@@ -90,7 +90,7 @@ def get_percentile(
     to_dataset_p = partial(to_dataset, batch_size=batch_size, cache=cache)
     maybes = to_dataset_p(ds_tfm[0], nrows=dataset_len(ds_tfm[0])).sort(column, reverse=reverse)
 
-    print_err(f"Confidently tagged {n_definitely_true} {column=}, {p=}; need {n_required_from_maybe} / {maybes.num_rows} to make {k} total.")
+    print_err(f"[INFO] Confidently tagged {n_definitely_true} {column=}, {p=}; need {n_required_from_maybe} / {maybes.num_rows} to make {k} total.")
     maybes_to_true = maybes.take(n_required_from_maybe).map(lambda x: {top_col: 1}, desc="Tagging maybes as True")
     try:
         maybes_to_false = maybes.skip(n_required_from_maybe).map(lambda x: {top_col: -1}, desc="Tagging maybes as False")

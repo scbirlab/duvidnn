@@ -255,7 +255,7 @@ class DataMixinBase(ABC):
 
         if cache is None:
             cache = cls._default_cache
-            print_err(f"Defaulting to cache: {cache}")
+            print_err(f"[INFO] Defaulting to cache: {cache}")
         if not isinstance(dataframe, DataFrame) and isinstance(dataframe, Mapping):
             dataframe = DataFrame(dataframe)
 
@@ -266,10 +266,10 @@ class DataMixinBase(ABC):
             os.makedirs(df_temp_dir)
 
         if not os.path.exists(df_temp_file):
-            print_err(f"Caching dataframe at {df_temp_file}")
+            print_err(f"[INFO] Caching dataframe at {df_temp_file}")
             dataframe.to_csv(df_temp_file, index=False)
 
-        print_err(f"Reloading dataframe from {df_temp_file}")
+        print_err(f"[INFO] Reloading dataframe from {df_temp_file}")
         return cls._load_from_csv(
             df_temp_file, 
             cache=cache,
@@ -558,8 +558,6 @@ class DataMixinBase(ABC):
                 tuple(_f.output_column for _f in f) 
                 for f in featurizers
             )
-        print_err(f"{input_columns=}")
-        print_err(f"{concat_label=}")
         concat_kwargs = {
             "inputs": concat_label[:-1] if n_context > 0 else concat_label,
             "context": concat_label[-1] if n_context > 0 else tuple(),
@@ -568,7 +566,6 @@ class DataMixinBase(ABC):
             "_out_key": self._out_key,
             "_context_key": self._context_key,
         }
-        print_err(f"{concat_kwargs=}")
         processed_dataset = (
             input_dataset
             .with_format(None)  # guard against tensors
@@ -580,7 +577,6 @@ class DataMixinBase(ABC):
                 desc="Collating features and labels",
             )
         )
-        print_err(f"{processed_dataset=}")
         processed_dataset = (
             processed_dataset
             .select_columns(
@@ -639,7 +635,6 @@ class DataMixinBase(ABC):
             cache=cache,
             **preprocessing_args,
         )
-        print_err(f"{ingest_output=}")
         (
             self._input_cols,
             self._use_context,
@@ -705,7 +700,7 @@ class ChemMixinBase(DataMixinBase):
             extra_featurizers is None or len(extra_featurizers) == 0,
             not _allow_no_features,
         ]):
-            print_err("No featurizers defined for fingerprint. Setting `use_fp=True`.")
+            print_err("[WARN] No featurizers defined for fingerprint. Setting `use_fp=True`.")
             use_fp = True
         if use_fp:
             featurizer.append(Preprocessor(

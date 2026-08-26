@@ -82,7 +82,7 @@ def load_checkpoint_file(
             filename_pattern = filename
         with TemporaryDirectory() as tmpdirname:
             try:
-                print_err(f"Looking up: {checkpoint} :: {filename}")
+                print_err(f"[INFO] Looking up: {checkpoint} :: {filename}")
                 snapshot_download(
                     repo_id=checkpoint,
                     allow_patterns=filename_pattern,
@@ -91,7 +91,7 @@ def load_checkpoint_file(
                     *args, **kwargs
                 )
             except Exception as e:
-                print_err(e)
+                print_err("[ERROR]", e)
                 if none_on_error:
                     return None
                 else:

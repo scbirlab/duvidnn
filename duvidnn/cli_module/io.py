@@ -23,7 +23,7 @@ def _resolve_and_slice_data(
     skip = start or 0
     take = (end or nrows) - skip
     if (take - skip) < nrows:
-        print_err(f"INFO: Reading dataset from row {skip} to row {take + skip} / {nrows}.")
+        print_err(f"[INFO] Reading dataset from row {skip} to row {take + skip} / {nrows}.")
     return candidates_ds.skip(skip).take(take)
 
 
@@ -31,7 +31,7 @@ def _save_dataset(
     dataset,
     output: str
 ) -> None:
-    print_err("INFO: Saving dataset:\n" + str(dataset) + "\n" + f"at {output} as", end=" ")
+    print_err("[INFO] Saving dataset:\n" + str(dataset) + "\n" + f"at {output} as", end=" ")
     if output.endswith((".csv", ".csv.gz", ".tsv", ".tsv.gz", ".txt", ".txt.gz")):
         print_err("CSV.")
         dataset.to_csv(
@@ -54,5 +54,5 @@ def _save_dataset(
     else:
         print_err("Hugging Face dataset.")
         dataset.save_to_disk(output + ".hf")
-        print_err(f"WARNING: Unsure what format to save as for filename {output}. Defaulted to Hugging Face dataset.")
+        print_err(f"[WARN] Unsure what format to save as for filename {output}. Defaulted to Hugging Face dataset.")
     return None

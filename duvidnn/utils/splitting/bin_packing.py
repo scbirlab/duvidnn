@@ -67,7 +67,7 @@ def pack_bins(
     for example in tqdm(ds.iter(batch_size=batch_size), desc="Finding unique groups"):
         sizes.update(example[group_column])
 
-    print_err(f"There are {len(sizes)} unique groups.")
+    print_err(f"[INFO] There are {len(sizes)} unique groups.")
     
     group_to_split = {}
     split_target_sizes = {

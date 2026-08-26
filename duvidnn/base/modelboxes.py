@@ -42,7 +42,7 @@ class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
         self,
         checkpoint: str
     ) -> None:
-        print_err(f"Saving checkpoint at {checkpoint}")
+        print_err(f"[INFO] Saving checkpoint at {checkpoint}")
         if not os.path.exists(checkpoint):
             os.makedirs(checkpoint)
         self.save_data_checkpoint(checkpoint)
@@ -62,7 +62,7 @@ class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
         cache_dir: Optional[str] = None
     ) -> None:
         cache_dir = cache_dir or CACHE_DIR
-        print_err(f"Loading checkpoint from {checkpoint}")
+        print_err(f"[INFO] Loading checkpoint from {checkpoint}")
         self._model_config = load_checkpoint_file(
             checkpoint, 
             self.__class__._model_config_filename, 
@@ -308,7 +308,6 @@ class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
             "_in_key": _in_key,
             "_prediction_column": _prediction_column,
         }
-        print_err("!!!!!!!!!!!!!!!!\n!!!!!!!!!", f"{prediction_kwargs=}")
         
         predictions = data.map(
             self._predict,

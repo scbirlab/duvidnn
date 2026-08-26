@@ -53,7 +53,7 @@ def _percentile(args: Namespace) -> None:
         from carabiner.mpl import figsaver
         from ..utils.splitting.plot import plot_chemical_splits
 
-        print_err(f"Plotting top percentiles...")
+        print_err(f"[INFO] Plotting top percentiles...")
 
         (fig, axes), df = plot_chemical_splits(
             ds=ds,
