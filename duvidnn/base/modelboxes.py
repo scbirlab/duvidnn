@@ -46,8 +46,11 @@ class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
     ) -> None:
         print_err(f"[INFO] Saving checkpoint at {checkpoint}")
         os.makedirs(checkpoint, exist_ok=True)
-        if save_data:
-            self.save_data_checkpoint(checkpoint)
+        self.save_data_checkpoint(
+            checkpoint,
+            save_data=save_data,
+        )
+
         init_kwargs = {
             "class_name": self.__class__.class_name,
         }
@@ -77,9 +80,9 @@ class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
             cache_dir=cache_dir,
         )
         self.load_data_checkpoint(checkpoint, cache_dir=cache_dir)
-        if self.training_data is not None:
-            self.model = self.create_model()
-            self.load_weights(checkpoint, cache_dir=cache_dir)
+
+        self.model = self.create_model()
+        self.load_weights(checkpoint, cache_dir=cache_dir)
         return None
 
     @abstractmethod
