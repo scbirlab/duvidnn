@@ -65,7 +65,7 @@ class ChempropBase(Module, ABC):
 
         if self.batch_norm:
             # TODO: fix this issue.
-            print_err("Warning: using batch norm, which will not allow calculation of doubtscore or information sensitivity.")
+            print_err("[WARN] Using batch norm, which will not allow calculation of doubtscore or information sensitivity.")
 
     def build_model(self) -> Module:
         message_passing_layer = BondMessagePassing(

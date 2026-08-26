@@ -16,7 +16,7 @@ from .information import DoubtMixinBase
 from .preprocessing import Preprocessor
 from .training import ModelTrainerBase
 from .typing import DataLike, FeatureLike, StrOrIterableOfStr
-from ..checkpoint_utils import save_json, _load_json
+from ..checkpoint_utils import save_json, _load_json, load_checkpoint_file
 from ..utils.package_data import CACHE_DIR
 
 class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
@@ -42,7 +42,7 @@ class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
         self,
         checkpoint: str
     ) -> None:
-        print_err(f"Saving checkpoint at {checkpoint}")
+        print_err(f"[INFO] Saving checkpoint at {checkpoint}")
         if not os.path.exists(checkpoint):
             os.makedirs(checkpoint)
         self.save_data_checkpoint(checkpoint)
@@ -62,10 +62,19 @@ class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
         cache_dir: Optional[str] = None
     ) -> None:
         cache_dir = cache_dir or CACHE_DIR
-        print_err(f"Loading checkpoint from {checkpoint}")
+        print_err(f"[INFO] Loading checkpoint from {checkpoint}")
+        self._model_config = load_checkpoint_file(
+            checkpoint, 
+            self.__class__._model_config_filename, 
+            cache_dir=cache_dir,
+        )
+        self._special_args = load_checkpoint_file(
+            checkpoint, 
+            self.__class__._special_args_filename, 
+            allow_empty=True,
+            cache_dir=cache_dir,
+        )
         self.load_data_checkpoint(checkpoint, cache_dir=cache_dir)
-        self._model_config = _load_json(checkpoint, self.__class__._model_config_filename)
-        self._special_args = _load_json(checkpoint, self.__class__._special_args_filename)
         if self.training_data is not None:
             self.model = self.create_model()
             self.load_weights(checkpoint, cache_dir=cache_dir)
@@ -105,7 +114,6 @@ class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
                 cache=cache,
                 **preprocessing_args,
             )
-        print(f">>> {dataset}")
         essential_keys = set([self._out_key])
         missing_keys = sorted(essential_keys - set(dataset.column_names))
         if len([col for col in dataset.column_names if col.startswith(self._in_key)]) == 0:
@@ -254,6 +262,7 @@ class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
         aggregator: Optional[Union[str, AggFunction]] = None,
         cache: Optional[str] = None,
         agg_kwargs: Optional[Mapping] = None,
+        one_column_input: Optional[str] = None,
         _prediction_column: Optional[str] = None,
         **kwargs
     ) -> Dataset:
@@ -273,22 +282,35 @@ class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
             data=data,
             batch_size=batch_size,
             cache=cache,
+            one_column_input=one_column_input,
             **kwargs
         )
             
         self.eval_mode()
-        _in_key = tuple(sorted(
-            col for col in data.column_names 
-            if col.startswith(self.__class__._in_key)
-        ))
+        if one_column_input is None:
+            _in_key = tuple(sorted(
+                col for col in data.column_names 
+                if "/inputs" in col and not col.endswith("context")
+            )) + tuple(sorted(
+                col for col in data.column_names 
+                if col.endswith("/inputs:context")
+            ))
+        else:
+            _in_key = (one_column_input,)
+        
+        if len(_in_key) == 0:  # should never happen
+            raise AttributeError(f"Model input for prediction is empty: {_in_key=}. Dataset columns are {data.column_names=}. Other parameters: {one_column_input=}, {kwargs=}")
+
+        prediction_kwargs = {
+            "model": self.model,
+            "detacher_fn": self.detach_tensor,
+            "_in_key": _in_key,
+            "_prediction_column": _prediction_column,
+        }
+        
         predictions = data.map(
             self._predict,
-            fn_kwargs={
-                "model": self.model,
-                "detacher_fn": self.detach_tensor,
-                "_in_key": _in_key,
-                "_prediction_column": _prediction_column,
-            },
+            fn_kwargs=prediction_kwargs,
             batched=True, 
             batch_size=batch_size, 
             desc="Predicting",
@@ -356,7 +378,6 @@ class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
         preds = predictions[eval_prediction_col]
         # if len(y_vals.shape) == 1 and len(preds.shape) == 2:
         #     y_vals = y_vals[...,None]
-        print(y_vals[:].shape, preds[:].shape)
         if isinstance(metrics, Mapping):
             metrics = {
                 name: asarray(metric(preds, y_vals)).tolist()
@@ -414,6 +435,11 @@ class ModelBoxWithVarianceBase(ModelBoxBase):
 
 class FingerprintModelBoxBase(ChemMixinBase, ModelBoxWithVarianceBase):
 
+    _default_preprocessing_args = {
+        "structure_column": None,
+        "input_representation": None,
+    }
+
     def __init__(
         self, 
         use_fp: bool = False,
@@ -428,10 +454,6 @@ class FingerprintModelBoxBase(ChemMixinBase, ModelBoxWithVarianceBase):
             if isinstance(extra_featurizers, (str, Mapping)):
                 extra_featurizers = [extra_featurizers]
         self.extra_featurizers = extra_featurizers
-        self._default_preprocessing_args = {
-            "structure_column": None,
-            "input_representation": None,
-        }
         self._model_config = kwargs
 
     def load_training_data(
@@ -457,7 +479,6 @@ class FingerprintModelBoxBase(ChemMixinBase, ModelBoxWithVarianceBase):
             new_features = [self._resolve_featurizers(f) for f in features]
             featurizer.extend(new_features[0])
             featurizer = [featurizer] + new_features[1:]
-        print(f">>> {featurizer=}")
         return super().load_training_data(
             features=[self._resolve_featurizers(f) for f in featurizer],
             **kwargs,
@@ -548,17 +569,16 @@ class ChempropModelBoxBase(FingerprintModelBoxBase):
         use_fp: bool = False,
         use_2d: bool = False,
         extra_featurizers: Optional[FeatureLike] = None,
+        _special_args: Mapping | None = None,
         **kwargs
     ):
         super().__init__(
             use_fp=use_fp,
             use_2d=use_2d,
-            extra_featurizers=extra_featurizers
+            extra_featurizers=extra_featurizers,
         )
         self._model_config = kwargs
-        self._special_args = {
-            "chemprop_input_column": None,
-        }
+        self._special_args = _special_args or {}
 
     def load_training_data(
         self,
@@ -576,7 +596,6 @@ class ChempropModelBoxBase(FingerprintModelBoxBase):
         if features is not None:
             featurizer = [featurizer] + features
             featurizer = [_f for f in featurizer for _f in f]
-        print(f"!!!! {featurizer=}")
         featurizer = self._resolve_featurizers(featurizer)
         chemprop_feat = {
             "name": "chemprop-mol",
@@ -591,7 +610,7 @@ class ChempropModelBoxBase(FingerprintModelBoxBase):
         self._special_args["chemprop_input_column"] = Preprocessor.from_dict(chemprop_feat).output_column
         featurizer.append(chemprop_feat)
         featurizer = self._resolve_featurizers(featurizer)
-        super().load_training_data(
+        return super().load_training_data(
             labels=labels,
             features=[featurizer],
             _run_featurizer_constructor_first=False,
@@ -601,7 +620,9 @@ class ChempropModelBoxBase(FingerprintModelBoxBase):
     def _ingest_data(
         self, *args, **kwargs
     ):
+        if len(self._special_args) == 0 or "chemprop_input_column" not in self._special_args:
+            raise ValueError(f"Chemprop column is not set! {self._special_args=}")
+        kwargs |= {"one_column_input": self._special_args["chemprop_input_column"]}
         return super()._ingest_data(
             *args, **kwargs,
-            one_column_input=self._special_args["chemprop_input_column"],
         )

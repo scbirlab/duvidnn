@@ -39,7 +39,7 @@ def _load_modelbox_training_data(
             # command-line takes precedent:
             load_data_args["structure_column"] = overrides.get("structure") or modelbox._default_preprocessing_args.get("structure_column")
             if load_data_args["structure_column"] is None:
-                print_err(f"Structure column not provided, falling back to {STRUCTURE_COLUMN_DEFAULT}.")
+                print_err(f"[WARN] Structure column not provided, falling back to {STRUCTURE_COLUMN_DEFAULT}.")
                 load_data_args["structure_column"] = STRUCTURE_COLUMN_DEFAULT
         pprint_dict(
             load_data_args,

@@ -108,7 +108,7 @@ def _predict(args: Namespace) -> None:
             )
             preprocessing_args["_extra_cols_to_keep"].append(modelbox.tanimoto_column)
         else:
-            print_err(f"Cannot calculate Tanimoto for non-chemical modelbox from {args.checkpoint}")
+            print_err(f"[WARN] Cannot calculate Tanimoto for non-chemical modelbox from {args.checkpoint}")
     if args.doubtscore:
         modelbox.model.set_model(0)
         candidates_ds = modelbox.doubtscore(

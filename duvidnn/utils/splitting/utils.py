@@ -32,7 +32,7 @@ def dataset_len(ds: Union[Dataset, IterableDataset]):
     if isinstance(ds, Dataset):
         return ds.num_rows
     elif isinstance(ds, IterableDataset):
-        print_err("Looping through dataset to count rows: ", end="")
+        print_err("[INFO] Looping through dataset to count rows: ", end="")
         for i, _ in enumerate(tqdm(ds)):
             pass
         return i

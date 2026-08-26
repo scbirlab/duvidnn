@@ -255,7 +255,7 @@ class DataMixinBase(ABC):
 
         if cache is None:
             cache = cls._default_cache
-            print_err(f"Defaulting to cache: {cache}")
+            print_err(f"[INFO] Defaulting to cache: {cache}")
         if not isinstance(dataframe, DataFrame) and isinstance(dataframe, Mapping):
             dataframe = DataFrame(dataframe)
 
@@ -266,10 +266,10 @@ class DataMixinBase(ABC):
             os.makedirs(df_temp_dir)
 
         if not os.path.exists(df_temp_file):
-            print_err(f"Caching dataframe at {df_temp_file}")
+            print_err(f"[INFO] Caching dataframe at {df_temp_file}")
             dataframe.to_csv(df_temp_file, index=False)
 
-        print_err(f"Reloading dataframe from {df_temp_file}")
+        print_err(f"[INFO] Reloading dataframe from {df_temp_file}")
         return cls._load_from_csv(
             df_temp_file, 
             cache=cache,
@@ -490,7 +490,6 @@ class DataMixinBase(ABC):
             n_context = 0
 
         dataset = self._resolve_data(data, cache=cache)
-        print(f">>> {features=}")
         featurizers = [self._resolve_featurizers(f) for f in features]
         featurizers_dicts = tuple(tuple(_f.to_dict() for _f in f) for f in featurizers)
         input_columns = [
@@ -540,9 +539,12 @@ class DataMixinBase(ABC):
                 batch_size=batch_size,
                 desc="Filling NaN values",
             )
+            .with_format(None)  # guard against tensors
             .map(
                 self._featurize,
-                fn_kwargs={"featurizers": tuple(item for f in featurizers_dicts for item in f)},
+                fn_kwargs={
+                    "featurizers": tuple(item for f in featurizers_dicts for item in f)
+                },
                 batched=True,
                 batch_size=batch_size,
                 desc="Featurizing",
@@ -555,21 +557,20 @@ class DataMixinBase(ABC):
                 tuple(_f.output_column for _f in f) 
                 for f in featurizers
             )
-        print_err(f"{input_columns=}")
-        print_err(f"{concat_label=}")
+        concat_kwargs = {
+            "inputs": concat_label[:-1] if n_context > 0 else concat_label,
+            "context": concat_label[-1] if n_context > 0 else tuple(),
+            "labels": labels,
+            "_in_key": self._in_key,
+            "_out_key": self._out_key,
+            "_context_key": self._context_key,
+        }
         processed_dataset = (
             input_dataset
             .with_format(None)  # guard against tensors
             .map(
                 self._concat_features,
-                fn_kwargs={
-                    "inputs": concat_label[:-1] if n_context > 0 else concat_label,
-                    "context": concat_label[-1] if n_context > 0 else tuple(),
-                    "labels": labels,
-                    "_in_key": self._in_key,
-                    "_out_key": self._out_key,
-                    "_context_key": self._context_key,
-                },
+                fn_kwargs=concat_kwargs,
                 batched=True,
                 batch_size=batch_size,
                 desc="Collating features and labels",
@@ -582,7 +583,7 @@ class DataMixinBase(ABC):
                 + labels
                 + [
                     c for c in processed_dataset.column_names 
-                    if c.startswith(f"{self._in_key}")
+                    if c.startswith((f"{self._in_key}", f"{self._context_key}"))
                 ]
                 + [self._out_key]
             )
@@ -633,7 +634,6 @@ class DataMixinBase(ABC):
             cache=cache,
             **preprocessing_args,
         )
-        print_err(f"{ingest_output=}")
         (
             self._input_cols,
             self._use_context,
@@ -699,7 +699,7 @@ class ChemMixinBase(DataMixinBase):
             extra_featurizers is None or len(extra_featurizers) == 0,
             not _allow_no_features,
         ]):
-            print_err("No featurizers defined for fingerprint. Setting `use_fp=True`.")
+            print_err("[WARN] No featurizers defined for fingerprint. Setting `use_fp=True`.")
             use_fp = True
         if use_fp:
             featurizer.append(Preprocessor(

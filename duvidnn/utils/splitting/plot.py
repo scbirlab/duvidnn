@@ -70,7 +70,7 @@ def plot_chemical_splits(
     cols_to_plot = sorted(set(descriptors + additional_columns + split_columns))
 
     print_err(
-        f"Plotting UMAP embedding with maximum {sample_size} rows, coloring by", 
+        f"[INFO] Plotting UMAP embedding with maximum {sample_size} rows, coloring by", 
         ", ".join(cols_to_plot)
     )
 
@@ -184,7 +184,7 @@ def plot_chemical_splits(
                 try:
                     fig.colorbar(sc, ax=ax)
                 except ValueError as e:
-                    print_err(e)
+                    print_err("[WARN]", e)
         ax.set(title=col)
         ax.set_axis_off()
     

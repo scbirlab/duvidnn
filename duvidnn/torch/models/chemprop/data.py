@@ -3,6 +3,7 @@
 from typing import Iterable, Mapping, Optional, Union
 from dataclasses import dataclass, field, InitVar
 
+from carabiner import print_err
 from chemprop.data import Datum, MolGraph, TrainingBatch
 import numpy as np
 import torch
@@ -135,8 +136,7 @@ def _collate_training_batch_for_forward(
                 try:
                     new_val = MolGraph(**val)
                 except TypeError as e:
-                    print(f">>>> {new_val=}")
-                    print(batch)
+                    print_err(f"[ERROR] {val=}\n{batch=}")
                     raise e
                 
             else:

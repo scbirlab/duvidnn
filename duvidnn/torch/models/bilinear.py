@@ -195,7 +195,7 @@ class _TorchBilinearBase(Module):
             x = [x]
         elif isinstance(x, tuple):
             x = list(x)
-        if self.n_context is not None:
+        if self.n_context is not None and len(x) > 0:
             context_x = x[-1]  # context is the final input
             x = x[:-1]
         else:
