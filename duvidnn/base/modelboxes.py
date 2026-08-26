@@ -291,7 +291,7 @@ class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
         if one_column_input is None:
             _in_key = tuple(sorted(
                 col for col in data.column_names 
-                if "/inputs:0" in col
+                if "/inputs" in col and not col.endswith("context")
             )) + tuple(sorted(
                 col for col in data.column_names 
                 if col.endswith("/inputs:context")
@@ -299,14 +299,20 @@ class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
         else:
             _in_key = (one_column_input,)
         
+        if len(_in_key) == 0:  # should never happen
+            raise AttributeError(f"Model input for prediction is empty: {_in_key=}. Dataset columns are {data.column_names=}. Other parameters: {one_column_input=}, {kwargs=}")
+
+        prediction_kwargs = {
+            "model": self.model,
+            "detacher_fn": self.detach_tensor,
+            "_in_key": _in_key,
+            "_prediction_column": _prediction_column,
+        }
+        print_err("!!!!!!!!!!!!!!!!\n!!!!!!!!!", f"{prediction_kwargs=}")
+        
         predictions = data.map(
             self._predict,
-            fn_kwargs={
-                "model": self.model,
-                "detacher_fn": self.detach_tensor,
-                "_in_key": _in_key,
-                "_prediction_column": _prediction_column,
-            },
+            fn_kwargs=prediction_kwargs,
             batched=True, 
             batch_size=batch_size, 
             desc="Predicting",
@@ -432,6 +438,11 @@ class ModelBoxWithVarianceBase(ModelBoxBase):
 
 class FingerprintModelBoxBase(ChemMixinBase, ModelBoxWithVarianceBase):
 
+    _default_preprocessing_args = {
+        "structure_column": None,
+        "input_representation": None,
+    }
+
     def __init__(
         self, 
         use_fp: bool = False,
@@ -446,10 +457,6 @@ class FingerprintModelBoxBase(ChemMixinBase, ModelBoxWithVarianceBase):
             if isinstance(extra_featurizers, (str, Mapping)):
                 extra_featurizers = [extra_featurizers]
         self.extra_featurizers = extra_featurizers
-        self._default_preprocessing_args = {
-            "structure_column": None,
-            "input_representation": None,
-        }
         self._model_config = kwargs
 
     def load_training_data(
@@ -566,17 +573,16 @@ class ChempropModelBoxBase(FingerprintModelBoxBase):
         use_fp: bool = False,
         use_2d: bool = False,
         extra_featurizers: Optional[FeatureLike] = None,
+        _special_args: Mapping | None = None,
         **kwargs
     ):
         super().__init__(
             use_fp=use_fp,
             use_2d=use_2d,
-            extra_featurizers=extra_featurizers
+            extra_featurizers=extra_featurizers,
         )
         self._model_config = kwargs
-        self._special_args = {
-            "chemprop_input_column": None,
-        }
+        self._special_args = _special_args or {}
 
     def load_training_data(
         self,
@@ -609,7 +615,7 @@ class ChempropModelBoxBase(FingerprintModelBoxBase):
         self._special_args["chemprop_input_column"] = Preprocessor.from_dict(chemprop_feat).output_column
         featurizer.append(chemprop_feat)
         featurizer = self._resolve_featurizers(featurizer)
-        super().load_training_data(
+        return super().load_training_data(
             labels=labels,
             features=[featurizer],
             _run_featurizer_constructor_first=False,
@@ -619,7 +625,9 @@ class ChempropModelBoxBase(FingerprintModelBoxBase):
     def _ingest_data(
         self, *args, **kwargs
     ):
+        if len(self._special_args) == 0 or "chemprop_input_column" not in self._special_args:
+            raise ValueError(f"Chemprop column is not set! {self._special_args=}")
+        kwargs |= {"one_column_input": self._special_args["chemprop_input_column"]}
         return super()._ingest_data(
             *args, **kwargs,
-            one_column_input=self._special_args["chemprop_input_column"],
         )

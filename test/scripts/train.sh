@@ -34,8 +34,8 @@ do
             -i $i \
             --output "$OUTPUT/$class-$i" \
             --cache "$CACHE" \
-            --epochs 2 \
-            -z 10 \
+            --epochs 1 \
+            -z 3 \
             --learning-rate 0.001 \
             --descriptors \
             --fp

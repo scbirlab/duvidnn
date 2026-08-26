@@ -135,7 +135,7 @@ def _collate_training_batch_for_forward(
                 try:
                     new_val = MolGraph(**val)
                 except TypeError as e:
-                    print(f">>>> {new_val=}")
+                    print(f">>>> {val=}")
                     print(batch)
                     raise e
                 

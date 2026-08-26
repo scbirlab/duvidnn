@@ -335,7 +335,7 @@ class DoubtMixinBase(ABC):
             "_out_key": score_type,
             "device": self.device,
         } | extra_kwargs
-        score = candidates.map(
+        score = candidates.with_format(None).map(
             map_fn,
             fn_kwargs=fn_kwargs,
             batched=True, 
