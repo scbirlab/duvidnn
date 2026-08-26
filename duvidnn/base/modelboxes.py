@@ -384,9 +384,12 @@ class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
         # if len(y_vals.shape) == 1 and len(preds.shape) == 2:
         #     y_vals = y_vals[...,None]
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
         print(y_vals[:].shape, preds[:].shape)
 >>>>>>> 2c0ec40 (MAke caching more robust)
+=======
+>>>>>>> 53be2e3 (Tidy up print statements)
         if isinstance(metrics, Mapping):
             metrics = {
                 name: asarray(metric(preds, y_vals)).tolist()
@@ -500,7 +503,10 @@ class FingerprintModelBoxBase(ChemMixinBase, ModelBoxWithVarianceBase):
             featurizer.extend(new_features[0])
             featurizer = [featurizer] + new_features[1:]
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
+=======
+>>>>>>> 53be2e3 (Tidy up print statements)
         if not isinstance(featurizer, (list, tuple)):
             featurizer = [featurizer]
         else:
@@ -508,7 +514,12 @@ class FingerprintModelBoxBase(ChemMixinBase, ModelBoxWithVarianceBase):
                 featurizer = [f if isinstance(f, (list, tuple)) else [f] for f in featurizer]
 
         print(f">>> {featurizer=}")
+<<<<<<< HEAD
 >>>>>>> c2bc129 (Bug fixes and tidy up)
+=======
+=======
+>>>>>>> b00e0d8 (Tidy up print statements)
+>>>>>>> 53be2e3 (Tidy up print statements)
         return super().load_training_data(
             features=[self._resolve_featurizers(f) for f in featurizer],
             **kwargs,
