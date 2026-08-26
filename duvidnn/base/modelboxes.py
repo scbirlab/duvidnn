@@ -291,7 +291,7 @@ class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
         )
             
         self.eval_mode()
-<<<<<<< HEAD
+
         if one_column_input is None:
             _in_key = tuple(sorted(
                 col for col in data.column_names 
@@ -312,19 +312,6 @@ class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
             "_in_key": _in_key,
             "_prediction_column": _prediction_column,
         }
-<<<<<<< HEAD
-=======
-        _in_key = tuple(sorted(
-            col for col in data.column_names 
-            if "/inputs:0" in col
-        )) + tuple(sorted(
-            col for col in data.column_names 
-            if col.endswith("/inputs:context")
-        ))
->>>>>>> 2008aeb (Bug fixing)
-=======
-        print_err("!!!!!!!!!!!!!!!!\n!!!!!!!!!", f"{prediction_kwargs=}")
->>>>>>> 7a8463b (Fix chemprop round trip)
         
         predictions = data.map(
             self._predict,

@@ -621,7 +621,6 @@ class DataMixinBase(ABC):
                 desc="Collating features and labels",
             )
         )
-        print_err(f"{processed_dataset=}")
         processed_dataset = (
             processed_dataset
             .select_columns(
