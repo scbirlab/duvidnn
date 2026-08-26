@@ -120,7 +120,7 @@ class DataMixinBase(ABC):
             checkpoint, 
             filename="training-example.hf",
             callback="hf-dataset",
-            none_on_error=False,
+            none_on_error=True,  # compatible with older checkpoints
             cache_dir=cache_dir,
         )
 
@@ -215,7 +215,7 @@ class DataMixinBase(ABC):
         x: Mapping[str, ArrayLike],
         featurizers: Iterable[Mapping[str, Any]]
     ) -> Dict[str, np.ndarray]:
-
+        from .preprocessing.serializing import Preprocessor
         if not isinstance(featurizers, (list, tuple)):
             featurizers = [featurizers]
         for featurizer in featurizers:
@@ -319,6 +319,7 @@ class DataMixinBase(ABC):
         featurizer: FeatureLike,
         transformer_prefix: str
     ):
+        from .preprocessing.serializing import Preprocessor
         if isinstance(featurizer, str):
             if featurizer.endswith(".json"):
                 featurizer = Preprocessor.from_file(featurizer)
@@ -740,6 +741,7 @@ class ChemMixinBase(DataMixinBase):
         extra_featurizers: Optional[FeatureLike] = None,
         _allow_no_features: bool = False
     ) -> Iterable[Preprocessor]:
+        from .preprocessing.serializing import Preprocessor
         featurizer = []
         if all([
             not use_fp, 
@@ -848,6 +850,7 @@ class ChemMixinBase(DataMixinBase):
         """Get Tanimoto similarity of nearest training set data.
     
         """
+        from .preprocessing.serializing import Preprocessor
         cache = cache or self._default_cache
         if query_structure_column is None:
             query_structure_column = self._default_preprocessing_args["structure_column"]

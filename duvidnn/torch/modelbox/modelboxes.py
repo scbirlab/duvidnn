@@ -191,7 +191,15 @@ class ChempropModelBox(ChempropDataMixin, ChempropDoubtMixin, ChempropModelBoxBa
 
     def create_model(self, *args, **kwargs) -> ChempropEnsemble:
         self._model_config.update(kwargs)
-        input_example = self.training_example[self._in_key]
+        input_example_col = sorted([  # for backward compatibility
+            col for col in self.training_example.column_names 
+            if "input" in col and not col.endswith("context")
+        ])
+        if len(input_example_col) > 0:
+            input_example_col = input_example_col[0]
+        else:
+            raise AttributeError(f"No chemprop input column in training example! {self.training_example.column_names=}")
+        input_example = self.training_example[input_example_col]
         if input_example is not None:
             if input_example[0]["x_d"] is None:
                 self.input_shape = (0,)

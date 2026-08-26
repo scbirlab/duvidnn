@@ -41,14 +41,15 @@ class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
 
     def save_checkpoint(
         self,
-        checkpoint: str
+        checkpoint: str,
+        save_data: bool = False
     ) -> None:
         print_err(f"[INFO] Saving checkpoint at {checkpoint}")
-        if not os.path.exists(checkpoint):
-            os.makedirs(checkpoint)
-        self.save_data_checkpoint(checkpoint)
+        os.makedirs(checkpoint, exist_ok=True)
+        if save_data:
+            self.save_data_checkpoint(checkpoint)
         init_kwargs = {
-            "class_name": self.class_name,
+            "class_name": self.__class__.class_name,
         }
         init_kwargs.update(self._init_kwargs)
         save_json(init_kwargs, os.path.join(checkpoint, self.__class__._init_kwargs_filename))

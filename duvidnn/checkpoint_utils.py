@@ -105,7 +105,14 @@ def load_checkpoint_file(
                 else:
                     raise e
             else:
-                obj = callback(tmpdirname, filename)
+                try:
+                    obj = callback(tmpdirname, filename)
+                except FileNotFoundError as e:
+                    print_err("[ERROR]", e)
+                    if none_on_error:
+                        return None
+                    else:
+                        raise e
 
     if allow_empty or obj is not None:
         return obj
