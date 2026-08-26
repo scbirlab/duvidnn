@@ -39,8 +39,6 @@ jobs:
         pytest duvidnn --doctest-modules
         # run other tests
         pytest test/test_evaluation.py
-<<<<<<< HEAD
-=======
     - name: Test CLI bilinear model with fingerprints
       run: |
         bash test/scripts/train-hash-fp.sh
@@ -53,4 +51,3 @@ jobs:
     - name: Test CLI train/test
       run: |
         bash test/scripts/train.sh
->>>>>>> 9b9ce3b (Add logo)
