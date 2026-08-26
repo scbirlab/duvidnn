@@ -490,7 +490,6 @@ class DataMixinBase(ABC):
             n_context = 0
 
         dataset = self._resolve_data(data, cache=cache)
-        print(f">>> {features=}")
         featurizers = [self._resolve_featurizers(f) for f in features]
         featurizers_dicts = tuple(tuple(_f.to_dict() for _f in f) for f in featurizers)
         input_columns = [

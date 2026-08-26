@@ -129,9 +129,7 @@ def percentiles(
     }
     input_ds = ds
     for i, example in enumerate(tqdm(ds.iter(batch_size=batch_size), desc="Building quantile sketch")):
-        # print(example)
         for key, digest in digests.items():
-            # print(example[key])
             digest.batch_update(example[key])
     count = i * batch_size + len(example[key])
 

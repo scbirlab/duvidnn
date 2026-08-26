@@ -114,7 +114,6 @@ class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
                 cache=cache,
                 **preprocessing_args,
             )
-        print(f">>> {dataset}")
         essential_keys = set([self._out_key])
         missing_keys = sorted(essential_keys - set(dataset.column_names))
         if len([col for col in dataset.column_names if col.startswith(self._in_key)]) == 0:
@@ -379,7 +378,6 @@ class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
         preds = predictions[eval_prediction_col]
         # if len(y_vals.shape) == 1 and len(preds.shape) == 2:
         #     y_vals = y_vals[...,None]
-        print(y_vals[:].shape, preds[:].shape)
         if isinstance(metrics, Mapping):
             metrics = {
                 name: asarray(metric(preds, y_vals)).tolist()
@@ -481,7 +479,6 @@ class FingerprintModelBoxBase(ChemMixinBase, ModelBoxWithVarianceBase):
             new_features = [self._resolve_featurizers(f) for f in features]
             featurizer.extend(new_features[0])
             featurizer = [featurizer] + new_features[1:]
-        print(f">>> {featurizer=}")
         return super().load_training_data(
             features=[self._resolve_featurizers(f) for f in featurizer],
             **kwargs,
@@ -599,7 +596,6 @@ class ChempropModelBoxBase(FingerprintModelBoxBase):
         if features is not None:
             featurizer = [featurizer] + features
             featurizer = [_f for f in featurizer for _f in f]
-        print(f"!!!! {featurizer=}")
         featurizer = self._resolve_featurizers(featurizer)
         chemprop_feat = {
             "name": "chemprop-mol",
