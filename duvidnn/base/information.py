@@ -161,8 +161,19 @@ class DoubtMixinBase(ABC):
         
         grad_fns = tuple(f(model) for f in fn)
         _in_key = tuple(sorted(
-            col for col in dataset.column_names if col.startswith(self._in_key)
+            col for col in dataset.column_names 
+            if "/inputs" in col and not col.endswith("context")
+        )) + tuple(sorted(
+            col for col in dataset.column_names 
+            if col.endswith("/inputs:context")
         ))
+        _out_key = tuple(sorted(
+            col for col in dataset.column_names if "label" in col
+        ))
+        if len(_out_key) == 0:
+            raise AttributeError(f"No label columns in dataset: {dataset.column_names=}")
+        else:
+            _out_key = _out_key[0]
         dataset = (
             dataset
             .map(
@@ -170,7 +181,7 @@ class DoubtMixinBase(ABC):
                 fn_kwargs={
                     "grad_fns": grad_fns,
                     "_in_key": _in_key,
-                    "_out_key": self._out_key,
+                    "_out_key": _out_key,
                 },
                 batch_size=batch_size,
                 batched=True,
@@ -324,8 +335,11 @@ class DoubtMixinBase(ABC):
             param_hessian_fn = None            
         
         _in_key = tuple(sorted(
-            col for col in candidates.column_names
-            if col.startswith(self._in_key)
+            col for col in candidates.column_names 
+            if "/inputs" in col and not col.endswith("context")
+        )) + tuple(sorted(
+            col for col in candidates.column_names 
+            if col.endswith("/inputs:context")
         ))
         fn_kwargs = {
             "param_grad_fn": param_grad_fn, 
