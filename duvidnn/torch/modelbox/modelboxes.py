@@ -190,6 +190,7 @@ class TorchFingerprintModelBox(TorchChemMixin, FingerprintModelBoxBase, TorchMLP
 class ChempropModelBox(ChempropDataMixin, ChempropDoubtMixin, ChempropModelBoxBase, TorchFingerprintModelBox):
 
     def create_model(self, *args, **kwargs) -> ChempropEnsemble:
+        import numpy as np
         self._model_config.update(kwargs)
         input_example_col = sorted([  # for backward compatibility
             col for col in self.training_example.column_names 
