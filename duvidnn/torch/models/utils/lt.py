@@ -28,7 +28,8 @@ class LightningMixin(LightningModule):
         optimizer: Optional[Optimizer] = None, 
         learning_rate: float = .01,
         reduce_lr_on_plateau: bool = False,
-        reduce_lr_patience: int = 10
+        reduce_lr_patience: int = 10,
+        l1: float = 0.
     ) -> None:
         if issubclass(optimizer, Optimizer):
             self.optimizer = optimizer
@@ -43,6 +44,7 @@ class LightningMixin(LightningModule):
             raise KeyError(f"The model attribute '{model_attr}' does not exist!")
         self.reduce_lr_on_plateau = reduce_lr_on_plateau
         self.reduce_lr_patience = reduce_lr_patience
+        self.l1 = l1
         return None
 
     def get_loss(
@@ -69,6 +71,13 @@ class LightningMixin(LightningModule):
             on_step=False, on_epoch=True, prog_bar=True, 
             batch_size=batch[self._out_key].shape[-1],
         )
+        if self.l1 > 0. and hasattr(self, "l1_penalty"):
+            loss = loss + self.l1 * self.l1_penalty()
+            self.log(
+                'loss_l1', loss, 
+                on_step=False, on_epoch=True, prog_bar=False, 
+                batch_size=batch[self._out_key].shape[-1],
+            )
         return loss
 
     def validation_step(

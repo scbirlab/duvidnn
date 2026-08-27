@@ -10,6 +10,7 @@ from numpy import concatenate, ndarray
 from numpy.typing import ArrayLike
 
 from .aggregators import get_aggregator, AggFunction
+from .data import _DEFAULT_BATCH_SIZE
 from ..utils.package_data import CACHE_DIR
 
 
@@ -145,7 +146,7 @@ class DoubtMixinBase(ABC):
         dataset: Optional[Dataset] = None,
         hessian: bool = False, 
         last_layer_only: bool = False,
-        batch_size: int = 16,
+        batch_size: int = _DEFAULT_BATCH_SIZE,
         **kwargs
     ) -> Dataset:
         if dataset is None:  
@@ -160,8 +161,19 @@ class DoubtMixinBase(ABC):
         
         grad_fns = tuple(f(model) for f in fn)
         _in_key = tuple(sorted(
-            col for col in dataset.column_names if col.startswith(self._in_key)
+            col for col in dataset.column_names 
+            if "/inputs" in col and not col.endswith("context")
+        )) + tuple(sorted(
+            col for col in dataset.column_names 
+            if col.endswith("/inputs:context")
         ))
+        _out_key = tuple(sorted(
+            col for col in dataset.column_names if "label" in col
+        ))
+        if len(_out_key) == 0:
+            raise AttributeError(f"No label columns in dataset: {dataset.column_names=}")
+        else:
+            _out_key = _out_key[0]
         dataset = (
             dataset
             .map(
@@ -169,7 +181,7 @@ class DoubtMixinBase(ABC):
                 fn_kwargs={
                     "grad_fns": grad_fns,
                     "_in_key": _in_key,
-                    "_out_key": self._out_key,
+                    "_out_key": _out_key,
                 },
                 batch_size=batch_size,
                 batched=True,
@@ -274,7 +286,7 @@ class DoubtMixinBase(ABC):
         score_type: str,
         dataset: Dataset,
         candidates: Dataset,
-        batch_size: int = 16,
+        batch_size: int = _DEFAULT_BATCH_SIZE,
         model: Optional[Callable] = None,
         optimality_approximation: bool = False,
         last_layer_only: bool = False,  # TODO: implement
@@ -323,8 +335,11 @@ class DoubtMixinBase(ABC):
             param_hessian_fn = None            
         
         _in_key = tuple(sorted(
-            col for col in candidates.column_names
-            if col.startswith(self._in_key)
+            col for col in candidates.column_names 
+            if "/inputs" in col and not col.endswith("context")
+        )) + tuple(sorted(
+            col for col in candidates.column_names 
+            if col.endswith("/inputs:context")
         ))
         fn_kwargs = {
             "param_grad_fn": param_grad_fn, 
@@ -364,7 +379,7 @@ class DoubtMixinBase(ABC):
         context: Optional[str] = None,
         labels: Optional[str] = None,
         training_dataset: Optional[Dataset] = None,
-        batch_size: int = 16,
+        batch_size: int = _DEFAULT_BATCH_SIZE,
         preprocessing_args: Optional[Mapping] = None,
         cache: Optional[str] = None,
         **info_score_kwargs

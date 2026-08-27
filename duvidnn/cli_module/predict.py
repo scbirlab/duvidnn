@@ -28,7 +28,7 @@ def _predict(args: Namespace) -> None:
         os.makedirs(out_dir)
     common_args = {
         "batch_size": args.batch,
-        "cache": args.cache,
+        # "cache": args.cache,
     }
     candidates_ds = _resolve_and_slice_data(
         args.test,
@@ -85,6 +85,7 @@ def _predict(args: Namespace) -> None:
         aggregator="mean",
         features=features,
         context=context,
+        cache=args.cache,
         **preprocessing_args,
         **common_args,
     )
@@ -94,6 +95,7 @@ def _predict(args: Namespace) -> None:
             candidates=candidates_ds,
             features=features,
             context=context,
+            cache=args.cache,
             **preprocessing_args,
             **common_args,
         )
@@ -117,6 +119,7 @@ def _predict(args: Namespace) -> None:
             context=context,
             preprocessing_args=preprocessing_args,
             last_layer_only=args.last_layer,
+            cache=args.cache,
             **common_args,
         )
         preprocessing_args["_extra_cols_to_keep"].append("doubtscore")
@@ -134,6 +137,7 @@ def _predict(args: Namespace) -> None:
             approximator=args.approx,
             optimality_approximation=args.optimality,
             last_layer_only=args.last_layer,
+            cache=args.cache,
             **common_args,
             **extra_args,
         )

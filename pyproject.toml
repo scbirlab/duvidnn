@@ -1,6 +1,6 @@
 [project]
 name = "duvidnn"
-version = "0.0.3"
+version = "0.0.4"
 authors = [
   { name="Eachan Johnson", email="eachan.johnson@crick.ac.uk" },
 ]
@@ -39,6 +39,7 @@ dependencies = [
   "datasets>=3.5.0",
   "dill>=0.3.9",
   "duvida[torch]>=0.0.3.post1",
+  "filelock",
   "huggingface_hub",
   "numpy",
   "platformdirs>=4.4.0",
@@ -53,7 +54,7 @@ dependencies = [
 [project.optional-dependencies]
 transformers = ["torch>=2.4,<=2.9", "torchvision", "transformers"]
 chem = ["chemprop>=2.1.0", "schemist>=0.0.6", "scikit-learn>=1.7"]
-bio = ["vectome>=0.0.4"]
+bio = ["vectome>=0.0.6"]
 splits = ["umap-learn", "scipy", "schemist>=0.0.6", "tdigest>=0.5", "faiss-cpu>=1.11"]
 splits_gpu = ["umap-learn", "scipy", "schemist>=0.0.6", "tdigest>=0.5", "faiss-gpu"]
 dev = ["duvidnn[chem,bio,splits,transformers]", "pytest>=7.4", "flake8"]

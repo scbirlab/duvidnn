@@ -19,6 +19,7 @@ from .typing import DataLike, FeatureLike, StrOrIterableOfStr
 from ..checkpoint_utils import save_json, _load_json, load_checkpoint_file
 from ..utils.package_data import CACHE_DIR
 
+
 class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
 
     """Container class for models and their training datasets.
@@ -40,14 +41,18 @@ class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
 
     def save_checkpoint(
         self,
-        checkpoint: str
+        checkpoint: str,
+        save_data: bool = False
     ) -> None:
         print_err(f"[INFO] Saving checkpoint at {checkpoint}")
-        if not os.path.exists(checkpoint):
-            os.makedirs(checkpoint)
-        self.save_data_checkpoint(checkpoint)
+        os.makedirs(checkpoint, exist_ok=True)
+        self.save_data_checkpoint(
+            checkpoint,
+            save_data=save_data,
+        )
+
         init_kwargs = {
-            "class_name": self.class_name,
+            "class_name": self.__class__.class_name,
         }
         init_kwargs.update(self._init_kwargs)
         save_json(init_kwargs, os.path.join(checkpoint, self.__class__._init_kwargs_filename))
@@ -75,9 +80,9 @@ class ModelBoxBase(DataMixinBase, DoubtMixinBase, ABC):
             cache_dir=cache_dir,
         )
         self.load_data_checkpoint(checkpoint, cache_dir=cache_dir)
-        if self.training_data is not None:
-            self.model = self.create_model()
-            self.load_weights(checkpoint, cache_dir=cache_dir)
+
+        self.model = self.create_model()
+        self.load_weights(checkpoint, cache_dir=cache_dir)
         return None
 
     @abstractmethod
