@@ -850,6 +850,13 @@ class ChemMixinBase(DataMixinBase):
         """Get Tanimoto similarity of nearest training set data.
     
         """
+        
+        if self._input_training_data is None:
+            raise AttributeError(
+                "Tanimoto similarity requires the training reference data. "
+                "Train checkpoints with `duvidnn train --save-data`, "
+                "or load training data before calling `tanimoto_nn()`."
+            )
         from .preprocessing.serializing import Preprocessor
         cache = cache or self._default_cache
         if query_structure_column is None:
