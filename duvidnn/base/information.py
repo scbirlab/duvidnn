@@ -76,9 +76,19 @@ class DoubtMixinBase(ABC):
     ) -> Union[None, Dict[str, ndarray]]:
         n = len(x)
         if n > 0:
-            total_size = reduce(self._add_size, x)
-            total_value = reduce(self._add_values, x)
-            return {key: (val / total_size[key]) for key, val in total_value.items()}
+            total_size = {
+                key: sum(self._get_shape(d[key])[axis] for d in x)
+                for key in x[0]
+            }
+            total_value = {
+                key: sum(d[key] for d in x)
+                for key in x[0]
+            }
+
+            return {
+                key: total_value[key] / total_size[key]
+                for key in total_value
+            }
         else:
             return None
 
@@ -311,6 +321,7 @@ class DoubtMixinBase(ABC):
         use_param_hessian = (use_hessian and not optimality_approximation)
         fisher_score_and_info = self._information_scores(
             model=model,
+            dataset=dataset,
             hessian=use_hessian,
             last_layer_only=last_layer_only,
             batch_size=batch_size, 
@@ -390,6 +401,16 @@ class DoubtMixinBase(ABC):
             preprocessing_args = {}
         if training_dataset is None:  
             dataset = self._check_training_data()
+        else:
+            dataset = self._prepare_data(
+                data=training_dataset,
+                features=features,
+                context=context,
+                labels=labels,
+                batch_size=batch_size,
+                cache=cache,
+                **preprocessing_args,
+            )
 
         if hasattr(self, "_prepare_data"):
             candidates = self._prepare_data(
@@ -399,7 +420,7 @@ class DoubtMixinBase(ABC):
                 labels=labels,
                 batch_size=batch_size,
                 cache=cache,
-                **preprocessing_args
+                **preprocessing_args,
             )
             
         return self._get_info_score(
