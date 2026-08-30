@@ -1,14 +1,9 @@
-"""Tests for declarative model construction."""
-
+from aspect.collate.chemprop import chemprop_collate
+from jsonargparse import ArgumentParser
 from torch import nn
 
-from aspect.collate.chemprop import chemprop_collate
-
-from jsonargparse import ArgumentParser
-
-from duvidnn.models.chemprop import ChempropEncoder
-from duvidnn.models.composition import TwoTower
-from duvidnn.models.mlp import MLP
+from duvidnn.invoke import ModelInvoker
+from duvidnn.mapping import ColumnMap
 
 from utils.data import _make_chemprop_rows, _make_vectome_rows
 
@@ -42,35 +37,42 @@ CONFIG = {
             "merge": "concat",
         },
     },
+    "column_map": {
+        "inputs": {
+            "left": "chemprop",
+            "right": "vectome",
+        },
+        "target": "mic",
+    },
 }
 
-def test_construct_two_tower_from_config():
+
+def test_construct_model_and_mapping_from_config():
     parser = ArgumentParser()
 
     parser.add_subclass_arguments(
         nn.Module,
         "model",
     )
-
+    parser.add_class_arguments(
+        ColumnMap,
+        "column_map",
+    )
     parsed = parser.parse_object(CONFIG)
     instantiated = parser.instantiate(parsed)
 
-    model = instantiated.model
-
-    assert isinstance(model, TwoTower)
-    assert isinstance(model.left, ChempropEncoder)
-    assert isinstance(model.right, MLP)
-    assert isinstance(model.fusion, MLP)
-
-    assert model.left.output_dim == 8
-    assert model.right.input_dim == 4
-    assert model.right.output_dim == 8
-    assert model.fusion.input_dim == 16
-    assert model.fusion.output_dim == 1
-    assert model.merge == "concat"
+    assert isinstance(
+        instantiated.column_map,
+        ColumnMap,
+    )
+    assert instantiated.column_map.inputs == {
+        "left": "chemprop",
+        "right": "vectome",
+    }
+    assert instantiated.column_map.target == "mic"
 
 
-def test_constructed_two_tower_runs():
+def test_configured_model_pipeline():
     import torch
 
     parser = ArgumentParser()
@@ -78,15 +80,27 @@ def test_constructed_two_tower_runs():
         nn.Module,
         "model",
     )
-
+    parser.add_class_arguments(
+        ColumnMap,
+        "column_map",
+    )
     parsed = parser.parse_object(CONFIG)
     instantiated = parser.instantiate(parsed)
 
     model = instantiated.model
+    column_map = instantiated.column_map
 
-    prediction = model(
-        left=chemprop_collate(_make_chemprop_rows()),
-        right=_make_vectome_rows(),
+    batch = {
+        "chemprop": chemprop_collate(_make_chemprop_rows()),
+        "vectome": _make_vectome_rows(),
+        "mic": torch.tensor([1., 2.]),
+    }
+
+    invoker = ModelInvoker(
+        model=model,
+        input_map=column_map,
     )
+    prediction, observed = invoker.supervised(batch)
 
     assert prediction.shape == (2, 1)
+    assert torch.equal(observed, batch["mic"])

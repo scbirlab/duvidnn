@@ -16,6 +16,14 @@ def _cached_molgraph(smiles: str) -> dict:
     }
 
 
+def _make_vectome_rows():
+    import torch
+    return torch.tensor([
+            [.1, .2, .3, .4],
+            [.5, .6, .7, .8],
+    ], dtype=torch.float32)
+    
+
 def _make_chemprop_rows():
     return [
         {
