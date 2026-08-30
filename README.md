@@ -23,6 +23,15 @@ input table
 output dataset with named feature columns
 ```
 
+Aspect datasets store Arrow-compatible feature representations.
+
+Before model execution, an optional collator converts stored examples into
+runtime representations. A runtime batch is always a mapping from feature
+column names to batched values. Values may be tensors or structured mappings.
+
+Downstream model libraries should treat runtime batch values as opaque and
+should not perform dataset preprocessing or deserialization.
+
 ---
 
 ## Contents

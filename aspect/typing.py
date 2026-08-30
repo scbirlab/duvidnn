@@ -1,6 +1,7 @@
 """Custom types."""
 
-from typing import TYPE_CHECKING, Any, Iterable, Mapping, Union
+from typing import TYPE_CHECKING, Any, TypeAlias
+from collections.abc import Iterable, Mapping, Union
 
 from datasets import Dataset, IterableDataset
 from pandas import DataFrame
@@ -11,14 +12,14 @@ if TYPE_CHECKING:
 else:
     ColumnTransform = Any
 
-DataLike = Union[
+DataLike: TypeAlias = Union[
     str, 
     DataFrame, 
     Mapping[str, ArrayLike], 
     Dataset, 
     IterableDataset
 ]
-FeatureLike = Union[
+FeatureLike: TypeAlias = Union[
     str, 
     Mapping[str, ColumnTransform], 
     Mapping[str, Mapping[str, Any]], 
@@ -29,3 +30,6 @@ FeatureLike = Union[
     ]]
 ]
 StrOrIterableOfStr = Union[str, Iterable[str]]
+
+Datum: TypeAlias = Mapping[str, Any]
+Batch: TypeAlias = Mapping[str, Any]
