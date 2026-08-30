@@ -311,10 +311,14 @@ def ChempropData(
         y_vals = _stack_columns(data, nrows, label_column)
         extra_features = _stack_columns(data, nrows, extra_featurizers)
 
-        mol_datapoints = [
-            MoleculeDatapoint.from_smi(smi=x, y=y, x_d=xd) 
-            for x, y, xd in zip(data[input_column], y_vals, extra_features)
-        ]
+        mol_datapoints = []
+        for x, y, xd in zip(data[input_column], y_vals, extra_features):
+            try:
+                md = MoleculeDatapoint.from_smi(smi=x, y=y, x_d=xd)
+            except RuntimeError:  # invalid smiles
+                md = MoleculeDatapoint.from_smi(smi="CCCC", y=y, x_d=xd)
+            else:
+                mol_datapoints.append(md)
     
         datums = []
         for datum in MoleculeDataset(mol_datapoints):
