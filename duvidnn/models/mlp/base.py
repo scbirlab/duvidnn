@@ -69,7 +69,7 @@ class MLP(nn.Module):
                 f"All hidden dimensions must be positive, but were {hidden_dims=}."
             )
 
-        if not 0. <= dropout < 10:
+        if not 0. <= dropout < 1.:
             raise ValueError(
                 f"`dropout` must satisfy 0 <= dropout < 1, but was {dropout}."
             )

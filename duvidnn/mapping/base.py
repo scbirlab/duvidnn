@@ -59,5 +59,5 @@ class ColumnMap:
             self.map_target(batch),
         )
 
-    def __call__(*args, **kwargs):
+    def __call__(self, *args, **kwargs):
         return self.map_batch(*args, **kwargs)
