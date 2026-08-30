@@ -4,6 +4,25 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 
 
+def resolve_input(
+    source: str | tuple[str, ...],
+    batch: Mapping[str, ...]
+):
+    import torch
+    if isinstance(source, str):
+        return batch[source]
+    return torch.cat(
+        [batch[column] for column in source],
+        dim=-1,
+    )
+
+
+def _columns(source):
+    if isinstance(source, str):
+        return (source,)
+    return tuple(source)
+
+
 @dataclass(frozen=True)
 class ColumnMap:
     """Map batch fields onto model inputs.
@@ -16,7 +35,7 @@ class ColumnMap:
         Dataset column containing the training target.
     """
 
-    inputs: Mapping[str, str]
+    inputs: Mapping[str, str | tuple[str, ...]]
     target: str
 
     def map_inputs(
@@ -25,7 +44,8 @@ class ColumnMap:
     ) -> dict[str, ...]:
         missing = [
             column
-            for column in self.inputs.values()
+            for source in self.inputs.values()
+            for column in _columns(source)
             if column not in batch
         ]
 
@@ -35,7 +55,7 @@ class ColumnMap:
                 + ", ".join(missing)
             )
         return {
-            argument: batch[column]
+            argument: resolve_input(batch=batch, source=column)
             for argument, column in self.inputs.items()
         }
 
