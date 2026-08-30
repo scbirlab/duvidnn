@@ -1,6 +1,6 @@
 """Composable Chemprop model primitives."""
 
-from typing import Any
+from collections.abc import Mapping
 
 import torch
 from chemprop.nn import BondMessagePassing, NormAggregation
@@ -104,12 +104,12 @@ class ChempropEncoder(nn.Module):
 
     def forward(
         self, 
-        *, 
-        bmg: dict[str, Tensor],
-        V_d: dict[str, Tensor] | None = None,
-        X_d: Tensor = None
+        input: Mapping[str, ...]
     ) -> Tensor:
         if self._built:
+            bmg = input["bmg"]
+            V_d = input.get("V_d")
+            X_d = input.get("X_d")
             if self.extra_dim == 0 and X_d is not None:
                 raise ValueError(
                     f"Received X_d descriptors ({len(X_d)=}) but {self.extra_dim=}."
@@ -142,4 +142,4 @@ class ChempropEncoder(nn.Module):
             return self.projection(h)
         else:
             self.build()
-            return self.forward(bmg=bmg, V_d=V_d, X_d=X_d)
+            return self.forward(input)
