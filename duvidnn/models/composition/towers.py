@@ -93,12 +93,17 @@ class MultiTower(nn.Module):
                 f". {(set(inputs) - set(self.towers))=}\n\t"
                 f". {(set(self.towers) - set(inputs))=}\n\t"
             )
-        tower_out = [
-            self.towers[name](**_input)
-            if isinstance(_input, dict) 
-            else self.towers[name](_input)
-            for name, _input in inputs.items()
-        ]
+        tower_out = []
+
+        for name, tower in self.towers.items():
+            _input = inputs[name]
+
+            if isinstance(_input, dict):
+                output = tower(**_input)
+            else:
+                output = tower(_input)
+
+            tower_out.append(output)
         merged = self._merge(*tower_out)
         return self.fusion(merged)
 
@@ -132,9 +137,5 @@ class TwoTower(MultiTower):
         super().__init__(towers={"left": left, "right": right}, fusion=fusion, merge=merge)
         self.left, self.right = self.towers["left"], self.towers["right"]
 
-    def forward(
-        self,
-        left: Tensor,
-        right: Tensor,
-    ) -> Tensor:
+    def forward(self, left, right) -> Tensor:
         return super().forward(left=left, right=right)
