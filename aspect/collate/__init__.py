@@ -1,6 +1,7 @@
-from .base import ColumnCollator, identity_collate
+from .base import ColumnCollator
+from .chemprop import chemprop_collate
 
 __all__ = [
     "ColumnCollator",
-    "identity_collate",
+    "chemprop_collate",
 ]
