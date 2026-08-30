@@ -21,7 +21,7 @@ class ColumnMap:
 
     def map_inputs(
         self,
-        batch: Mapping[str, ...],
+        batch: Mapping[str, ...]
     ) -> dict[str, ...]:
         missing = [
             column
@@ -41,7 +41,7 @@ class ColumnMap:
 
     def map_target(
         self,
-        batch: Mapping[str, ...],
+        batch: Mapping[str, ...]
     ):
         try:
             return batch[self.target]
@@ -52,9 +52,12 @@ class ColumnMap:
 
     def map_batch(
         self,
-        batch: Mapping[str, ...],
+        batch: Mapping[str, ...]
     ) -> tuple[dict[str, ...], ...]:
         return (
             self.map_inputs(batch),
             self.map_target(batch),
         )
+
+    def __call__(*args, **kwargs):
+        return self.map_batch(*args, **kwargs)
