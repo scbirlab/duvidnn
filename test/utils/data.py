@@ -1,0 +1,31 @@
+from chemprop.featurizers import SimpleMoleculeMolGraphFeaturizer
+from rdkit import Chem
+
+def _cached_molgraph(smiles: str) -> dict:
+    """Create an Arrow/HF-like serialized Chemprop MolGraph."""
+    featurizer = SimpleMoleculeMolGraphFeaturizer()
+    molgraph = featurizer(
+        Chem.MolFromSmiles(smiles)
+    )
+
+    return {
+        "V": molgraph.V.tolist(),
+        "E": molgraph.E.tolist(),
+        "edge_index": molgraph.edge_index.tolist(),
+        "rev_edge_index": molgraph.rev_edge_index.tolist(),
+    }
+
+
+def _make_chemprop_rows():
+    return [
+        {
+            "bmg": _cached_molgraph("CCO"),
+            "V_d": None,
+            "X_d": None,
+        },
+        {
+            "bmg": _cached_molgraph("CCN"),
+            "V_d": None,
+            "X_d": None,
+        },
+    ]

@@ -10,37 +10,11 @@ from duvidnn.invoke import ModelInvoker
 from duvidnn.mapping import ColumnMap
 from duvidnn.models.chemprop import ChempropEncoder
 
-
-def _cached_molgraph(smiles: str) -> dict:
-    """Create an Arrow/HF-like serialized Chemprop MolGraph."""
-    featurizer = SimpleMoleculeMolGraphFeaturizer()
-    molgraph = featurizer(
-        Chem.MolFromSmiles(smiles)
-    )
-
-    return {
-        "V": molgraph.V.tolist(),
-        "E": molgraph.E.tolist(),
-        "edge_index": molgraph.edge_index.tolist(),
-        "rev_edge_index": molgraph.rev_edge_index.tolist(),
-    }
+from utils.data import _make_chemprop_rows
 
 
 def test_chemprop_collate_to_model():
-    chemprop_batch = chemprop_collate(
-        [
-            {
-                "bmg": _cached_molgraph("CCO"),
-                "V_d": None,
-                "X_d": None,
-            },
-            {
-                "bmg": _cached_molgraph("CCN"),
-                "V_d": None,
-                "X_d": None,
-            },
-        ]
-    )
+    chemprop_batch = chemprop_collate(_make_chemprop_rows())
 
     batch = {
         "chemprop": chemprop_batch,
