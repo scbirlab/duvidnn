@@ -38,7 +38,6 @@ def test_multitower_concat_uses_tower_order():
             [1.0, 2.0],
         ]
     )
-
     assert torch.equal(
         output,
         expected,
@@ -49,26 +48,42 @@ class StructuredModule(nn.Module):
         return x * multiplier
 
 
-def test_multitower_dispatches_mapping_as_kwargs():
+class MappingTower(nn.Module):
+    def forward(self, x):
+        return x["value"]
+
+
+def test_multitower_passes_mapping_as_single_input():
     model = MultiTower(
         towers={
-            "structured": StructuredModule(),
-            "plain": nn.Identity(),
+            "left": MappingTower(),
+            "right": nn.Identity(),
         },
         fusion=nn.Identity(),
-        merge="concat",
+        merge="sum",
     )
+
+    left = {
+        "value": torch.tensor([
+            [1.0, 2.0],
+            [3.0, 4.0],
+        ])
+    }
+
+    right = torch.tensor([
+        [10.0, 20.0],
+        [30.0, 40.0],
+    ])
 
     output = model(
-        structured={
-            "x": torch.ones(2, 3),
-            "multiplier": 2,
-        },
-        plain=torch.zeros(2, 2),
+        left=left,
+        right=right,
     )
 
-    assert output.shape == (2, 5)
     assert torch.equal(
-        output[:, :3],
-        torch.full((2, 3), 2.0),
+        output,
+        torch.tensor([
+            [11.0, 22.0],
+            [33.0, 44.0],
+        ]),
     )

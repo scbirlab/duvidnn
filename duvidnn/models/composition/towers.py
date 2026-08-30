@@ -94,16 +94,10 @@ class MultiTower(nn.Module):
                 f". {(set(self.towers) - set(inputs))=}\n\t"
             )
         tower_out = []
-
         for name, tower in self.towers.items():
-            _input = inputs[name]
-
-            if isinstance(_input, dict):
-                output = tower(**_input)
-            else:
-                output = tower(_input)
-
-            tower_out.append(output)
+            tower_out.append(
+                tower(inputs[name])
+            )
         merged = self._merge(*tower_out)
         return self.fusion(merged)
 
