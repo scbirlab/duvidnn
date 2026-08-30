@@ -79,3 +79,24 @@ def test_chemprop_multitower():
         species=torch.randn(3, 128),
     )
     assert prediction.shape == (3, 1)
+
+    loss = prediction.sum()
+    loss.backward()
+
+    assert any(
+        parameter.grad is not None
+        for parameter
+        in model.towers["compound"].parameters()
+    )
+
+    assert any(
+        parameter.grad is not None
+        for parameter
+        in model.towers["species"].parameters()
+    )
+
+    assert any(
+        parameter.grad is not None
+        for parameter
+        in model.fusion.parameters()
+    )

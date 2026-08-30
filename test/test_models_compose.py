@@ -2,7 +2,7 @@ import pytest
 import torch
 from torch import nn
 
-from duvidnn.models import MLP, TwoTower
+from duvidnn.models import MLP, TwoTower, MultiTower
 
 
 def test_two_tower_concat():
@@ -111,3 +111,64 @@ def test_two_tower_rejects_unknown_merge():
             fusion=nn.Identity(),
             merge="nonsense",
         )
+
+
+def test_multitower_mlp():
+    model = MultiTower(
+        towers={
+            "compound": MLP(
+                input_dim=8,
+                hidden_dims=16,
+                output_dim=4,
+            ),
+            "species": MLP(
+                input_dim=6,
+                hidden_dims=16,
+                output_dim=4,
+            ),
+        },
+        fusion=MLP(
+            hidden_dims=8,
+            output_dim=1,
+        ),
+        merge="concat",
+    )
+
+    output = model(
+        compound=torch.randn(10, 8),
+        species=torch.randn(10, 6),
+    )
+
+    assert output.shape == (10, 1)
+
+
+class Add(nn.Module):
+
+    def forward(self, *, x, offset):
+        return x + offset
+
+
+def test_multitower_mapping_input():
+    model = MultiTower(
+        towers={
+            "mapped": Add(),
+            "plain": nn.Identity(),
+        },
+        fusion=nn.Identity(),
+        merge="concat",
+    )
+
+    output = model(
+        mapped={
+            "x": torch.ones(3, 2),
+            "offset": torch.ones(3, 2),
+        },
+        plain=torch.zeros(3, 2),
+    )
+
+    assert output.shape == (3, 4)
+
+    assert torch.equal(
+        output[:, :2],
+        torch.full((3, 2), 2.0),
+    )
