@@ -8,8 +8,6 @@ import numpy as np
 import torch
 from torch import Tensor
 
-from ..typing import Datum
-
 
 def _as_tensor(x) -> Tensor:
     """Convert an value to a tensor."""
@@ -68,7 +66,7 @@ def _collate_optional(
 
 
 def chemprop_collate(
-    values: Iterable[Datum],
+    values: Iterable[Mapping[str, ...]],
 ) -> dict[str, ...]:
     """Collate cached Chemprop features into a runtime model input.
 

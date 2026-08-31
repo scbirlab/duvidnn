@@ -3,8 +3,6 @@
 from collections.abc import Callable, Mapping, Iterable
 from typing import Any, TypeAlias
 
-from ..typing import Batch
-
 
 CollateFn: TypeAlias = Callable[[Iterable[Any]], Any]
 
@@ -20,7 +18,7 @@ class ColumnCollator:
 
     def __call__(
         self,
-        rows: Batch,
+        rows: Iterable[Mapping[str, ...]],
     ) -> dict[str, ...]:
         from torch.utils.data import default_collate
 
