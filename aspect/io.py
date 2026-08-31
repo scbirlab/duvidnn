@@ -1,11 +1,12 @@
 
 from typing import TYPE_CHECKING, Any
 from collections.abc import Iterable, Mapping
-from dataclasses import dataclass
+from copy import deepcopy
+from dataclasses import asdict, dataclass
 from functools import partial
+import json
 import hashlib
 import os
-import tempfile
 
 from carabiner import print_err
 
@@ -22,6 +23,47 @@ from .package_data import resolve_cache, configure_hf_cache
 
 DATASETS_PREFIX: str = "hf://datasets/"
 
+
+def load_json(
+    checkpoint: str, 
+    filename: str | None = None
+) -> dict[str, ...]:
+    if filename is not None:
+        path = os.path.join(checkpoint, filename)
+    else:
+        path = checkpoint
+    with open(path, "r") as f:
+        obj = json.load(f)
+    return obj
+   
+
+def save_json(obj, filename: str) -> None:
+    _dir = os.path.dirname(filename)
+    if _dir != "." and len(_dir) > 0:
+        os.makedirs(_dir, exist_ok=True)
+    with open(filename, "w") as f:
+        try:
+            json.dump(obj, f, sort_keys=True, indent=4)
+        except TypeError as e:
+            print_err(f"{obj=}")
+            raise e
+    return None
+
+
+def autoload(
+    filename: str | os.PathLike,
+    cache_dir: str | None = None
+):
+    return (
+        AutoDataset
+        .load(
+            str(filename),
+            cache=cache_dir,
+        )
+        ._dataset
+    )
+
+
 @dataclass(frozen=True)
 class DataSource:
     """Provenance for a resolved dataset.
@@ -37,8 +79,45 @@ class DataSource:
     """
 
     uri: str | None = None
+    requested_uri: str | None = None
     revision: str | None = None
     requested_revision: str | None = None
+
+    @classmethod
+    def from_config(
+        cls,
+        config: Mapping[str, str | None] | str
+    ):
+        if isinstance(config, str):
+            if os.path.exists(config):
+                config = load_json(config)
+            else:
+                raise FileNotFoundError(
+                    "`config` was string, but filename "
+                    f"called `{config}` not found."
+                )
+
+        config = deepcopy(dict(config))
+        return cls(**config)
+
+    def to_config(self, filename: str | None = None) -> dict[str, str | None]:
+        config = asdict(self)
+        if filename is not None:
+            save_json(config, filename)
+        return config
+
+    @property
+    def is_remote(self) -> bool:
+        return all([
+            self.uri is not None
+            and self.uri.startswith((
+                "hf://", 
+                "https://", 
+                "s3://",
+            )),
+            self.revision is not None,
+        ])
+
 
 def hasher(
     s: str | bytes,
@@ -257,7 +336,12 @@ def _resolve_hf_hub_dataset(
         ds = concatenate_datasets([v for key, v in ds.items()])
     
     source = DataSource(
-        uri=original_ref,
+        uri=(
+            f"{DATASETS_PREFIX}/{repo}@{revision}" 
+            + ('~' + config if config is not None else '')
+            + (':' + split if split is not None else '')
+        ),
+        requested_uri=original_ref,
         revision=revision,
         requested_revision=requested_revision,
     )
