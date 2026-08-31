@@ -82,6 +82,8 @@ def test_box_from_config():
     assert box.input_map.inputs == BOX_CONFIG["input_map"]["inputs"]
     assert box.input_map.target == BOX_CONFIG["input_map"]["target"]
 
+    print(box.pipeline.to_config())
+
     prepared = box.prepare({
         "x": [
             [1., 2.],
@@ -119,6 +121,8 @@ def test_configured_box_checkpoint_roundtrip(tmp_path):
     assert (checkpoint / "config.json").exists()
     assert (checkpoint / "weights.pt").exists()
     assert not (checkpoint / "model.pt").exists()
+    assert (checkpoint / "data" / "config.json").exists()
+    assert (checkpoint / "data"/ "data.parquet").exists()
 
     restored = Box.load(checkpoint)
     observed = restored.model(x).detach()
@@ -126,6 +130,7 @@ def test_configured_box_checkpoint_roundtrip(tmp_path):
     torch.testing.assert_close(observed,expected)
     assert restored.model_config == box.model_config
     assert restored.input_map == box.input_map
+    assert restored.pipeline.data_in is not None
 
 
 def test_nested_model_from_config():
@@ -214,3 +219,28 @@ def test_opaque_box_checkpoint_roundtrip(tmp_path):
 
     torch.testing.assert_close(observed, expected)
     assert restored.model_config is None
+
+
+def test_box_retains_requested_training_columns(tmp_path):
+    box = Box.from_config(BOX_CONFIG)
+
+    box.prepare({
+        "x": [
+            [1., 2.],
+            [3., 4.],
+        ],
+        "y": [1., 2.],
+    })
+
+    checkpoint = tmp_path / "box"
+    box.save(
+        checkpoint,
+        save_transformed_columns=["logx"],
+    )
+
+    assert (checkpoint / "data" / "transformed.parquet").exists()
+
+    restored = Box.load(checkpoint)
+
+    assert restored.pipeline.data_out is not None
+    assert restored.pipeline.data_out.column_names == ["logx"]
