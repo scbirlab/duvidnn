@@ -96,9 +96,8 @@ def test_invoke_supervised():
 
 
 class StructuredTower(nn.Module):
-
-    def forward(self, *, x, scale):
-        return x * scale
+    def forward(self, inputs):
+        return inputs["x"] * inputs["scale"]
 
 
 def test_invoke_structured_input():
@@ -131,7 +130,6 @@ def test_invoke_structured_input():
         model=model,
         input_map=mapping,
     )
-
     output = invoker(batch)
 
     assert output.shape == (3, 4)

@@ -33,15 +33,12 @@ def test_multitower_concat_uses_tower_order():
 
     expected = torch.tensor(
         [
-            [1.0, 2.0],
-            [1.0, 2.0],
-            [1.0, 2.0],
+            [1., 2.],
+            [1., 2.],
+            [1., 2.],
         ]
     )
-    assert torch.equal(
-        output,
-        expected,
-    )
+    assert torch.equal(output, expected)
 
 class StructuredModule(nn.Module):
     def forward(self, *, x, multiplier):
@@ -65,14 +62,14 @@ def test_multitower_passes_mapping_as_single_input():
 
     left = {
         "value": torch.tensor([
-            [1.0, 2.0],
-            [3.0, 4.0],
+            [1., 2.],
+            [3., 4.],
         ])
     }
 
     right = torch.tensor([
-        [10.0, 20.0],
-        [30.0, 40.0],
+        [10., 20.],
+        [30., 40.],
     ])
 
     output = model(
@@ -83,7 +80,7 @@ def test_multitower_passes_mapping_as_single_input():
     assert torch.equal(
         output,
         torch.tensor([
-            [11.0, 22.0],
-            [33.0, 44.0],
+            [11., 22.],
+            [33., 44.],
         ]),
     )

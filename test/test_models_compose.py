@@ -143,9 +143,8 @@ def test_multitower_mlp():
 
 
 class Add(nn.Module):
-
-    def forward(self, *, x, offset):
-        return x + offset
+    def forward(self, inputs):
+        return inputs["x"] + inputs["offset"]
 
 
 def test_multitower_mapping_input():
@@ -161,14 +160,13 @@ def test_multitower_mapping_input():
     output = model(
         mapped={
             "x": torch.ones(3, 2),
-            "offset": torch.ones(3, 2),
+            "offset": 2,
         },
         plain=torch.zeros(3, 2),
     )
 
     assert output.shape == (3, 4)
-
     assert torch.equal(
         output[:, :2],
-        torch.full((3, 2), 2.0),
+        torch.full((3, 2), 3.),
     )

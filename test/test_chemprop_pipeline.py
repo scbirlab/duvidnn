@@ -14,33 +14,20 @@ from utils.data import _make_chemprop_rows
 
 
 def test_chemprop_collate_to_model():
-    chemprop_batch = chemprop_collate(_make_chemprop_rows())
+    invoker = ModelInvoker(
+        model=ChempropEncoder(output_dim=1),
+        input_map=ColumnMap(
+            inputs={"input": "chemprop"},
+            target="target",
+        ),
+    )
 
+    chemprop_batch = chemprop_collate(_make_chemprop_rows())
     batch = {
         "chemprop": chemprop_batch,
-        "target": torch.tensor([1.0, 2.0]),
+        "target": torch.tensor([1., 2.]),
     }
-
-    model = ChempropEncoder(
-        output_dim=1,
-    )
-
-    column_map = ColumnMap(
-        inputs={
-            "input": "chemprop",
-        },
-        target="target",
-    )
-
-    invoker = ModelInvoker(
-        model=model,
-        input_map=column_map,
-    )
-
     prediction, target = invoker.supervised(batch)
 
     assert prediction.shape == (2, 1)
-    assert torch.equal(
-        target,
-        torch.tensor([1.0, 2.0]),
-    )
+    assert torch.equal(target, batch["target"])

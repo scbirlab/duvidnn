@@ -43,7 +43,7 @@ def test_chemprop_encoder():
     )
 
     x = _make_chemprop_batch()
-    y = model(**x)
+    y = model(x)
 
     assert y.shape == (3, 32)
 

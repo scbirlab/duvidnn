@@ -15,13 +15,22 @@ else:
 from .utils.package_data import CACHE_DIR
 
 
-def _load_json(checkpoint: str, filename: str) -> Dict[str, Any]:
-    with open(os.path.join(checkpoint, filename), "r") as f:
+def _load_json(checkpoint: str, filename: str | None = None) -> dict[str, ...]:
+    if filename is not None:
+        path = os.path.join(checkpoint, filename)
+    else:
+        path = checkpoint
+    with open(path, "r") as f:
         obj = json.load(f)
     return obj
+
+load_json = _load_json
    
 
 def save_json(obj, filename: str) -> None:
+    _dir = os.path.dirname(filename)
+    if _dir != "." and len(_dir) > 0:
+        os.makedirs(_dir, exist_ok=True)
     with open(filename, "w") as f:
         try:
             json.dump(obj, f, sort_keys=True, indent=4)

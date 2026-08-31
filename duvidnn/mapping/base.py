@@ -1,8 +1,10 @@
 """Mapping between dataset columns and model inputs."""
 
+from typing import Any
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 
+from ..checkpoint_utils import load_json, save_json
 
 def resolve_input(
     source: str | tuple[str, ...],
@@ -35,13 +37,18 @@ class ColumnMap:
         Dataset column containing the training target.
     """
 
-    inputs: Mapping[str, str | tuple[str, ...]]
-    target: str
+    inputs: Mapping[str, str | tuple[str, ...]] | None = None
+    target: str = "labels"
 
     def map_inputs(
         self,
         batch: Mapping[str, ...]
     ) -> dict[str, ...]:
+        if self.inputs is None:
+            return {
+                column: resolve_input(batch=batch, source=column)
+                for column in batch
+            }
         missing = [
             column
             for source in self.inputs.values()
@@ -81,3 +88,28 @@ class ColumnMap:
 
     def __call__(self, *args, **kwargs):
         return self.map_batch(*args, **kwargs)
+
+    @classmethod
+    def from_config(
+        cls, 
+        config: Mapping[str, Any] | str
+    ) -> 'ColumnMap':
+        """Construct a ColumnMap from JSON-native configuration."""
+        if isinstance(config, str):
+            if os.path.exists(config):
+                config = load_json(config)
+            else:
+                raise FileNotFoundError(
+                    "`config` was string, but filename "
+                    f"called `{config}` not found."
+                )
+        return cls(**config)
+
+    def to_config(
+        self, 
+        filename: str | None = None
+    ) -> dict[str, str]:
+        config = asdict(self)
+        if filename is not None:
+            save_json(config, filename)
+        return config

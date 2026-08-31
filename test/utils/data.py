@@ -24,16 +24,9 @@ def _make_vectome_rows():
     ], dtype=torch.float32)
     
 
-def _make_chemprop_rows():
-    return [
-        {
-            "bmg": _cached_molgraph("CCO"),
+def _make_chemprop_rows(smiles=("CCO", "CCN")):
+    return [{
+            "bmg": _cached_molgraph(s),
             "V_d": None,
             "X_d": None,
-        },
-        {
-            "bmg": _cached_molgraph("CCN"),
-            "V_d": None,
-            "X_d": None,
-        },
-    ]
+    } for s in smiles]
