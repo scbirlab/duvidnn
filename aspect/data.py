@@ -1,6 +1,7 @@
 """Data pipeline class."""
 
-from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Mapping, Tuple, Optional, Union
+from typing import TYPE_CHECKING, Any
+from collections.abc import Iterable, Mapping
 
 from functools import cached_property, partial
 import os
@@ -17,7 +18,7 @@ from numpy.typing import ArrayLike
 
 from . import app_name, __version__
 from .checkpoint_utils import load_checkpoint_file, save_json
-from .io import AutoDataset
+from .io import AutoDataset, DataSource
 from .package_data import CACHE_DIR
 from .transform.base import ColumnTransform
 from .typing import DataLike, StrOrIterableOfStr
@@ -45,7 +46,7 @@ def _check_column_presence(
 def _check_is_calculated(
     x: Dataset,  
     column_transform: ColumnTransform
-) -> Tuple[str, bool]:
+) -> tuple[str, bool]:
     """Check named column is in dataset.
 
     Examples
@@ -73,7 +74,7 @@ def _check_is_calculated(
 def _fill_na(
     x: Mapping[str, Any],
     types: Mapping[str, Any]
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Fill missing values with typed missing.
 
     For example, numeric filled with zeros, and strings filled with `""`.
@@ -196,11 +197,11 @@ class DataPipeline:
     """
     def __init__(
         self,
-        column_transforms: Optional[Iterable[Union[str, ColumnTransform]]] = None,
-        columns_to_keep: Optional[Iterable[Union[str, ColumnTransform]]] = None,
+        column_transforms: Iterable[str | ColumnTransform] | None = None,
+        columns_to_keep: Iterable[str | ColumnTransform] | None = None,
         output_format: str = DEFAULT_FORMAT,
-        output_format_opts: Optional[Mapping[str, Any]] = None,
-        cache_dir: Optional[str] = None,
+        output_format_opts: Mapping[str, Any] | None = None,
+        cache_dir: str | None = None,
         _version: str = __version__,
         _app: str = app_name
     ):
@@ -215,6 +216,7 @@ class DataPipeline:
         self.output_format = output_format
         self.output_format_opts = output_format_opts or {}
         self.data_in = None
+        self.data_source = None
         self.data_out = None
         self.data_out_example = None
         self.data_out_shape = None
@@ -227,7 +229,7 @@ class DataPipeline:
 
         self._inspect_data_out()
 
-    def __eq__(self, other):
+    def __eq__(self, other) -> bool:
         if hasattr(other, "column_transforms_serialized"):
             return all([
                 self.column_transforms_serialized == other.column_transforms_serialized,
@@ -242,9 +244,9 @@ class DataPipeline:
 
     def _canonicalize_transforms(
         self,
-        column_transforms: Iterable[Union[str, Mapping, ColumnTransform]],
-        input_column: Optional[str] = None
-    ) -> Tuple[ColumnTransform]:
+        column_transforms: Iterable[str | Mapping | ColumnTransform],
+        input_column: str | None = None
+    ) -> tuple[ColumnTransform]:
         if isinstance(column_transforms, (str, dict, ColumnTransform)):
             column_transforms = [column_transforms]
         out = []
@@ -288,9 +290,9 @@ class DataPipeline:
 
     def canonicalize_transforms(
         self,
-        column_transforms: Union[Mapping, Iterable],
-        input_column: Optional[str] = None
-    ) -> Dict[str, ColumnTransform]:
+        column_transforms: Mapping[str, Any] | Iterable,
+        input_column: str | None = None
+    ) -> dict[str, ColumnTransform]:
         if isinstance(column_transforms, (list, tuple)):
             if len(column_transforms) == 0:
                 return {}
@@ -337,7 +339,7 @@ class DataPipeline:
     def serialize_transforms(
         self, 
         column_transforms: Mapping[str, ColumnTransform]
-    ) -> Dict[str, Tuple[dict]]:
+    ) -> dict[str, tuple[dict]]:
             return {k: tuple(t.to_dict() for t in v) for k, v in column_transforms.items()}
 
     def _inspect_data_out(self) -> None:
@@ -365,15 +367,20 @@ class DataPipeline:
     def _resolve_data(
         self,
         data: DataLike, 
-        cache_dir: Optional[str] = None
-    ) -> Union[Dataset, IterableDataset]:
-        return AutoDataset.load(data, cache=cache_dir or self.cache_dir)._dataset
+        cache_dir: str | None = None
+    ) -> Dataset | IterableDataset:
+        resolved = AutoDataset.load(
+            data, 
+            cache=cache_dir or self.cache_dir,
+        )
+        self.data_source = resolved.source
+        return resolved._dataset
 
     @staticmethod
     def _featurize(
         x: Mapping[str, ArrayLike],
         column_transforms: Mapping[str, dict]
-    ) -> Dict[str, np.ndarray]:
+    ) -> dict[str, np.ndarray]:
 
         column_transforms = {
             k: [ColumnTransform(**d) for d in v]
@@ -400,8 +407,8 @@ class DataPipeline:
     @staticmethod
     def _unsqueeze(
         x: Mapping[str, ArrayLike],
-        columns: Optional[Iterable[str]] = None
-    ) -> Dict[str, np.ndarray]:
+        columns: Iterable[str] | None = None
+    ) -> dict[str, np.ndarray]:
         columns = columns or x.keys()
         for key in columns:
             vals = x[key]
@@ -416,7 +423,7 @@ class DataPipeline:
         dataset: DataLike, 
         batch_size: int = DEFAULT_BATCH_SIZE,
         drop_unused_columns: bool = False,
-        keep_extra_columns: Optional[Iterable[str]] = None
+        keep_extra_columns: Iterable[str] | None = None
     ):
         data_in = self._resolve_data(dataset)
         input_columns = sorted(set(
@@ -548,7 +555,7 @@ class DataPipeline:
         checkpoint: str,
         skip_data_in: bool = False,
         skip_data_out: bool = False,
-        cache_dir: Optional[str] = None
+        cache_dir: str | None = None
     ):
         cache_dir = cache_dir or self.cache_dir
         data_config = load_checkpoint_file(
