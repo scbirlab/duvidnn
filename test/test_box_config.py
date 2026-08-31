@@ -113,8 +113,15 @@ def test_configured_box_checkpoint_roundtrip(tmp_path):
         [1., 2.],
         [3., 4.],
     ])
-
     expected = box.model(x).detach()
+
+    box.prepare({
+        "x": [
+            [1., 2.],
+            [3., 4.],
+        ],
+        "y": [1., 2.],
+    })
     checkpoint = tmp_path / "box"
     box.save(checkpoint)
 

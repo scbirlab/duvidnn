@@ -251,25 +251,33 @@ class Box:
         config["pipeline"] = pipeline_config
 
         model_config = config.get("model")
-        box = cls.from_config(config)
-        box.pipeline = pipeline
         
         if model_config is not None:
-            _materialize_model(box.model)
+            model = instantiate_model(model_config)
+            _materialize_model(model)
             state_dict = torch.load(
                 path / WEIGHTS_FILENAME,
                 map_location=map_location,
                 weights_only=True,
             )
-            box.model.load_state_dict(state_dict)
-            return box
+            model.load_state_dict(state_dict)
+            return cls(
+                model=model,
+                input_map=input_map,
+                pipeline=pipeline,
+                model_config=model_config,
+            )
 
         model = torch.load(
             path / MODEL_FILENAME,
             map_location=map_location,
             weights_only=False,
         )
-        return box
+        return cls(
+            model=model,
+            input_map=input_map,
+            pipeline=pipeline,
+        )
 
     def prepare(self, data):
         """Apply the recorded Aspect pipeline."""
