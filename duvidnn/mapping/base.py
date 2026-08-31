@@ -3,6 +3,7 @@
 from typing import Any
 from collections.abc import Mapping
 from dataclasses import asdict, dataclass
+import os
 
 from ..checkpoint_utils import load_json, save_json
 

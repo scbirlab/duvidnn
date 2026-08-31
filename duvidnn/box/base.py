@@ -8,6 +8,7 @@ import json
 import os
 
 from aspect.data import DataPipeline
+from carabiner import print_err
 import torch
 from torch import nn
 
@@ -35,7 +36,7 @@ def _json_copy(
 
 def _resolve_pipeline(pipeline: PipelineLike | None = None) -> DataPipeline:
     """Resolve a pipeline specification."""
-    if isinstance(pipeline, DataPipeline) or callable(pipeline):
+    if isinstance(pipeline, DataPipeline):
         return pipeline
 
     if callable(pipeline):
