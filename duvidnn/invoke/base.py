@@ -13,9 +13,16 @@ class ModelInvoker:
     def __init__(
         self,
         model: nn.Module,
-        input_map: ColumnMap,
-    ) -> None:
+        input_map: Mapping[str, str] | ColumnMap
+    ):
         self.model = model
+        if isinstance(input_map, Mapping):
+            input_map = ColumnMap(**input_map)
+        elif not isinstance(input_map, ColumnMap):
+            raise ValueError(
+                "`input_map` should be dict or ColumnMap, "
+                f"but was {type(input_map)}: {input_map}."
+            )
         self.input_map = input_map
 
     def inputs(

@@ -1,12 +1,10 @@
 """"""
 from typing import TYPE_CHECKING, Any
 from collections.abc import Callable, Mapping
+import os
 
 from aspect.data import DataPipeline
-if TYPE_CHECKING:
-    from torch.nn import Module
-else:
-    Module = Any
+from torch.nn import Module
 
 from ..invoke import ModelInvoker
 from ..mapping import ColumnMap
@@ -15,7 +13,7 @@ from ..mapping import ColumnMap
 def _resolve_pipeline(
     pipeline: DataPipeline | Mapping[str, ...] | None = None
 ):
-    if isinstance(pipeline, dict) or pipeline is None:
+    if isinstance(pipeline, Mapping) or pipeline is None:
         return DataPipeline(column_transforms=pipeline)
     elif isinstance(pipeline, str):
         if os.path.exists(pipeline):
@@ -40,7 +38,7 @@ class Box:
         self,
         model: Module,
         input_map: ColumnMap,
-        pipeline: DataPipeline | Mapping[str, ...] | None = None,
+        pipeline: Mapping[str, Any] | DataPipeline | None = None,
         data: Any | None = None,
         trainer: Any | None = None
     ) -> None:
