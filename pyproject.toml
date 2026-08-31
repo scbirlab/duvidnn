@@ -47,7 +47,7 @@ chem = ["schemist>=0.0.6"]
 torch = ["torch>=2.4"]
 chemprop = ["aspect-data[torch,chem]", "chemprop>=2.1.0"]
 deep = ["transformers"]
-bio = ["vectome>=0.0.4"]
+bio = ["vectome>=0.0.8"]
 dev = ["aspect-data[chemprop,bio]", "pytest>=7.4", "flake8"]
 
 [project.urls]
