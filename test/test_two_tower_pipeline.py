@@ -14,7 +14,7 @@ from utils.data import _make_chemprop_rows
 
 
 def test_chemprop_vectome_two_tower():
-    chemprop_batch = chemprop_collate(_make_chemprop_rows()
+    chemprop_batch = chemprop_collate(_make_chemprop_rows())
 
     vectome = torch.tensor(
         [
