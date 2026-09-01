@@ -32,12 +32,3 @@ class Readout(nn.Module):
         )
 
 
-class HillReadout(nn.Module):
-    """Map dose-response parameters and concentration to response."""
-
-    def forward(
-        self,
-        parameters,
-        context
-    ):
-        ...

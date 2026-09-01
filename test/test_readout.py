@@ -162,3 +162,25 @@ def test_readout_model_with_two_tower_latent():
         observed,
         expected,
     )
+
+
+def test_hill_readout_at_ic50():
+    import torch
+    from duvidnn.models import HillCurve
+
+    readout = HillCurve(slope=1.)
+
+    assert readout.latent_params == ("log_ic50",)
+    assert readout.context_params == ("conc",)
+
+    ic50 = torch.tensor([
+        [2.],
+        [10.],
+    ])
+    observed = readout(
+        latent=torch.log(ic50),
+        context=ic50,
+    )
+    expected = torch.full_like(ic50, .5)
+
+    torch.testing.assert_close(observed, expected)
