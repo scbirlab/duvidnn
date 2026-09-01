@@ -98,3 +98,67 @@ def test_instantiate_readout_from_config():
     model = instantiate_model(MODEL_CONFIG)
 
     assert isinstance(model, Readout)
+
+
+def test_readout_model_with_two_tower_latent():
+    import torch
+    from torch import nn
+
+    from duvidnn.models import Readout, TwoTower
+
+    class Left(nn.Module):
+        def forward(self, x):
+            return x * 2.
+
+    class Right(nn.Module):
+        def forward(self, x):
+            return x * 3.
+
+    class Fusion(nn.Module):
+        def forward(self, x):
+            return x.sum(dim=-1, keepdim=True)
+
+    class ReadoutFn(nn.Module):
+        def forward(self, latent, context):
+            return latent + context
+
+    model = Readout(
+        latent=TwoTower(
+            left=Left(),
+            right=Right(),
+            fusion=Fusion(),
+            merge="concat",
+        ),
+        readout=ReadoutFn(),
+    )
+
+    left = torch.tensor([
+        [1.],
+        [2.],
+    ])
+
+    right = torch.tensor([
+        [4.],
+        [5.],
+    ])
+
+    context = torch.tensor([
+        [10.],
+        [20.],
+    ])
+
+    observed = model(
+        left=left,
+        right=right,
+        context=context,
+    )
+
+    expected = torch.tensor([
+        [24.],
+        [39.],
+    ])
+
+    torch.testing.assert_close(
+        observed,
+        expected,
+    )
