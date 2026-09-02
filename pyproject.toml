@@ -35,7 +35,7 @@ classifiers = [
 ]
 
 dependencies = [
-  "aspect-data[torch]",
+  "aspect-data[torch]>=0.0.5",
   "carabiner-tools[pd,mpl]>=0.0.5.post3",
   "datasets>=3.5.0",
   "dill>=0.3.9",

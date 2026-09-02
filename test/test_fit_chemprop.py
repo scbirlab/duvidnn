@@ -149,3 +149,18 @@ def test_box_fit_heterogeneous_chemprop_hill_readout():
     assert torch.all(torch.isfinite(prediction))
     assert torch.all(prediction >= 0.)
     assert torch.all(prediction <= 1.)
+
+    predictions = box.predict(
+        data,
+        batch_size=2,
+    )
+
+    assert "prediction" in predictions.column_names
+
+    prediction = torch.tensor(predictions.with_format(None)["prediction"])
+
+    assert prediction.shape == (4, 1)
+    assert torch.all(torch.isfinite(prediction))
+    assert torch.all(prediction >= 0.)
+    assert torch.all(prediction <= 1.)
+    

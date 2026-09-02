@@ -13,10 +13,11 @@ import torch
 from torch import nn
 
 from ..config import instantiate_model
+from ..checkpoint_utils import save_json, load_json
 from ..invoke import ModelInvoker
 from ..mapping import ColumnMap
 from ..training import Trainer
-from ..checkpoint_utils import save_json, load_json
+from ..utils.device import move_to_device
 
 
 CONFIG_FILENAME = "config.json"
@@ -24,6 +25,7 @@ WEIGHTS_FILENAME = "weights.pt"
 MODEL_FILENAME = "model.pt"
 PIPELINE_DIRNAME: str = "data"
 DEFAULT_BATCH_SIZE: int = 32
+DEFAULT_PREDICTION_COLUMN: str = "prediction"
 
 PipelineLike: TypeAlias = DataPipeline | Mapping[str, Any] | str | Callable
 
@@ -84,6 +86,40 @@ def _materialize_model(module: nn.Module) -> None:
 
     for child in module.children():
         _materialize_model(child)
+
+
+def _model_device(model: nn.Module):
+    try:
+        return next(model.parameters()).device
+    except StopIteration:
+        try:
+            return next(model.buffers()).device
+        except StopIteration:
+            return torch.device("cpu")
+
+
+def _predict_map_batch(
+    batch: Mapping[str, Any],
+    *,
+    pipeline: DataPipeline,
+    invoker: ModelInvoker,
+    device,
+    prediction_column: str = DEFAULT_PREDICTION_COLUMN
+) -> dict[str, ...]:
+    runtime_batch = pipeline.collate(batch)
+    runtime_batch = move_to_device(runtime_batch, device)
+
+    with torch.inference_mode():
+        prediction = invoker.predict(runtime_batch)
+
+    return {
+        prediction_column: (
+            prediction
+            .detach()
+            .cpu()
+            .numpy()
+        )
+    }
 
 
 class Box:
@@ -362,3 +398,74 @@ class Box:
             val_dataloader=val_loader,
         )
         return self
+
+    def predict(
+        self,
+        data=None,
+        pipeline: Mapping[str, Any] | DataPipeline | None = None,
+        batch_size: int = DEFAULT_BATCH_SIZE,
+        prediction_column: str = DEFAULT_PREDICTION_COLUMN,
+        device=None,
+        map_kwargs: Mapping[str, Any] | None = None
+    ):
+        """Predict over a dataset in bounded-memory batches."""
+
+        map_kwargs = dict(map_kwargs or {})
+
+        if pipeline is None:
+            ref_pipeline = self.pipeline
+        elif isinstance(pipeline, Mapping):
+            ref_pipeline = DataPipeline(column_transforms=pipeline)
+        elif not isinstance(pipeline, DataPipeline):
+            raise ValueError(
+                "If provided, `pipeline` must be a dict or aspect.DataPipeline "
+                f"but was {type(pipeline)}: {pipeline}"
+            )
+
+        if not isinstance(ref_pipeline, DataPipeline):
+            raise TypeError(
+                "Box.predict() requires an "
+                "aspect.DataPipeline."
+            )
+
+        if device is None:
+            device = _model_device(self.model)
+        else:
+            device = torch.device(device)
+            self.model.to(device)
+
+        pipeline = ref_pipeline.clone()
+        prepared = None
+        if data is None:  # use training data
+            if self.pipeline.data_out is not None:
+                prepared = self.pipeline.data_out  # use training data
+            else:
+                if self.pipeline.data_in is not None:
+                    data = self.pipeline.data_in  # fall back to regenerating from saved inputs
+                else:
+                    raise ValueError(
+                        "If `data` not supplied, then the data pipeline needs "
+                        "to have been run to generate the featurized training data. "
+                        "Try training the model or box.pipeline(training_data)."
+                    )
+        if prepared is None:
+            prepared = pipeline(data)
+
+        self.model.eval()
+
+        if prediction_column in prepared.column_names:
+            prepared = prepared.remove_columns(prediction_column)
+
+        return prepared.map(
+            _predict_map_batch,
+            batched=True,
+            batch_size=batch_size,
+            fn_kwargs={
+                "pipeline": pipeline,
+                "invoker": self.invoker,
+                "prediction_column": prediction_column,
+                "device": device,
+            },
+            desc="Predicting",
+            **map_kwargs,
+        )
