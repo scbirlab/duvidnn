@@ -1,16 +1,22 @@
 """Ephemeral Lightning integration for training PyTorch models."""
 
-from typing import Any
-
-from lightning.pytorch.callbacks import EarlyStopping
-from torch.optim import Adam
-
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Iterable, Mapping
+from copy import deepcopy
+from dataclasses import dataclass
 
 import lightning as L
-from torch import nn
+from lightning.pytorch.callbacks import EarlyStopping
+from torch import nn, Tensor
+from torch.optim import Adam
+from torchmetrics import Metric, MetricCollection
 
 from ..invoke import ModelInvoker
+
+@dataclass
+class PredictionTargetLoss:
+    prediction: Tensor
+    target: Tensor
+    loss: Tensor
 
 
 class LightningTask(L.LightningModule):
@@ -24,6 +30,8 @@ class LightningTask(L.LightningModule):
         optimizer: Callable,
         optimizer_kwargs: Mapping | None = None,
         loss_inputs: Mapping[str, str] | None = None,
+        metrics: Mapping[str, Metric] | Iterable[Metric] | None = None,
+        metric_mask: Callable[[Mapping], Tensor] | None = None
     ) -> None:
         super().__init__()
 
@@ -33,6 +41,15 @@ class LightningTask(L.LightningModule):
         self.optimizer_cls = optimizer
         self.optimizer_kwargs = dict(optimizer_kwargs or {})
         self.loss_inputs = dict(loss_inputs or {})
+        self.metric_mask = metric_mask
+
+        metrics = metrics or {}
+        if isinstance(metrics, (tuple, list)):
+            metrics = {f.__name__: f for f in metrics}
+
+        self.train_metrics = MetricCollection(deepcopy(metrics))
+        self.val_metrics = MetricCollection(deepcopy(metrics))
+        self.test_metrics = MetricCollection(deepcopy(metrics))
 
     def _loss_kwargs(self, batch) -> dict:
         return {
@@ -41,29 +58,78 @@ class LightningTask(L.LightningModule):
             in self.loss_inputs.items()
         }
 
-    def loss(self, batch):
+    def _prediction_target_loss(self, batch):
         prediction, target = self.invoker.supervised(batch)
-        return self.loss_fn(
+        loss = self.loss_fn(
             prediction,
             target,
             **self._loss_kwargs(batch),
         )
+        return PredictionTargetLoss(prediction, target, loss)
+
+    def loss(self, batch):
+        prediction, target = self.invoker.supervised(batch)
+        return self._prediction_target_loss(batch).loss
+
+    def _update_metrics(
+        self,
+        prediction,
+        target,
+        batch,
+        stage: str
+    ) -> None:
+        metrics = (
+            self.train_metrics
+            if stage == "train"
+            else self.val_metrics
+        )
+
+        if len(metrics) == 0:
+            return None
+
+        if self.metric_mask is not None:
+            mask = self.metric_mask(batch)
+
+            prediction = prediction[mask]
+            target = target[mask]
+
+            if prediction.numel() == 0:
+                return None
+
+        metrics.update(prediction, target)
+        for name, metric in metrics.items():
+            self.log(
+                f"{stage}_{name}",
+                metric,
+                on_step=False,
+                on_epoch=True,
+                prog_bar=False,
+                sync_dist=True,
+            )
+        return None
 
     def _step(
         self,
         batch,
         stage: str
     ):
-        loss = self.loss(batch)
+        prediction_target_loss = self._prediction_target_loss(batch)
+
         self.log(
             f"{stage}_loss",
-            loss,
+            prediction_target_loss.loss,
             on_step=(stage == "train"),
             on_epoch=True,
             prog_bar=True,
             sync_dist=True,
         )
-        return loss
+        self._update_metrics(
+            prediction=prediction_target_loss.prediction,
+            target=prediction_target_loss.target,
+            batch=batch,
+            stage=stage,
+        )
+        return prediction_target_loss.loss
 
     def training_step(
         self,
@@ -98,7 +164,9 @@ class Trainer:
         optimizer_kwargs: Mapping | None = None,
         loss_inputs: Mapping[str, str] | None = None,
         early_stopping: int | None = None,
-        **trainer_kwargs: Any,
+        metrics: Mapping[str, Metric] | Iterable[Metric] | None = None,
+        metric_mask: Callable[[Mapping], Tensor] | None = None,
+        **trainer_kwargs
     ) -> None:
         self.max_epochs = max_epochs
         self.loss = loss
@@ -106,6 +174,8 @@ class Trainer:
         self.optimizer_kwargs = dict(optimizer_kwargs or {})
         self.loss_inputs = dict(loss_inputs or {})
         self.early_stopping = early_stopping
+        self.metrics = dict(metrics or {})
+        self.metric_mask = metric_mask
         self.trainer_kwargs = trainer_kwargs
 
         self._trainer = None
@@ -125,6 +195,8 @@ class Trainer:
             optimizer=self.optimizer,
             optimizer_kwargs=self.optimizer_kwargs,
             loss_inputs=self.loss_inputs,
+            metrics=self.metrics,
+            metric_mask=self.metric_mask,
         )
 
         trainer_kwargs = dict(self.trainer_kwargs)
