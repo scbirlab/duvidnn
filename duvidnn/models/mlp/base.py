@@ -84,7 +84,11 @@ class MLP(nn.Module):
         self.layers = None
         self._built = False
 
+        self.build()
+
     def build(self) -> None:
+        if self._built:
+            return None
         widths = (*self.hidden_dims, self.output_dim)
 
         layers: list[nn.Module] = []
@@ -126,8 +130,5 @@ class MLP(nn.Module):
         self._built = True
 
     def forward(self, x: Tensor) -> Tensor:
-        if self._built:
-            return self.layers(x)
-        else:
-            self.build()
-            return self.layers(x)
+        self.build()
+        return self.layers(x)

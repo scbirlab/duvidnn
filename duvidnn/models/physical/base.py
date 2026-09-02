@@ -165,6 +165,8 @@ class PhysicalModel(nn.Module):
         self._trainable_params = None
         self._built = False
 
+        self.build()
+
     def build(self) -> None:
         if self._built:
             return None

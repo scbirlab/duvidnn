@@ -76,8 +76,11 @@ class ChempropEncoder(nn.Module):
         self.projection = None
         self.aggregation = None
         self.graph_dim = None
+        self.build()
 
     def build(self):
+        if self._built:
+            return None
         self.message_passing = BondMessagePassing(
             d_h=self.mp_hidden_dim,
             depth=self.mp_depth,
@@ -106,40 +109,37 @@ class ChempropEncoder(nn.Module):
         self, 
         input: Mapping[str, ...]
     ) -> Tensor:
-        if self._built:
-            bmg = input["bmg"]
-            V_d = input.get("V_d")
-            X_d = input.get("X_d")
-            if self.extra_dim == 0 and X_d is not None:
-                raise ValueError(
-                    f"Received X_d descriptors ({len(X_d)=}) but {self.extra_dim=}."
-                )
-            if self.extra_dim > 0 and X_d is None:
-                raise ValueError(
-                    f"Expected X_d with width {self.extra_dim=}, "
-                    "but no X_d was provided."
-                )
-            if X_d is not None and X_d.shape[-1] != self.extra_dim:
-                raise ValueError(
-                    f"Expected X_d width {self.extra_dim=}, "
-                    f"got {X_d.shape[-1]=}."
-                )
-            if isinstance(bmg, dict):
-                _batch = bmg["batch"]
-            else:
-                _batch = getattr(bmg, "batch")
-            h = self.message_passing(
-                bmg,
-                V_d,
+        self.build()
+        bmg = input["bmg"]
+        V_d = input.get("V_d")
+        X_d = input.get("X_d")
+        if self.extra_dim == 0 and X_d is not None:
+            raise ValueError(
+                f"Received X_d descriptors ({len(X_d)=}) but {self.extra_dim=}."
             )
-            h = self.aggregation(
-                h,
-                _batch,
+        if self.extra_dim > 0 and X_d is None:
+            raise ValueError(
+                f"Expected X_d with width {self.extra_dim=}, "
+                "but no X_d was provided."
             )
-            h = self.batch_normalization(h)
-            if X_d is not None:
-                h = torch.cat((h, X_d), dim=-1)
-            return self.projection(h)
+        if X_d is not None and X_d.shape[-1] != self.extra_dim:
+            raise ValueError(
+                f"Expected X_d width {self.extra_dim=}, "
+                f"got {X_d.shape[-1]=}."
+            )
+        if isinstance(bmg, dict):
+            _batch = bmg["batch"]
         else:
-            self.build()
-            return self.forward(input)
+            _batch = getattr(bmg, "batch")
+        h = self.message_passing(
+            bmg,
+            V_d,
+        )
+        h = self.aggregation(
+            h,
+            _batch,
+        )
+        h = self.batch_normalization(h)
+        if X_d is not None:
+            h = torch.cat((h, X_d), dim=-1)
+        return self.projection(h)
