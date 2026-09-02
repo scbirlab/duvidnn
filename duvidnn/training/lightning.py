@@ -45,7 +45,10 @@ class LightningTask(L.LightningModule):
 
         metrics = metrics or {}
         if isinstance(metrics, (tuple, list)):
-            metrics = {f.__name__: f for f in metrics}
+            metrics = {
+                (f.__name__ if hasattr(f, "__name__") else str(f)): f 
+                for f in metrics
+            }
 
         self.train_metrics = MetricCollection(deepcopy(metrics))
         self.val_metrics = MetricCollection(deepcopy(metrics))
@@ -101,9 +104,11 @@ class LightningTask(L.LightningModule):
 
     def _log_metrics(
         self,
-        metrics,
+        metrics: Mapping[str, Metric] | None,
         stage: str,
     ) -> None:
+        if metrics is None:
+            return None
         for name, metric in metrics.items():
             self.log(
                 f"{stage}_{name}",
