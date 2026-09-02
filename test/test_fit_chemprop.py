@@ -68,9 +68,7 @@ def test_box_fit_heterogeneous_chemprop_hill_readout():
         ),
         trainer=Trainer(
             loss=nn.MSELoss(),
-            optimizer_kwargs={
-                "lr": 0.01,
-            },
+            optimizer_kwargs={"lr": .01},
             max_epochs=1,
             logger=False,
             enable_checkpointing=False,
@@ -105,17 +103,9 @@ def test_box_fit_heterogeneous_chemprop_hill_readout():
         ],
     }
 
-    before_chemprop = parameters(
-        model.latent.left
-    )
-
-    before_right = parameters(
-        model.latent.right
-    )
-
-    before_fusion = parameters(
-        model.latent.fusion
-    )
+    before_chemprop = parameters(model.latent.left)
+    before_right = parameters(model.latent.right)
+    before_fusion = parameters(model.latent.fusion)
 
     assert "molecule" in pipeline.collators
 

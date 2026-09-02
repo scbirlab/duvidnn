@@ -431,7 +431,6 @@ def test_box_fit_heterogeneous_two_tower():
     )
 
     assert observed is box
-    print(before.keys())
     assert not torch.equal(before["towers.left.weight"], model.left.weight)
     assert not torch.equal(
         before["towers.right.embedding.weight"],

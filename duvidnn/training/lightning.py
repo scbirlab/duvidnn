@@ -55,7 +55,6 @@ class LightningTask(L.LightningModule):
 
         self.train_metrics = MetricCollection(deepcopy(metrics))
         self.val_metrics = MetricCollection(deepcopy(metrics))
-        self.test_metrics = MetricCollection(deepcopy(metrics))
 
     def _loss_kwargs(self, batch) -> dict:
         return {
@@ -109,6 +108,7 @@ class LightningTask(L.LightningModule):
         self,
         metrics: Mapping[str, Metric] | None,
         stage: str,
+        batch_size: int
     ) -> None:
         if metrics is None:
             return None
@@ -120,6 +120,7 @@ class LightningTask(L.LightningModule):
                 on_epoch=True,
                 prog_bar=False,
                 sync_dist=True,
+                batch_size=batch_size,
             )
 
     def _step(
@@ -128,6 +129,7 @@ class LightningTask(L.LightningModule):
         stage: str
     ):
         prediction_target_loss = self._prediction_target_loss(batch)
+        batch_size = prediction_target_loss.target.shape[0]
 
         self.log(
             f"{stage}_loss",
@@ -136,6 +138,7 @@ class LightningTask(L.LightningModule):
             on_epoch=True,
             prog_bar=True,
             sync_dist=True,
+            batch_size=batch_size,
         )
         metrics = self._update_metrics(
             prediction=prediction_target_loss.prediction,
@@ -143,7 +146,11 @@ class LightningTask(L.LightningModule):
             batch=batch,
             stage=stage,
         )
-        self._log_metrics(metrics, stage=stage)
+        self._log_metrics(
+            metrics, 
+            stage=stage,
+            batch_size=batch_size,
+        )
         return prediction_target_loss.loss
 
     def training_step(
@@ -189,7 +196,13 @@ class Trainer:
         self.optimizer_kwargs = dict(optimizer_kwargs or {})
         self.loss_inputs = dict(loss_inputs or {})
         self.early_stopping = early_stopping
-        self.metrics = dict(metrics or {})
+        metrics = metrics or {}
+        if isinstance(metrics, (tuple, list)):
+            metrics = {
+                (f.__name__ if hasattr(f, "__name__") else str(f)): f 
+                for f in metrics
+            }
+        self.metrics = metrics
         self.metric_mask = metric_mask
         self.trainer_kwargs = trainer_kwargs
 
@@ -201,7 +214,6 @@ class Trainer:
         invoker: ModelInvoker,
         train_dataloader,
         val_dataloader=None,
-        test_dataloader=None,
         trainer: L.Trainer | None = None
     ) -> nn.Module:
         task = LightningTask(
