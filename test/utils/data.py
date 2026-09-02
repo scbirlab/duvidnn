@@ -26,7 +26,7 @@ def _make_vectome_rows():
 
 def _make_chemprop_rows(smiles=("CCO", "CCN")):
     return [{
-            "bmg": _cached_molgraph(s),
+            "mg": _cached_molgraph(s),
             "V_d": None,
             "X_d": None,
     } for s in smiles]
