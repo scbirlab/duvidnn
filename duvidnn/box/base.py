@@ -15,6 +15,7 @@ from torch import nn
 from ..config import instantiate_model
 from ..invoke import ModelInvoker
 from ..mapping import ColumnMap
+from ..training import Trainer
 from ..checkpoint_utils import save_json, load_json
 
 
@@ -22,6 +23,7 @@ CONFIG_FILENAME = "config.json"
 WEIGHTS_FILENAME = "weights.pt"
 MODEL_FILENAME = "model.pt"
 PIPELINE_DIRNAME: str = "data"
+DEFAULT_BATCH_SIZE: int = 32
 
 PipelineLike: TypeAlias = DataPipeline | Mapping[str, Any] | str | Callable
 
@@ -104,7 +106,7 @@ class Box:
         pipeline: PipelineLike | None = None,
         # TODO: Make type hints more specific
         data: Any | None = None,
-        trainer: Any | None = None,
+        trainer: Trainer | None = None,
         model_config: Mapping[str, Any] | None = None
     ):
         self.pipeline = _resolve_pipeline(pipeline)
@@ -296,3 +298,67 @@ class Box:
     ):
         """Return predictions and target from an already prepared batch."""
         return self.invoker.supervised(batch)
+
+    def fit(
+        self,
+        data,
+        *,
+        validation=None,
+        batch_size: int = DEFAULT_BATCH_SIZE,
+        validation_batch_size: int | None = None,
+        dataloader_kwargs: Mapping[str, Any] | None = None,
+        validation_dataloader_kwargs: Mapping[str, Any] | None = None
+    ):
+        """Fit the model using raw training and optional validation and test data."""
+
+        if self.trainer is None:
+            raise ValueError(
+                "Box.fit() requires a trainer."
+            )
+
+        if not isinstance(self.pipeline, DataPipeline):
+            raise TypeError(
+                "Box.fit() requires an "
+                "aspect.DataPipeline."
+            )
+
+        dataloader_kwargs = dict(dataloader_kwargs or {})
+        train_data = self.pipeline(data)
+        train_loader = self.pipeline.dataloader(
+            train_data,
+            batch_size=batch_size,
+            shuffle=True,
+            **dataloader_kwargs,
+        )
+
+        val_loader = None
+        if validation is not None:
+            validation_pipeline = self.pipeline.clone()
+            validation_data = validation_pipeline(validation)
+
+            validation_kwargs = dict(
+                validation_dataloader_kwargs
+                or dataloader_kwargs
+            )
+
+            val_loader = (
+                validation_pipeline.dataloader(
+                    validation_data,
+                    batch_size=(
+                        validation_batch_size
+                        or batch_size
+                    ),
+                    shuffle=False,
+                    **validation_kwargs,
+                )
+            )
+        else:
+            val_loader = None
+
+        self.trainer.fit(
+            model=self.model,
+            invoker=self.invoker,
+            train_dataloader=train_loader,
+            val_dataloader=val_loader,
+        )
+        return self

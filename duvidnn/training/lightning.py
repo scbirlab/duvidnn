@@ -3,9 +3,12 @@
 from collections.abc import Callable, Iterable, Mapping
 from copy import deepcopy
 from dataclasses import dataclass
+import warnings
 
 import lightning as L
+from lightning.fabric.plugins.environments import LightningEnvironment
 from lightning.pytorch.callbacks import EarlyStopping
+from lightning.pytorch.utilities.warnings import PossibleUserWarning
 from torch import nn, Tensor
 from torch.optim import Adam
 from torchmetrics import Metric, MetricCollection
@@ -198,6 +201,7 @@ class Trainer:
         invoker: ModelInvoker,
         train_dataloader,
         val_dataloader=None,
+        test_dataloader=None,
         trainer: L.Trainer | None = None
     ) -> nn.Module:
         task = LightningTask(
@@ -212,9 +216,9 @@ class Trainer:
         )
 
         trainer_kwargs = dict(self.trainer_kwargs)
-
+        if val_dataloader is None:
+            trainer_kwargs.setdefault("limit_val_batches", 0)
         callbacks = list(trainer_kwargs.pop("callbacks", []))
-
         if (
             self.early_stopping is not None
             and val_dataloader is not None
@@ -227,10 +231,17 @@ class Trainer:
                 )
             )
 
+        plugins = list(trainer_kwargs.pop("plugins", []))
+        if not any(
+            isinstance(plugin, LightningEnvironment)
+            for plugin in plugins
+        ):
+            plugins.append(LightningEnvironment())
         if trainer is None:
             self._trainer = L.Trainer(
                 max_epochs=self.max_epochs,
                 callbacks=callbacks,
+                plugins=plugins,
                 **trainer_kwargs,
             )
         elif isinstance(trainer, L.Trainer):
@@ -241,10 +252,19 @@ class Trainer:
                 f"but was {type(trainer)}: {trainer}"
             )
 
-        self._trainer.fit(
-            task,
-            train_dataloaders=train_dataloader,
-            val_dataloaders=val_dataloader,
-        )
-
+        with warnings.catch_warnings():
+            for msg in (
+                r".*does not have many workers.*",  # Reduce lightning chatter about dataloaders
+                r".*defined a `validation_step` but have no `val_dataloader`.*",
+            ):
+                warnings.filterwarnings(
+                    "ignore",
+                    message=msg,
+                    category=PossibleUserWarning,
+                )
+            self._trainer.fit(
+                task,
+                train_dataloaders=train_dataloader,
+                val_dataloaders=val_dataloader,
+            )
         return model
