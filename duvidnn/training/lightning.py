@@ -97,6 +97,13 @@ class LightningTask(L.LightningModule):
                 return None
 
         metrics.update(prediction, target)
+        return metrics
+
+    def _log_metrics(
+        self,
+        metrics,
+        stage: str,
+    ) -> None:
         for name, metric in metrics.items():
             self.log(
                 f"{stage}_{name}",
@@ -106,7 +113,6 @@ class LightningTask(L.LightningModule):
                 prog_bar=False,
                 sync_dist=True,
             )
-        return None
 
     def _step(
         self,
@@ -123,12 +129,13 @@ class LightningTask(L.LightningModule):
             prog_bar=True,
             sync_dist=True,
         )
-        self._update_metrics(
+        metrics = self._update_metrics(
             prediction=prediction_target_loss.prediction,
             target=prediction_target_loss.target,
             batch=batch,
             stage=stage,
         )
+        self._log_metrics(metrics, stage=stage)
         return prediction_target_loss.loss
 
     def training_step(
