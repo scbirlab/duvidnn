@@ -14,7 +14,12 @@ from torch import nn
 
 from ..config import instantiate_model
 from ..checkpoint_utils import save_json, load_json
-from ..invoke import ModelInvoker
+from ..invoke import (
+    DuvidaModel,
+    ModelInvoker,
+    TrainingDerivatives,
+)
+from ..invoke.duvida import DEFAULT_APPROXIMATOR
 from ..mapping import ColumnMap
 from ..training import Trainer
 from ..utils.device import move_to_device
@@ -26,6 +31,7 @@ MODEL_FILENAME = "model.pt"
 PIPELINE_DIRNAME: str = "data"
 DEFAULT_BATCH_SIZE: int = 32
 DEFAULT_PREDICTION_COLUMN: str = "prediction"
+TRAINING_DERIVATIVES_FILENAME: str = "training_derivatives.pt"
 
 PipelineLike: TypeAlias = DataPipeline | Mapping[str, Any] | str | Callable
 
@@ -122,6 +128,55 @@ def _predict_map_batch(
     }
 
 
+def _load_training_derivatives(
+    path: Path,
+    map_location,
+) -> TrainingDerivatives | None:
+    filename = path / TRAINING_DERIVATIVES_FILENAME
+
+    if not filename.exists():
+        return None
+
+    state = torch.load(
+        filename,
+        map_location=map_location,
+        weights_only=True,
+    )
+
+    return TrainingDerivatives.from_state_dict(state)
+
+
+def _validate_training_derivatives(
+    model: nn.Module,
+    derivatives: TrainingDerivatives | None,
+) -> None:
+    if derivatives is None:
+        return
+
+    parameters = dict(model.named_parameters())
+
+    for label, tree in (
+        ("fisher_score", derivatives.fisher_score),
+        ("fisher_information", derivatives.fisher_information),
+    ):
+        if tree is None:
+            continue
+
+        if set(tree) != set(parameters):
+            raise ValueError(
+                f"Cached {label} parameter keys "
+                "do not match the restored model."
+            )
+        for name, value in tree.items():
+            if value.shape != parameters[name].shape:
+                raise ValueError(
+                    f"Cached {label} shape for "
+                    f"{name!r} is {value.shape}, "
+                    "but model parameter shape is "
+                    f"{parameters[name].shape}."
+                )
+
+
 class Box:
     """Data processing, model invocation, and optional training.
 
@@ -143,7 +198,8 @@ class Box:
         # TODO: Make type hints more specific
         data: Any | None = None,
         trainer: Trainer | None = None,
-        model_config: Mapping[str, Any] | None = None
+        model_config: Mapping[str, Any] | None = None,
+        training_derivatives: TrainingDerivatives | None = None,
     ):
         self.pipeline = _resolve_pipeline(pipeline)
         self.model = model
@@ -160,6 +216,7 @@ class Box:
             model=self.model,
             input_map=self.input_map,
         )
+        self.training_derivatives = training_derivatives
 
     @classmethod
     def from_config(
@@ -267,6 +324,16 @@ class Box:
                 self.model.state_dict(),
                 path / WEIGHTS_FILENAME,
             )
+        derivatives_path = path / TRAINING_DERIVATIVES_FILENAME
+        if self.training_derivatives is not None:
+            torch.save(
+                self.training_derivatives.state_dict(),
+                derivatives_path,
+            )
+        elif derivatives_path.exists():
+            derivatives_path.unlink()
+
+    
 
     @classmethod
     def load(
@@ -289,6 +356,10 @@ class Box:
         config["pipeline"] = pipeline_config
 
         model_config = config.get("model")
+        training_derivatives = _load_training_derivatives(
+            path,
+            map_location,
+        )
         
         if model_config is not None:
             model = instantiate_model(model_config)
@@ -299,11 +370,16 @@ class Box:
                 weights_only=True,
             )
             model.load_state_dict(state_dict)
+            _validate_training_derivatives(
+                model,
+                training_derivatives,
+            )
             return cls(
                 model=model,
                 input_map=input_map,
                 pipeline=pipeline,
                 model_config=model_config,
+                training_derivatives=training_derivatives,
             )
 
         model = torch.load(
@@ -311,10 +387,15 @@ class Box:
             map_location=map_location,
             weights_only=False,
         )
+        _validate_training_derivatives(
+            model,
+            training_derivatives,
+        )
         return cls(
             model=model,
             input_map=input_map,
             pipeline=pipeline,
+            training_derivatives=training_derivatives,
         )
 
     def prepare(self, data):
@@ -334,6 +415,27 @@ class Box:
     ):
         """Return predictions and target from an already prepared batch."""
         return self.invoker.supervised(batch)
+
+    def _training_data(self):
+        if not isinstance(self.pipeline, DataPipeline):
+            raise TypeError(
+                "Training data requires an "
+                "aspect.DataPipeline."
+            )
+
+        if self.pipeline.data_out is not None:
+            return self.pipeline.data_out
+
+        if self.pipeline.data_in is not None:
+            pipeline = self.pipeline.clone()
+
+            return pipeline(self.pipeline.data_in)
+
+        raise ValueError(
+            "Training data require retained "
+            "training data or enough source provenance "
+            "to reconstruct them."
+        )
 
     def fit(
         self,
@@ -390,7 +492,7 @@ class Box:
             )
         else:
             val_loader = None
-
+        self.training_derivatives = None
         self.trainer.fit(
             model=self.model,
             invoker=self.invoker,
@@ -437,17 +539,7 @@ class Box:
         pipeline = ref_pipeline.clone()
         prepared = None
         if data is None:  # use training data
-            if self.pipeline.data_out is not None:
-                prepared = self.pipeline.data_out  # use training data
-            else:
-                if self.pipeline.data_in is not None:
-                    data = self.pipeline.data_in  # fall back to regenerating from saved inputs
-                else:
-                    raise ValueError(
-                        "If `data` not supplied, then the data pipeline needs "
-                        "to have been run to generate the featurized training data. "
-                        "Try training the model or box.pipeline(training_data)."
-                    )
+            prepared = self._training_data()
         if prepared is None:
             prepared = pipeline(data)
 
@@ -469,3 +561,116 @@ class Box:
             desc="Predicting",
             **map_kwargs,
         )
+
+    def compute_training_derivatives(
+        self,
+        *,
+        fisher_score: bool = False,
+        fisher_information: Mapping[str, Any] | str | None = None,
+        loss: Callable | None = None,
+        loss_inputs: Mapping[str, str] | None = None,
+        loss_reduction: str = "mean",
+        batch_size: int = DEFAULT_BATCH_SIZE,
+        device=None,
+        dataloader_kwargs: Mapping[str, Any] | None = None,
+    ):
+        """Compute optional training-set derivatives for downstream UQ."""
+
+        if (
+            not fisher_score
+            and fisher_information is None
+        ):
+            return self
+
+        if loss is None:
+            if self.trainer is None:
+                raise ValueError(
+                    "No loss was supplied and this Box "
+                    "does not retain a Trainer. Pass `loss=` "
+                    "explicitly."
+                )
+
+            loss = self.trainer.loss
+
+            if loss_inputs is None:
+                loss_inputs = self.trainer.loss_inputs
+
+        data = self._training_data()
+
+        if device is None:
+            device = _model_device(self.model)
+        else:
+            device = torch.device(device)
+            self.model.to(device)
+
+        dataloader_kwargs = dict(
+            dataloader_kwargs or {}
+        )
+
+        def make_loader():
+            return self.pipeline.dataloader(
+                data,
+                batch_size=batch_size,
+                shuffle=False,
+                **dataloader_kwargs,
+            )
+
+        def prepare_batch(batch):
+            return move_to_device(batch, device)
+
+        functional = DuvidaModel(
+            self.model,
+            self.invoker,
+        )
+
+        self.model.eval()
+
+        if self.training_derivatives is None:
+            self.training_derivatives = TrainingDerivatives()
+
+        if fisher_score:
+            score, n_samples = functional.accumulate_fisher_score(
+                make_loader(),
+                loss,
+                loss_inputs=loss_inputs,
+                loss_reduction=loss_reduction,
+                prepare_batch=prepare_batch,
+            )
+            self.training_derivatives.fisher_score = score
+            self.training_derivatives.n_samples = n_samples
+            self.training_derivatives.loss_reduction = loss_reduction
+
+        if fisher_information is not None:
+            if isinstance(
+                fisher_information,
+                str,
+            ):
+                fisher_information = {
+                    "approximator": fisher_information,
+                }
+            else:
+                fisher_information = dict(fisher_information)
+
+            approximator = fisher_information.pop("approximator", DEFAULT_APPROXIMATOR)
+
+            information, n_samples = (
+                functional.accumulate_fisher_information(
+                    make_loader(),
+                    loss,
+                    loss_inputs=loss_inputs,
+                    loss_reduction=loss_reduction,
+                    approximator=approximator,
+                    prepare_batch=prepare_batch,
+                    **fisher_information,
+                )
+            )
+
+            self.training_derivatives.fisher_information = information
+            self.training_derivatives.fisher_information_config = {
+                "approximator": approximator,
+                **fisher_information,
+            }
+            self.training_derivatives.n_samples = n_samples
+            self.training_derivatives.loss_reduction = loss_reduction
+
+        return self

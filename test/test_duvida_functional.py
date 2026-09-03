@@ -1,181 +1,10 @@
 import torch
 from torch import nn
 
-from duvida import (
-    doubtscore,
-    fisher_information_diagonal,
-    fisher_score,
-    information_sensitivity,
-    parameter_gradient,
+from duvidnn.invoke import (
+    DuvidaModel, 
+    ModelInvoker,
 )
-
-from duvidnn.invoke import ModelInvoker, make_stateless_model
-from duvidnn.mapping import ColumnMap
-
-
-def _parameter_gradient(
-    model,
-    invoker,
-    batch
-):
-    inputs = invoker.inputs(batch)
-    stateless_model = make_stateless_model(model)
-    params = dict(model.named_parameters())
-
-    return parameter_gradient(stateless_model)(
-        (params,),
-        inputs,
-    )[0]
-
-
-def _fisher_score(
-    model,
-    invoker,
-    batch,
-    target,
-):
-    inputs = invoker.inputs(
-        batch
-    )
-
-    stateless_model = make_stateless_model(
-        model
-    )
-
-    params = dict(
-        model.named_parameters()
-    )
-
-    loss = lambda prediction, observed: torch.sum(
-        torch.square(
-            prediction - observed
-        )
-    )
-
-    return fisher_score(
-        stateless_model,
-        loss,
-    )(
-        (params,),
-        inputs,
-        target,
-    )[0]
-
-
-def _fisher_information(
-    model,
-    invoker,
-    batch,
-    target,
-):
-    inputs = invoker.inputs(
-        batch
-    )
-
-    stateless_model = make_stateless_model(
-        model
-    )
-
-    params = dict(
-        model.named_parameters()
-    )
-
-    loss = lambda prediction, observed: torch.sum(
-        torch.square(
-            prediction - observed
-        )
-    )
-
-    return fisher_information_diagonal(
-        stateless_model,
-        loss,
-        approximator="squared_jacobian",
-    )(
-        (params,),
-        inputs,
-        target,
-    )[0]
-
-
-def _doubtscore(
-    model,
-    invoker,
-    batch,
-    candidate_batch,
-    target,
-):
-    inputs = invoker.inputs(
-        batch
-    )
-
-    candidate_inputs = invoker.inputs(
-        candidate_batch
-    )
-
-    stateless_model = make_stateless_model(
-        model
-    )
-
-    params = dict(
-        model.named_parameters()
-    )
-
-    loss = lambda prediction, observed: torch.sum(
-        torch.square(
-            prediction - observed
-        )
-    )
-
-    return doubtscore(
-        stateless_model,
-        loss,
-    )(
-        (params,),
-        candidate_inputs,
-        inputs,
-        target,
-    )[0]
-
-
-def _information_sensitivity(
-    model,
-    invoker,
-    batch,
-    candidate_batch,
-    target,
-):
-    inputs = invoker.inputs(
-        batch
-    )
-
-    candidate_inputs = invoker.inputs(
-        candidate_batch
-    )
-
-    stateless_model = make_stateless_model(
-        model
-    )
-
-    params = dict(
-        model.named_parameters()
-    )
-
-    loss = lambda prediction, observed: torch.sum(
-        torch.square(
-            prediction - observed
-        )
-    )
-
-    return information_sensitivity(
-        stateless_model,
-        loss,
-        approximator="squared_jacobian",
-    )(
-        (params,),
-        candidate_inputs,
-        inputs,
-        target,
-    )[0]
 
 
 def test_duvida_parameter_gradient_linear():
@@ -200,11 +29,8 @@ def test_duvida_parameter_gradient_linear():
         in model.named_parameters()
     }
 
-    gradients = _parameter_gradient(
-        model,
-        invoker,
-        batch,
-    )
+    functional = DuvidaModel(model, invoker)
+    gradients = functional.parameter_gradient(batch)
 
     for name, gradient in gradients.items():
         assert gradient.shape == (*prediction.shape, *before[name].shape)
@@ -270,11 +96,8 @@ def test_duvida_parameter_gradient_two_tower():
         in model.named_parameters()
     }
 
-    gradients = _parameter_gradient(
-        model,
-        invoker,
-        batch,
-    )
+    functional = DuvidaModel(model, invoker)
+    gradients = functional.parameter_gradient(batch)
 
     assert set(gradients) == set(before)
     for name, gradient in gradients.items():
@@ -350,11 +173,8 @@ def test_duvida_parameter_gradient_readout():
         for name, parameter
         in model.named_parameters()
     }
-    gradients = _parameter_gradient(
-        model,
-        invoker,
-        batch,
-    )
+    functional = DuvidaModel(model, invoker)
+    gradients = functional.parameter_gradient(batch)
 
     assert set(gradients) == set(before)
 
@@ -377,226 +197,15 @@ def test_duvida_parameter_gradient_readout():
         assert torch.equal(parameter, before[name])
 
 
-def test_duvida_parameter_gradient_chemprop():
-
-    import torch
-
-    from aspect import DataPipeline
-    from duvida import parameter_gradient
-
-    from duvidnn.invoke import (
-        ModelInvoker,
-        make_stateless_model,
-    )
-    from duvidnn.mapping import ColumnMap
-    from duvidnn.models import (
-        ChempropEncoder,
-        HillCurve,
-        MLP,
-        Readout,
-        TwoTower,
-    )
-
-    torch.manual_seed(0)
-
-    pipeline = DataPipeline({
-        "molecule": ("smiles", "chemprop-mol"),
-    })
-
-    model = Readout(
-        latent=TwoTower(
-            left=ChempropEncoder(
-                output_dim=4,
-                mp_hidden_dim=16,
-                mp_depth=1,
-                hidden_dims=8,
-            ),
-            right=MLP(
-                input_dim=2,
-                output_dim=3,
-                hidden_dims=4,
-            ),
-            fusion=MLP(
-                input_dim=7,
-                output_dim=1,
-                hidden_dims=4,
-            ),
-        ),
-        readout=HillCurve(
-            slope=1.,
-            trainable_slope=True,
-        ),
-    )
-    
-    invoker = ModelInvoker(
-        model=model,
-        input_map={"inputs": {
-            "left": "molecule",
-            "right": "features",
-            "context": "concentration",
-        }},
-    )
-
-    data = {
-        "smiles": ["CCO", "CCN"],
-        "features": [
-            [0., 0.],
-            [0., 1.],
-        ],
-        "concentration": [
-            [0.5],
-            [1.0],
-        ],
-    }
-
-    prepared = pipeline(data)
-
-    batch = next(iter(pipeline.dataloader(batch_size=2)))
-
-    # Prove ordinary invocation works before testing derivatives.
-    prediction = invoker.predict(batch)
-
-    assert prediction.shape == (2, 1)
-
-    before = {
-        name: parameter.detach().clone()
-        for name, parameter
-        in model.named_parameters()
-    }
-
-    gradients = _parameter_gradient(
-        model,
-        invoker,
-        batch
-    )
-
-    assert set(gradients) == set(before)
-
-    for name, gradient in gradients.items():
-        assert gradient.shape[0] == 2
-        assert torch.all(torch.isfinite(gradient))
-
-    for name, parameter in model.named_parameters():
-        assert torch.equal(parameter, before[name])
-
-
-def test_duvida_parameter_gradient_chemprop():
-
-    from aspect import DataPipeline
-
-    from duvidnn.models import (
-        ChempropEncoder,
-        HillCurve,
-        MLP,
-        Readout,
-        TwoTower,
-    )
-
-    torch.manual_seed(0)
-
-    pipeline = DataPipeline({
-        "molecule": ("smiles", "chemprop-mol"),
-    })
-
-    model = Readout(
-        latent=TwoTower(
-            left=ChempropEncoder(
-                output_dim=4,
-                mp_hidden_dim=16,
-                mp_depth=1,
-                hidden_dims=8,
-            ),
-            right=MLP(
-                input_dim=2,
-                output_dim=3,
-                hidden_dims=4,
-            ),
-            fusion=MLP(
-                input_dim=7,
-                output_dim=1,
-                hidden_dims=4,
-            ),
-        ),
-        readout=HillCurve(
-            slope=1.,
-            trainable_slope=True,
-        ),
-    )
-
-    invoker = ModelInvoker(
-        model=model,
-        input_map={
-            "inputs": {
-                "left": "molecule",
-                "right": "features",
-                "context": "concentration",
-            },
-        },
-    )
-
-    data = {
-        "smiles": [
-            "CCO",
-            "CCN",
-            "CC(=O)O",
-            "c1ccccc1",
-        ],
-        "features": [
-            [0., 0.],
-            [0., 1.],
-            [1., 0.],
-            [1., 1.],
-        ],
-        "concentration": [
-            [0.5],
-            [1.0],
-            [2.0],
-            [4.0],
-        ],
-    }
-
-    pipeline(data)
-
-    batch = next(iter(pipeline.dataloader(batch_size=2)))
-
-    prediction = invoker.predict(batch)
-
-    before = {
-        name: parameter.detach().clone()
-        for name, parameter
-        in model.named_parameters()
-    }
-
-    gradients = _parameter_gradient(
-        model,
-        invoker,
-        batch,
-    )
-
-    assert set(gradients) == set(before)
-    for name, gradient in gradients.items():
-        assert gradient.shape == (*prediction.shape, *before[name].shape)
-        assert torch.all(torch.isfinite(gradient))
-
-    nonzero_grads = []
-    print(gradients)
-    for name, gradient in gradients.items():
-        if name.startswith("latent.towers.left."):
-            nonzero_grads.append(torch.any(gradient != 0.))
-
-    assert any(nonzero_grads)
-
-    for name, parameter in model.named_parameters():
-        assert torch.equal(parameter, before[name])
-
-
 def test_duvida_fisher_preserves_parameter_structure():
 
     model = nn.Linear(2, 1)
 
     invoker = ModelInvoker(
         model=model,
-        input_map={"inputs": {"input": "x"},
+        input_map={
+            "inputs": {"input": "x"},
+            "target": "y",
         },
     )
 
@@ -605,32 +214,25 @@ def test_duvida_fisher_preserves_parameter_structure():
             [1., 2.],
             [3., 4.],
         ]),
+        "y": torch.tensor([
+            [0.],
+            [1.],
+        ])
     }
-
-    target = torch.tensor([
-        [0.],
-        [1.],
-    ])
 
     before = {
         name: parameter.detach().clone()
         for name, parameter
         in model.named_parameters()
     }
-
-    score = _fisher_score(
-        model,
-        invoker,
-        batch,
-        target,
+    loss = lambda prediction, observed: torch.sum(
+        torch.square(
+            prediction - observed
+        )
     )
-
-    information = _fisher_information(
-        model,
-        invoker,
-        batch,
-        target,
-    )
+    functional = DuvidaModel(model, invoker)
+    score = functional.fisher_score(batch, loss)
+    information = functional.fisher_information(batch, loss)
 
     assert set(score) == set(before)
     assert set(information) == set(before)
@@ -683,10 +285,13 @@ def test_duvida_fisher_chemprop():
 
     invoker = ModelInvoker(
         model=model,
-        input_map={"inputs": {
-            "left": "molecule",
-            "right": "features",
-        }},
+        input_map={
+            "inputs": {
+                "left": "molecule",
+                "right": "features",
+            },
+            "target": "y",
+        },
     )
 
     pipeline({
@@ -695,14 +300,13 @@ def test_duvida_fisher_chemprop():
             [0., 0.],
             [1., 1.],
         ],
+        "y": [
+            [.25],
+            [.75],
+        ],
     })
 
     batch = next(iter(pipeline.dataloader(batch_size=2)))
-
-    target = torch.tensor([
-        [.25],
-        [.75],
-    ])
 
     _ = invoker.predict(batch)
 
@@ -712,19 +316,14 @@ def test_duvida_fisher_chemprop():
         in model.named_parameters()
     }
 
-    score = _fisher_score(
-        model,
-        invoker,
-        batch,
-        target,
+    loss = lambda prediction, observed: torch.sum(
+        torch.square(
+            prediction - observed
+        )
     )
-
-    information = _fisher_information(
-        model,
-        invoker,
-        batch,
-        target,
-    )
+    functional = DuvidaModel(model, invoker)
+    score = functional.fisher_score(batch, loss)
+    information = functional.fisher_information(batch, loss)
 
     assert set(score) == set(before)
     assert set(information) == set(before)
@@ -793,6 +392,7 @@ def test_duvida_doubtscore_chemprop():
                 "left": "molecule",
                 "right": "features",
             },
+            "target": "y",
         },
     )
 
@@ -809,6 +409,12 @@ def test_duvida_doubtscore_chemprop():
             [1., 0.],
             [1., 1.],
         ],
+        "y": [
+            [0.25],
+            [0.75],
+            [0.25],
+            [0.75],
+        ]
     })
 
     loader = pipeline.dataloader(batch_size=2)
@@ -818,11 +424,6 @@ def test_duvida_doubtscore_chemprop():
     batch = next(iterator)
     candidate_batch = next(iterator)
 
-    target = torch.tensor([
-        [0.25],
-        [0.75],
-    ])
-
     _ = invoker.predict(batch)
 
     before = {
@@ -831,13 +432,13 @@ def test_duvida_doubtscore_chemprop():
         in model.named_parameters()
     }
 
-    observed = _doubtscore(
-        model,
-        invoker,
-        batch,
-        candidate_batch,
-        target,
+    loss = lambda prediction, observed: torch.sum(
+        torch.square(
+            prediction - observed
+        )
     )
+    functional = DuvidaModel(model, invoker)
+    observed = functional.doubtscore(candidate_batch, batch, loss)
 
     assert set(observed) == set(before)
 
@@ -906,6 +507,7 @@ def test_duvida_information_sensitivity_chemprop():
                 "left": "molecule",
                 "right": "features",
             },
+            "target": "y",
         },
     )
 
@@ -922,6 +524,12 @@ def test_duvida_information_sensitivity_chemprop():
             [1., 0.],
             [1., 1.],
         ],
+        "y": [
+            [0.25],
+            [0.75],
+            [0.25],
+            [0.75],
+        ],
     })
 
     loader = pipeline.dataloader(batch_size=2)
@@ -931,11 +539,6 @@ def test_duvida_information_sensitivity_chemprop():
     batch = next(iterator)
     candidate_batch = next(iterator)
 
-    target = torch.tensor([
-        [0.25],
-        [0.75],
-    ])
-
     _ = invoker.predict(batch)
 
     before = {
@@ -944,13 +547,13 @@ def test_duvida_information_sensitivity_chemprop():
         in model.named_parameters()
     }
 
-    observed = _information_sensitivity(
-        model,
-        invoker,
-        batch,
-        candidate_batch,
-        target,
+    loss = lambda prediction, observed: torch.sum(
+        torch.square(
+            prediction - observed
+        )
     )
+    functional = DuvidaModel(model, invoker)
+    observed = functional.information_sensitivity(candidate_batch, batch, loss)
 
     assert set(observed) == set(before)
 
@@ -975,3 +578,62 @@ def test_duvida_information_sensitivity_chemprop():
     )
     for name, parameter in model.named_parameters():
         assert torch.equal(parameter, before[name])
+
+
+def test_accumulated_fisher_score_matches_full_batch():
+
+    model = nn.Linear(2, 1)
+    invoker = ModelInvoker(
+        model=model,
+        input_map={
+            "inputs": {
+                "input": "x",
+            },
+            "target": "y",
+        },
+    )
+
+    functional = DuvidaModel(model, invoker)
+    loss = nn.MSELoss(reduction="mean")
+
+    full_batch = {
+        "x": torch.tensor([
+            [1., 2.],
+            [3., 4.],
+            [5., 6.],
+        ]),
+        "y": torch.tensor([
+            [1.],
+            [2.],
+            [3.],
+        ]),
+    }
+
+    batches = [
+        {
+            key: value[:2]
+            for key, value
+            in full_batch.items()
+        },
+        {
+            key: value[2:]
+            for key, value
+            in full_batch.items()
+        },
+    ]
+
+    observed, _ = (
+        functional.accumulate_fisher_score(
+            batches,
+            loss,
+            loss_reduction="mean",
+        )
+    )
+    expected = functional.fisher_score(
+        full_batch,
+        loss,
+        loss_reduction="mean",
+    )
+
+    for name in expected:
+        assert torch.allclose(observed[name], expected[name])

@@ -78,7 +78,8 @@ class PhysicalModel(nn.Module):
         latent_params: str | Iterable[str] | None = None,
         context_params: str | Iterable[str] | None = None,
         transforms: Mapping[str, Callable[[Tensor], Tensor]] | None = None,
-        default_init_value: float | int | None = None
+        default_init_value: float | int | None = None,
+        default_fixed_value: float | int | None = .0001
     ):
         super().__init__()
         if not callable(fn):
@@ -104,7 +105,7 @@ class PhysicalModel(nn.Module):
         )
 
         if isinstance(fixed_params, Mapping):
-            self.fixed_param_values = fixed_params
+            self.fixed_param_values = dict(fixed_params)
         else:
             self.fixed_param_values = {
                 name: self.all_params[name] 
