@@ -2,8 +2,10 @@ import torch
 from torch import nn
 
 from duvida import (
+    doubtscore,
     fisher_information_diagonal,
     fisher_score,
+    information_sensitivity,
     parameter_gradient,
 )
 
@@ -90,6 +92,87 @@ def _fisher_information(
         approximator="squared_jacobian",
     )(
         (params,),
+        inputs,
+        target,
+    )[0]
+
+
+def _doubtscore(
+    model,
+    invoker,
+    batch,
+    candidate_batch,
+    target,
+):
+    inputs = invoker.inputs(
+        batch
+    )
+
+    candidate_inputs = invoker.inputs(
+        candidate_batch
+    )
+
+    stateless_model = make_stateless_model(
+        model
+    )
+
+    params = dict(
+        model.named_parameters()
+    )
+
+    loss = lambda prediction, observed: torch.sum(
+        torch.square(
+            prediction - observed
+        )
+    )
+
+    return doubtscore(
+        stateless_model,
+        loss,
+    )(
+        (params,),
+        candidate_inputs,
+        inputs,
+        target,
+    )[0]
+
+
+def _information_sensitivity(
+    model,
+    invoker,
+    batch,
+    candidate_batch,
+    target,
+):
+    inputs = invoker.inputs(
+        batch
+    )
+
+    candidate_inputs = invoker.inputs(
+        candidate_batch
+    )
+
+    stateless_model = make_stateless_model(
+        model
+    )
+
+    params = dict(
+        model.named_parameters()
+    )
+
+    loss = lambda prediction, observed: torch.sum(
+        torch.square(
+            prediction - observed
+        )
+    )
+
+    return information_sensitivity(
+        stateless_model,
+        loss,
+        approximator="squared_jacobian",
+    )(
+        (params,),
+        candidate_inputs,
         inputs,
         target,
     )[0]
@@ -664,5 +747,231 @@ def test_duvida_fisher_chemprop():
         for name in chemprop_parameters
     )
 
+    for name, parameter in model.named_parameters():
+        assert torch.equal(parameter, before[name])
+
+
+def test_duvida_doubtscore_chemprop():
+
+    from aspect import DataPipeline
+
+    from duvidnn.models import (
+        ChempropEncoder,
+        MLP,
+        TwoTower,
+    )
+
+    torch.manual_seed(0)
+
+    pipeline = DataPipeline({
+        "molecule": ("smiles", "chemprop-mol"),
+    })
+
+    model = TwoTower(
+        left=ChempropEncoder(
+            output_dim=4,
+            mp_hidden_dim=16,
+            mp_depth=1,
+            hidden_dims=8,
+        ),
+        right=MLP(
+            input_dim=2,
+            output_dim=3,
+            hidden_dims=4,
+        ),
+        fusion=MLP(
+            input_dim=7,
+            output_dim=1,
+            hidden_dims=4,
+        ),
+    )
+
+    invoker = ModelInvoker(
+        model=model,
+        input_map={
+            "inputs": {
+                "left": "molecule",
+                "right": "features",
+            },
+        },
+    )
+
+    pipeline({
+        "smiles": [
+            "CCO",
+            "CCN",
+            "CC(=O)O",
+            "c1ccccc1",
+        ],
+        "features": [
+            [0., 0.],
+            [0., 1.],
+            [1., 0.],
+            [1., 1.],
+        ],
+    })
+
+    loader = pipeline.dataloader(batch_size=2)
+
+    iterator = iter(loader)
+
+    batch = next(iterator)
+    candidate_batch = next(iterator)
+
+    target = torch.tensor([
+        [0.25],
+        [0.75],
+    ])
+
+    _ = invoker.predict(batch)
+
+    before = {
+        name: parameter.detach().clone()
+        for name, parameter
+        in model.named_parameters()
+    }
+
+    observed = _doubtscore(
+        model,
+        invoker,
+        batch,
+        candidate_batch,
+        target,
+    )
+
+    assert set(observed) == set(before)
+
+    candidate_prediction = invoker.predict(candidate_batch)
+
+    for name, score in observed.items():
+        assert score.shape == (
+            *candidate_prediction.shape,
+            *before[name].shape,
+        )
+
+    chemprop_parameters = [
+        name
+        for name in before
+        if name.startswith("towers.left.")
+    ]
+
+    assert chemprop_parameters
+    assert any(
+        torch.any(torch.isfinite(observed[name]))
+        for name in chemprop_parameters
+    )
+    for name, parameter in model.named_parameters():
+        assert torch.equal(parameter, before[name])
+
+
+def test_duvida_information_sensitivity_chemprop():
+
+    from aspect import DataPipeline
+
+    from duvidnn.models import (
+        ChempropEncoder,
+        MLP,
+        TwoTower,
+    )
+
+    torch.manual_seed(0)
+
+    pipeline = DataPipeline({
+        "molecule": ("smiles", "chemprop-mol"),
+    })
+
+    model = TwoTower(
+        left=ChempropEncoder(
+            output_dim=4,
+            mp_hidden_dim=16,
+            mp_depth=1,
+            hidden_dims=8,
+        ),
+        right=MLP(
+            input_dim=2,
+            output_dim=3,
+            hidden_dims=4,
+        ),
+        fusion=MLP(
+            input_dim=7,
+            output_dim=1,
+            hidden_dims=4,
+        ),
+    )
+
+    invoker = ModelInvoker(
+        model=model,
+        input_map={
+            "inputs": {
+                "left": "molecule",
+                "right": "features",
+            },
+        },
+    )
+
+    pipeline({
+        "smiles": [
+            "CCO",
+            "CCN",
+            "CC(=O)O",
+            "c1ccccc1",
+        ],
+        "features": [
+            [0., 0.],
+            [0., 1.],
+            [1., 0.],
+            [1., 1.],
+        ],
+    })
+
+    loader = pipeline.dataloader(batch_size=2)
+
+    iterator = iter(loader)
+
+    batch = next(iterator)
+    candidate_batch = next(iterator)
+
+    target = torch.tensor([
+        [0.25],
+        [0.75],
+    ])
+
+    _ = invoker.predict(batch)
+
+    before = {
+        name: parameter.detach().clone()
+        for name, parameter
+        in model.named_parameters()
+    }
+
+    observed = _information_sensitivity(
+        model,
+        invoker,
+        batch,
+        candidate_batch,
+        target,
+    )
+
+    assert set(observed) == set(before)
+
+    candidate_prediction = invoker.predict(candidate_batch)
+
+    for name, sensitivity in observed.items():
+        assert sensitivity.shape == (
+            *candidate_prediction.shape,
+            *before[name].shape,
+        )
+
+    chemprop_parameters = [
+        name
+        for name in before
+        if name.startswith("towers.left.")
+    ]
+
+    assert chemprop_parameters
+    assert any(
+        torch.any(torch.isfinite(observed[name]))
+        for name in chemprop_parameters
+    )
     for name, parameter in model.named_parameters():
         assert torch.equal(parameter, before[name])
