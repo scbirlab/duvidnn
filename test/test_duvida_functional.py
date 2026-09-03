@@ -1,7 +1,11 @@
 import torch
 from torch import nn
 
-from duvida import parameter_gradient
+from duvida import (
+    fisher_information_diagonal,
+    fisher_score,
+    parameter_gradient,
+)
 
 from duvidnn.invoke import ModelInvoker, make_stateless_model
 from duvidnn.mapping import ColumnMap
@@ -19,6 +23,75 @@ def _parameter_gradient(
     return parameter_gradient(stateless_model)(
         (params,),
         inputs,
+    )[0]
+
+
+def _fisher_score(
+    model,
+    invoker,
+    batch,
+    target,
+):
+    inputs = invoker.inputs(
+        batch
+    )
+
+    stateless_model = make_stateless_model(
+        model
+    )
+
+    params = dict(
+        model.named_parameters()
+    )
+
+    loss = lambda prediction, observed: torch.sum(
+        torch.square(
+            prediction - observed
+        )
+    )
+
+    return fisher_score(
+        stateless_model,
+        loss,
+    )(
+        (params,),
+        inputs,
+        target,
+    )[0]
+
+
+def _fisher_information(
+    model,
+    invoker,
+    batch,
+    target,
+):
+    inputs = invoker.inputs(
+        batch
+    )
+
+    stateless_model = make_stateless_model(
+        model
+    )
+
+    params = dict(
+        model.named_parameters()
+    )
+
+    loss = lambda prediction, observed: torch.sum(
+        torch.square(
+            prediction - observed
+        )
+    )
+
+    return fisher_information_diagonal(
+        stateless_model,
+        loss,
+        approximator="squared_jacobian",
+    )(
+        (params,),
+        inputs,
+        target,
     )[0]
 
 
@@ -429,6 +502,167 @@ def test_duvida_parameter_gradient_chemprop():
             nonzero_grads.append(torch.any(gradient != 0.))
 
     assert any(nonzero_grads)
+
+    for name, parameter in model.named_parameters():
+        assert torch.equal(parameter, before[name])
+
+
+def test_duvida_fisher_preserves_parameter_structure():
+
+    model = nn.Linear(2, 1)
+
+    invoker = ModelInvoker(
+        model=model,
+        input_map={"inputs": {"input": "x"},
+        },
+    )
+
+    batch = {
+        "x": torch.tensor([
+            [1., 2.],
+            [3., 4.],
+        ]),
+    }
+
+    target = torch.tensor([
+        [0.],
+        [1.],
+    ])
+
+    before = {
+        name: parameter.detach().clone()
+        for name, parameter
+        in model.named_parameters()
+    }
+
+    score = _fisher_score(
+        model,
+        invoker,
+        batch,
+        target,
+    )
+
+    information = _fisher_information(
+        model,
+        invoker,
+        batch,
+        target,
+    )
+
+    assert set(score) == set(before)
+    assert set(information) == set(before)
+
+    for name in before:
+        assert score[name].shape == before[name].shape
+        assert information[name].shape == before[name].shape
+
+        assert torch.all(torch.isfinite(score[name]))
+        assert torch.all(torch.isfinite(information[name]))
+
+    for name, parameter in model.named_parameters():
+        assert torch.equal(parameter, before[name])
+
+
+def test_duvida_fisher_chemprop():
+
+    from aspect import DataPipeline
+
+    from duvidnn.models import (
+        ChempropEncoder,
+        MLP,
+        TwoTower,
+    )
+
+    torch.manual_seed(0)
+
+    pipeline = DataPipeline({
+        "molecule": ("smiles", "chemprop-mol"),
+    })
+
+    model = TwoTower(
+        left=ChempropEncoder(
+            output_dim=4,
+            mp_hidden_dim=16,
+            mp_depth=1,
+            hidden_dims=8,
+        ),
+        right=MLP(
+            input_dim=2,
+            output_dim=3,
+            hidden_dims=4,
+        ),
+        fusion=MLP(
+            input_dim=7,
+            output_dim=1,
+            hidden_dims=4,
+        ),
+    )
+
+    invoker = ModelInvoker(
+        model=model,
+        input_map={"inputs": {
+            "left": "molecule",
+            "right": "features",
+        }},
+    )
+
+    pipeline({
+        "smiles": ["CCO", "CCN"],
+        "features": [
+            [0., 0.],
+            [1., 1.],
+        ],
+    })
+
+    batch = next(iter(pipeline.dataloader(batch_size=2)))
+
+    target = torch.tensor([
+        [.25],
+        [.75],
+    ])
+
+    _ = invoker.predict(batch)
+
+    before = {
+        name: parameter.detach().clone()
+        for name, parameter
+        in model.named_parameters()
+    }
+
+    score = _fisher_score(
+        model,
+        invoker,
+        batch,
+        target,
+    )
+
+    information = _fisher_information(
+        model,
+        invoker,
+        batch,
+        target,
+    )
+
+    assert set(score) == set(before)
+    assert set(information) == set(before)
+
+    for name in before:
+        assert score[name].shape == before[name].shape
+        assert information[name].shape == before[name].shape
+        assert torch.all(torch.isfinite(score[name]))
+        assert torch.all(torch.isfinite(information[name]))
+
+    chemprop_parameters = [
+        name
+        for name in before
+        if name.startswith("towers.left.")
+    ]
+
+    assert chemprop_parameters
+    assert any(
+        torch.any(score[name] != 0.)
+        for name in chemprop_parameters
+    )
 
     for name, parameter in model.named_parameters():
         assert torch.equal(parameter, before[name])
