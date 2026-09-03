@@ -37,7 +37,6 @@ def functional_predict(
 
 def make_stateless_model(
     model: nn.Module,
-    invoker: ModelInvoker,
     buffers: Mapping | None = None
 ):
     """Adapt a module to Duvida's stateless model interface."""
@@ -46,15 +45,14 @@ def make_stateless_model(
         buffers = dict(model.named_buffers())
 
     def stateless_model(
-        batch,
+        inputs,
         params
     ):
-        return functional_predict(
-            model=model,
-            invoker=invoker,
-            batch=batch,
-            params=params,
-            buffers=buffers,
+        return functional_call(
+            model,
+            (params, buffers),
+            args=(),
+            kwargs=inputs,
         )
 
     return stateless_model

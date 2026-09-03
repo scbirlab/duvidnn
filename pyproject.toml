@@ -39,7 +39,7 @@ dependencies = [
   "carabiner-tools[pd,mpl]>=0.0.5.post3",
   "datasets>=3.5.0",
   "dill>=0.3.9",
-  "duvida[torch]>=0.0.3.post1",
+  "duvida[torch]>=0.0.4",
   "filelock",
   "huggingface_hub",
   "jsonargparse>=4.40",
