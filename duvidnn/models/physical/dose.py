@@ -7,6 +7,26 @@ import torch.nn.functional as F
 from .base import PhysicalModel
 
 
+def _hill_curve(
+    conc: Tensor,
+    log_ic50: Tensor,
+    slope: Tensor = 1.,
+    efficacy: Tensor = 1.,
+    bottom: Tensor | None = None,
+    top: Tensor = 1.,
+    is_growth: bool = False
+) -> Tensor:
+    if bottom is None:
+        bottom = top * (1. - efficacy)
+    inhibition = bottom + (top - bottom) * torch.sigmoid(
+        slope * (torch.log(conc) - log_ic50)
+    )
+    if is_growth:
+        return top - inhibition
+    else:
+        return inhibition
+
+
 def hill_curve(
     conc: Tensor,
     log_ic50: Tensor,
@@ -18,15 +38,15 @@ def hill_curve(
 ) -> Tensor:
     if torch.any(conc <= 0):
         raise ValueError(f"Concentration must be positive, but was {conc}.")
-    if bottom is None:
-        bottom = top * (1. - efficacy)
-    inhibition = bottom + (top - bottom) * torch.sigmoid(
-        slope * (torch.log(conc) - log_ic50)
+    return _hill_curve(
+        conc=conc,
+        log_ic50=log_ic50,
+        slope=slope,
+        efficacy=efficacy,
+        bottom=bottom,
+        top=top,
+        is_growth=is_growth,
     )
-    if is_growth:
-        return top - inhibition
-    else:
-        return inhibition
 
 
 class HillCurve(PhysicalModel):
@@ -71,7 +91,7 @@ class HillCurve(PhysicalModel):
             transforms = None
 
         super().__init__(
-            fn=hill_curve,
+            fn=_hill_curve,
             fixed_params=fixed_params,
             trainable_params=trainable_params,
             latent_params="log_ic50",

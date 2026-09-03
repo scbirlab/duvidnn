@@ -131,3 +131,25 @@ def test_functional_predict_named_composition():
 
     assert not torch.allclose(changed, expected)
     assert torch.allclose(invoker.predict(batch), expected)
+
+    before = {
+        name: parameter.detach().clone()
+        for name, parameter
+        in model.named_parameters()
+    }
+
+    changed = functional_predict(
+        model=model,
+        invoker=invoker,
+        batch=batch,
+        params=modified,
+    )
+
+    assert not torch.allclose(changed, expected)
+    assert torch.allclose(
+        invoker.predict(batch),
+        expected,
+    )
+
+    for name, parameter in model.named_parameters():
+        assert torch.equal(parameter, before[name])

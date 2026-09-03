@@ -129,7 +129,14 @@ class TwoTower(MultiTower):
         merge: str = DEFAULT_MERGE
     ) -> None:
         super().__init__(towers={"left": left, "right": right}, fusion=fusion, merge=merge)
-        self.left, self.right = self.towers["left"], self.towers["right"]
+    
+    @property
+    def left(self):
+        return self.towers["left"]
+
+    @property
+    def right(self):
+        return self.towers["right"]
 
     def forward(self, left, right) -> Tensor:
         return super().forward(left=left, right=right)

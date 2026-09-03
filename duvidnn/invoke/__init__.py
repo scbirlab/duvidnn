@@ -1,5 +1,5 @@
 from .base import ModelInvoker
-
-__all__ = [
-    "ModelInvoker",
-]
+from .functional import (
+    functional_predict,
+    make_stateless_model,
+)

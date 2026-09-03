@@ -184,3 +184,20 @@ def test_hill_readout_at_ic50():
     expected = torch.full_like(ic50, .5)
 
     torch.testing.assert_close(observed, expected)
+
+
+def test_hill_curve_rejects_nonpositive_concentration():
+
+    import pytest
+    import torch
+
+    from duvidnn.models.physical.dose import hill_curve
+
+    with pytest.raises(
+        ValueError,
+        match="Concentration must be positive",
+    ):
+        hill_curve(
+            conc=torch.zeros(1),
+            log_ic50=torch.zeros(1),
+        )
