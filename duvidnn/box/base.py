@@ -122,7 +122,7 @@ def _predict_map_batch(
 
     with torch.inference_mode():
         prediction = box.model(**inputs)
-
+    print(prediction)
     result = {
         prediction_column: (
             prediction
@@ -567,6 +567,15 @@ class Box:
         self.model.eval()
 
         uncertainty = normalize_uncertainty(uncertainty)
+        for method in uncertainty.values():
+            prepare_candidates = getattr(
+                method,
+                "prepare_candidates",
+                None,
+            )
+            if prepare_candidates is not None:
+                prepared = prepare_candidates(prepared)
+
         uncertainty_state = {
             name: method.prepare(
                 self,
@@ -753,9 +762,7 @@ class Box:
             metrics = dict(metrics)
         else:
             metrics = {
-                (
-                    metric.__class__.__name__
-                ): metric
+                metric.__class__.__name__: metric
                 for metric in metrics
             }
 

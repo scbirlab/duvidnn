@@ -77,9 +77,7 @@ def test_evaluate_preserves_model_mode():
     }
     box.evaluate(
         data,
-        metrics={
-            "mae": MeanAbsoluteError(),
-        },
+        metrics={"mae": MeanAbsoluteError()},
     )
 
     assert box.model.training

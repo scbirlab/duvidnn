@@ -3,4 +3,5 @@ from .information import (
     DoubtScore,
     InformationSensitivity,
 )
+from .tanimoto import Tanimoto
 from .variance import Variance
