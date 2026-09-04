@@ -23,6 +23,7 @@ from ..invoke.duvida import DEFAULT_APPROXIMATOR
 from ..mapping import ColumnMap
 from ..training import Trainer
 from ..utils.device import move_to_device
+from ..uncertainty import normalize_uncertainty
 
 
 CONFIG_FILENAME = "config.json"
@@ -107,18 +108,21 @@ def _model_device(model: nn.Module):
 def _predict_map_batch(
     batch: Mapping[str, Any],
     *,
+    box,
     pipeline: DataPipeline,
-    invoker: ModelInvoker,
     device,
+    uncertainty,
+    uncertainty_state,
     prediction_column: str = DEFAULT_PREDICTION_COLUMN
 ) -> dict[str, ...]:
     runtime_batch = pipeline.collate(batch)
     runtime_batch = move_to_device(runtime_batch, device)
+    inputs = box.invoker.inputs(runtime_batch)
 
     with torch.inference_mode():
-        prediction = invoker.predict(runtime_batch)
+        prediction = box.model(**inputs)
 
-    return {
+    result = {
         prediction_column: (
             prediction
             .detach()
@@ -126,6 +130,21 @@ def _predict_map_batch(
             .numpy()
         )
     }
+    for name, method in uncertainty.items():
+        value = method(
+            box=box,
+            batch=runtime_batch,
+            prediction=prediction,
+            state=uncertainty_state[name],
+        )
+        result[name] = (
+            value
+            .detach()
+            .cpu()
+            .numpy()
+        )
+    return result
+
 
 
 def _load_training_derivatives(
@@ -507,6 +526,7 @@ class Box:
         pipeline: Mapping[str, Any] | DataPipeline | None = None,
         batch_size: int = DEFAULT_BATCH_SIZE,
         prediction_column: str = DEFAULT_PREDICTION_COLUMN,
+        uncertainty=None,
         device=None,
         map_kwargs: Mapping[str, Any] | None = None
     ):
@@ -545,17 +565,34 @@ class Box:
 
         self.model.eval()
 
-        if prediction_column in prepared.column_names:
-            prepared = prepared.remove_columns(prediction_column)
+        uncertainty = normalize_uncertainty(uncertainty)
+        uncertainty_state = {
+            name: method.prepare(
+                self,
+                batch_size=batch_size,
+                device=device,
+            )
+            for name, method
+            in uncertainty.items()
+        }
+
+        for column in (
+            prediction_column,
+            *uncertainty,
+        ):
+            if column in prepared.column_names:
+                prepared = prepared.remove_columns(column)
 
         return prepared.map(
             _predict_map_batch,
             batched=True,
             batch_size=batch_size,
             fn_kwargs={
+                "box": self,
                 "pipeline": pipeline,
-                "invoker": self.invoker,
                 "prediction_column": prediction_column,
+                "uncertainty": uncertainty,
+                "uncertainty_state": uncertainty_state,
                 "device": device,
             },
             desc="Predicting",

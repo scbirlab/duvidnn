@@ -12,6 +12,7 @@ from duvida import (
     parameter_hessian_diagonal,
     doubtscore,
 )
+from duvida.utils import ravel_pytree_like, tree_map
 import torch
 from torch import nn, Tensor
 from tqdm.auto import tqdm
@@ -114,6 +115,28 @@ class DuvidaModel:
     def stateless_model(self):
         return make_stateless_model(self.model)
 
+    def parameter_tree_to_device(
+        self,
+        tree
+    ):
+        device = next(self.model.parameters()).device
+
+        def _to_device(value):
+            return value.to(device)
+
+        return tree_map(
+            _to_device,
+            tree,
+        )
+
+    def parameter_rms(
+        self,
+        tree
+    ):
+        """RMS-reduce a derivative pytree over its parameter dimensions."""
+        flat = ravel_pytree_like(tree, self.params)
+        return torch.sqrt(torch.mean(torch.square(flat), dim=-1))
+
     @staticmethod
     def _loss(
         loss: Callable,
@@ -172,7 +195,7 @@ class DuvidaModel:
         self,
         batch,
         *,
-        approximator="squared_jacobian",
+        approximator=DEFAULT_APPROXIMATOR,
         **kwargs,
     ):
         return parameter_hessian_diagonal(
@@ -249,6 +272,68 @@ class DuvidaModel:
             self.inputs(batch),
             target,
         )[0]
+
+    def doubtscore_from_fisher(
+        self,
+        batch,
+        fisher_score: ParameterTree,
+        *,
+        use_reciprocal: bool = False
+    ):
+        """Calculate candidate DoubtScore from a precomputed Fisher score."""
+        fisher_score = self.parameter_tree_to_device(fisher_score)
+        parameter_gradient = self.parameter_gradient(batch)
+        score = tree_map(
+            operator.truediv,
+            fisher_score,
+            parameter_gradient,
+        )
+        if use_reciprocal:
+            score = tree_map(torch.reciprocal, score)
+        return score
+
+    def information_sensitivity_from_fisher(
+        self,
+        batch,
+        fisher_score: ParameterTree,
+        fisher_information: ParameterTree,
+        *,
+        approximator=DEFAULT_APPROXIMATOR,
+        use_reciprocal: bool = False,
+        **kwargs,
+    ):
+        """Calculate candidate information sensitivity from cached training derivatives."""
+        fisher_score = self.parameter_tree_to_device(fisher_score)
+        fisher_information = self.parameter_tree_to_device(fisher_information)
+        parameter_gradient = self.parameter_gradient(batch)
+        parameter_hessian = self.parameter_hessian(
+            batch,
+            approximator=approximator,
+            **kwargs,
+        )
+
+        def information_sensitivity_leaf(
+            score,
+            information,
+            gradient,
+            hessian
+        ):
+            return (
+                information / gradient
+                - score * hessian / torch.square(gradient)
+            )
+
+        sensitivity = tree_map(
+            information_sensitivity_leaf,
+            fisher_score,
+            fisher_information,
+            parameter_gradient,
+            parameter_hessian,
+        )
+
+        if use_reciprocal:
+            sensitivity = tree_map(torch.reciprocal, sensitivity)
+        return sensitivity
 
     def doubtscore(
         self,
