@@ -1,7 +1,7 @@
 """Checkpointable composition of data processing and PyTorch models."""
 
 from typing import Any, TypeAlias
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Iterable
 from copy import deepcopy
 from pathlib import Path
 import json
@@ -11,6 +11,7 @@ from aspect.data import DataPipeline
 from carabiner import print_err
 import torch
 from torch import nn
+from torchmetrics import Metric, MetricCollection
 
 from ..config import instantiate_model
 from ..checkpoint_utils import save_json, load_json
@@ -711,3 +712,92 @@ class Box:
             self.training_derivatives.loss_reduction = loss_reduction
 
         return self
+
+    def evaluate(
+        self,
+        data,
+        metrics: Mapping[str, Metric] | Iterable[Metric],
+        *,
+        pipeline: Mapping[str, Any] | DataPipeline | None = None,
+        batch_size: int = DEFAULT_BATCH_SIZE,
+        device=None,
+        metric_mask: Callable[[Mapping], torch.Tensor] | None = None,
+        dataloader_kwargs: Mapping[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Evaluate the model over a dataset using streaming metrics."""
+
+        if pipeline is None:
+            pipeline = self.pipeline.clone()
+        elif isinstance(pipeline, Mapping):
+            pipeline = DataPipeline(
+                column_transforms=pipeline,
+            )
+        elif isinstance(pipeline, DataPipeline):
+            pipeline = pipeline.clone()
+        else:
+            raise TypeError(
+                "`pipeline` must be a mapping, "
+                f"DataPipeline, or None, but was {type(pipeline)}: {pipeline}."
+            )
+
+        prepared = pipeline(data)
+
+        dataloader = pipeline.dataloader(
+            prepared,
+            batch_size=batch_size,
+            shuffle=False,
+            **dict(dataloader_kwargs or {}),
+        )
+
+        if isinstance(metrics, Mapping):
+            metrics = dict(metrics)
+        else:
+            metrics = {
+                (
+                    metric.__class__.__name__
+                ): metric
+                for metric in metrics
+            }
+
+        collection = MetricCollection(deepcopy(metrics))
+
+        if device is None:
+            device = _model_device(self.model)
+
+        collection = collection.to(device)
+
+        was_training = self.model.training
+        self.model.eval()
+
+        try:
+            with torch.inference_mode():
+                for batch in dataloader:
+                    batch = move_to_device(
+                        batch,
+                        device,
+                    )
+                    prediction, target = (
+                        self.invoker
+                        .supervised(batch)
+                    )
+                    if metric_mask is not None:
+                        mask = metric_mask(batch)
+
+                        prediction = prediction[mask]
+                        target = target[mask]
+                        if prediction.numel() == 0:
+                            continue
+
+                    collection.update(prediction, target)
+        finally:
+            self.model.train(was_training)
+
+        return {
+            name: (
+                value.detach().cpu().item()
+                if value.numel() == 1
+                else value.detach().cpu()
+            )
+            for name, value
+            in collection.compute().items()
+        }
