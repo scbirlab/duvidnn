@@ -31,7 +31,17 @@ class Tanimoto:
                 f"{data.column_names}."
             )
         pipeline = self._fingerprint_pipeline()
-        return pipeline(data)
+        source = data.select_columns([self.structure_column])
+        fingerprinted = pipeline(source)
+        fingerprints = (
+            fingerprinted
+            .with_format(None)
+            [self.column]
+        )
+        return data.add_column(
+            self.column,
+            fingerprints
+        )
 
     def prepare_candidates(self, data):
         return self._add_fingerprint(data)
@@ -43,7 +53,7 @@ class Tanimoto:
     ):
         training_data = box._training_data()
         training_data = self._add_fingerprint(training_data)
-        return training_data[self.column]
+        return training_data.with_format(None)[self.column]
 
     def __call__(
         self,

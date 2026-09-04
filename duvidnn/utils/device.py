@@ -24,8 +24,8 @@ def move_to_device(
             in value.items()
         })
 
-    if isinstance(value, tuple):
-        return tuple(
+    if isinstance(value, (tuple, list)):
+        return type(value)(
             move_to_device(
                 item,
                 device,
@@ -33,22 +33,10 @@ def move_to_device(
             for item in value
         )
 
-    if isinstance(value, list):
-        return [
-            move_to_device(
-                item,
-                device,
-            )
-            for item in value
-        ]
-
-    to = getattr(
-        value,
-        "to",
-        None,
-    )
+    to = getattr(value, "to", None)
 
     if callable(to):
-        return to(device)
+        moved = to(device)
+        return value if moved is None else moved
 
     return value

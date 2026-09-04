@@ -217,9 +217,7 @@ def test_tanimoto():
     box = Box(
         model=nn.Identity(),
         input_map=ColumnMap(
-            inputs={
-                "input": "fingerprint",
-            },
+            inputs={"input": "fingerprint"},
         ),
     )
 
@@ -261,7 +259,7 @@ def test_tanimoto_derives_fingerprint_from_smiles():
         ),
         pipeline=DataPipeline({"cp_in": ("smiles", "chemprop-mol")}),
         input_map=ColumnMap(
-            inputs={"input": "smiles"},
+            inputs={"input": "cp_in"},
         ),
     )
 

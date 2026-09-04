@@ -3,6 +3,7 @@
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import Any
+import operator
 
 from duvida import (
     fisher_information_diagonal,
