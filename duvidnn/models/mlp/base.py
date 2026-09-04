@@ -58,11 +58,11 @@ class MLP(nn.Module):
 
         if in_features is not None and in_features <= 0:
             raise ValueError(
-                f"`input_dim` must be positive when provided, but was {in_features}."
+                f"`in_features` must be positive when provided, but was {in_features}."
             )
 
         if out_features <= 0:
-            raise ValueError(f"`output_dim` must be positive, but was {out_features}.")
+            raise ValueError(f"`out_features` must be positive, but was {out_features}.")
 
         if any(width <= 0 for width in hidden_dims):
             raise ValueError(

@@ -71,23 +71,35 @@ def instantiate_trainer(
     config = dict(config)
 
     loss_config = config.pop("loss")
-
     if isinstance(loss_config, Mapping):
         loss = instantiate_object(loss_config)
     else:
         loss = loss_config
 
+    new_kwargs = {}
     optimizer = config.pop("optimizer", None)
-
     if isinstance(optimizer, str):
-        optimizer = resolve_class(optimizer)
+        new_kwargs["optimizer"] = resolve_class(optimizer)
 
+    scheduler = config.pop("scheduler", None)
+    if isinstance(scheduler, str):
+        new_kwargs["scheduler"] = resolve_class(scheduler)
+
+    regularizer = config.pop("regularizer", None)
+    if isinstance(regularizer, Mapping):
+        new_kwargs["regularizer"] = instantiate_object(regularizer)
+    elif isinstance(regularizer, (list, tuple)):
+        _regularizer = []
+        for item in regularizer:
+            if isinstance(item, Mapping):
+                item = instantiate_object(item)
+            _regularizer.append(item)
+        new_kwargs["regularizer"] = _regularizer
+             
     kwargs = {
         "loss": loss,
         **config,
-    }
-    if optimizer is not None:
-        kwargs["optimizer"] = optimizer
+    } | new_kwargs
 
     return Trainer(**kwargs)
 

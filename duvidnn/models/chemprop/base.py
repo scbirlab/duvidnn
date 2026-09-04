@@ -44,7 +44,7 @@ class ChempropEncoder(nn.Module):
 
     def __init__(
         self,
-        output_dim: int = 1,
+        out_features: int = 1,
         mp_hidden_dim: int = DEFAULT_CHEMPROP_MP_HIDDEN_DIM,
         mp_depth: int = DEFAULT_CHEMPROP_MP_DEPTH,
         mp_activation: str = DEFAULT_CHEMPROP_MP_ACTIVATION,
@@ -56,7 +56,7 @@ class ChempropEncoder(nn.Module):
         batch_norm: bool = False,
     ):
         super().__init__()
-        self.output_dim = output_dim
+        self.output_dim = out_features
         self.mp_hidden_dim = mp_hidden_dim
         self.mp_depth = mp_depth
         self.mp_activation = mp_activation

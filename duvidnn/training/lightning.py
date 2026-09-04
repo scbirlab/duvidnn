@@ -34,7 +34,11 @@ class LightningTask(L.LightningModule):
         optimizer_kwargs: Mapping | None = None,
         loss_inputs: Mapping[str, str] | None = None,
         metrics: Mapping[str, Metric] | Iterable[Metric] | None = None,
-        metric_mask: Callable[[Mapping], Tensor] | None = None
+        metric_mask: Callable[[Mapping], Tensor] | None = None,
+        regularizer: Callable | Iterable[Callable] | None = None,
+        scheduler: Callable | None = None,
+        scheduler_kwargs: Mapping | None = None,
+        scheduler_monitor: str | None = None
     ) -> None:
         super().__init__()
 
@@ -44,6 +48,19 @@ class LightningTask(L.LightningModule):
         self.optimizer_cls = optimizer
         self.optimizer_kwargs = dict(optimizer_kwargs or {})
         self.loss_inputs = dict(loss_inputs or {})
+
+        if regularizer is None:
+            regularizer = ()
+        elif callable(regularizer):
+            regularizer = (regularizer,)
+        else:
+            regularizer = tuple(regularizer)
+        self.regularizers = regularizer
+
+        self.scheduler_cls = scheduler
+        self.scheduler_kwargs = dict(scheduler_kwargs or {})
+        self.scheduler_monitor = scheduler_monitor
+
         self.metric_mask = metric_mask
 
         metrics = metrics or {}
@@ -70,10 +87,11 @@ class LightningTask(L.LightningModule):
             target,
             **self._loss_kwargs(batch),
         )
+        for regularizer in self.regularizers:
+            loss = loss + regularizer(self.model)
         return PredictionTargetLoss(prediction, target, loss)
 
     def loss(self, batch):
-        prediction, target = self.invoker.supervised(batch)
         return self._prediction_target_loss(batch).loss
 
     def _update_metrics(
@@ -168,10 +186,26 @@ class LightningTask(L.LightningModule):
         return self._step(batch, "val")
 
     def configure_optimizers(self):
-        return self.optimizer_cls(
+        optimizer = self.optimizer_cls(
             self.model.parameters(),
             **self.optimizer_kwargs,
         )
+
+        if self.scheduler_cls is None:
+            return optimizer
+
+        scheduler = self.scheduler_cls(
+            optimizer,
+            **self.scheduler_kwargs,
+        )
+        scheduler_config = {"scheduler": scheduler}
+        if self.scheduler_monitor is not None:
+            scheduler_config["monitor"] = self.scheduler_monitor
+
+        return {
+            "optimizer": optimizer,
+            "lr_scheduler": scheduler_config,
+        }
 
 
 class Trainer:
@@ -188,6 +222,10 @@ class Trainer:
         early_stopping: int | None = None,
         metrics: Mapping[str, Metric] | Iterable[Metric] | None = None,
         metric_mask: Callable[[Mapping], Tensor] | None = None,
+        regularizer: Callable | Iterable[Callable] | None = None,
+        scheduler: Callable | None = None,
+        scheduler_kwargs: Mapping | None = None,
+        scheduler_monitor: str | None = None,
         **trainer_kwargs
     ) -> None:
         self.max_epochs = max_epochs
@@ -195,6 +233,12 @@ class Trainer:
         self.optimizer = optimizer
         self.optimizer_kwargs = dict(optimizer_kwargs or {})
         self.loss_inputs = dict(loss_inputs or {})
+
+        self.regularizer = regularizer
+        self.scheduler = scheduler
+        self.scheduler_kwargs = dict(scheduler_kwargs or {})
+        self.scheduler_monitor = scheduler_monitor
+
         self.early_stopping = early_stopping
         metrics = metrics or {}
         if isinstance(metrics, (tuple, list)):
@@ -223,6 +267,10 @@ class Trainer:
             optimizer=self.optimizer,
             optimizer_kwargs=self.optimizer_kwargs,
             loss_inputs=self.loss_inputs,
+            regularizer=self.regularizer,
+            scheduler=self.scheduler,
+            scheduler_kwargs=self.scheduler_kwargs,
+            scheduler_monitor=self.scheduler_monitor,
             metrics=self.metrics,
             metric_mask=self.metric_mask,
         )

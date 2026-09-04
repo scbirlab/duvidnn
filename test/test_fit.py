@@ -155,8 +155,8 @@ def test_box_fit_hill_readout():
 
     model = Readout(
         latent=MLP(
-            input_dim=2,
-            output_dim=1,
+            in_features=2,
+            out_features=1,
             hidden_dims=4,
         ),
         readout=HillCurve(slope=1.),
@@ -253,8 +253,8 @@ def test_box_fit_hill_readout_trainable_slope():
 
     model = Readout(
         latent=MLP(
-            input_dim=2,
-            output_dim=1,
+            in_features=2,
+            out_features=1,
             hidden_dims=4,
         ),
         readout=HillCurve(

@@ -2,6 +2,6 @@
   "class_path": "duvidnn.models.MLP",
   "init_args": {
     "hidden_dims": [128, 64],
-    "output_dim": 1
+    "out_features": 1
   }
 }

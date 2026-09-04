@@ -1,7 +1,11 @@
 import json
+import torch
+from torch import nn
 
 from duvidnn.box import Box
 from duvidnn.mapping import ColumnMap
+
+from duvidnn.config import instantiate_trainer
 
 BOX_CONFIG = {
     "pipeline": {
@@ -10,9 +14,9 @@ BOX_CONFIG = {
     "model": {
         "class_path": "duvidnn.models.mlp.MLP",
         "init_args": {
-            "input_dim": 2,
+            "in_features": 2,
             "hidden_dims": 4,
-            "output_dim": 1,
+            "out_features": 1,
         },
     },
     "input_map": {
@@ -33,25 +37,25 @@ TWO_TOWER_CONFIG = {
             "left": {
                 "class_path": "duvidnn.models.mlp.MLP",
                 "init_args": {
-                    "input_dim": 2,
+                    "in_features": 2,
                     "hidden_dims": 4,
-                    "output_dim": 3,
+                    "out_features": 3,
                 },
             },
             "right": {
                 "class_path": "duvidnn.models.mlp.MLP",
                 "init_args": {
-                    "input_dim": 2,
+                    "in_features": 2,
                     "hidden_dims": 4,
-                    "output_dim": 3,
+                    "out_features": 3,
                 },
             },
             "fusion": {
                 "class_path": "duvidnn.models.mlp.MLP",
                 "init_args": {
-                    "input_dim": 6,
+                    "in_features": 6,
                     "hidden_dims": 4,
-                    "output_dim": 1,
+                    "out_features": 1,
                 },
             },
             "merge": "concat",
@@ -107,7 +111,7 @@ def test_box_config_is_json_serializable():
 
 
 def test_configured_box_checkpoint_roundtrip(tmp_path):
-    import torch
+    
     box = Box.from_config(BOX_CONFIG)
     x = torch.tensor([
         [1., 2.],
@@ -251,3 +255,40 @@ def test_box_retains_requested_training_columns(tmp_path):
 
     assert restored.pipeline.data_out is not None
     assert restored.pipeline.data_out.column_names == ["logx"]
+
+
+def test_instantiate_trainer_regularizer_scheduler():
+
+    from duvidnn.training import L1Regularizer
+
+    config = {
+        "loss": {
+            "class_path": (
+                "torch.nn.MSELoss"
+            ),
+        },
+        "optimizer": (
+            "torch.optim.Adam"
+        ),
+        "regularizer": {
+            "class_path": (
+                "duvidnn.training.L1Regularizer"
+            ),
+            "init_args": {
+                "weight": 1e-4,
+            },
+        },
+        "scheduler": (
+            "torch.optim.lr_scheduler.StepLR"
+        ),
+        "scheduler_kwargs": {
+            "step_size": 10,
+        },
+    }
+
+    trainer = instantiate_trainer(config)
+
+    assert isinstance(trainer.loss, nn.MSELoss)
+    assert isinstance(trainer.regularizer, L1Regularizer)
+    assert (trainer.scheduler is torch.optim.lr_scheduler.StepLR)
+    assert trainer.scheduler_kwargs == {"step_size": 10}
