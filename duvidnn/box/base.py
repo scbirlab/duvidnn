@@ -237,10 +237,28 @@ class Box:
         )
         self.training_derivatives = training_derivatives
 
+
+    @property
+    def training_data_source(self):
+        """Recorded provenance for the training data."""
+        return getattr(
+            self.pipeline,
+            "data_source",
+            None,
+        )
+    def verify_training_data_source(self) -> bool | None:
+        """Verify the original training-data source when possible."""
+        source = self.training_data_source
+        if source is None:
+            return None
+        return source.verify()
+
     @classmethod
     def from_config(
         cls,
-        config: Mapping[str, Any] | str
+        config: Mapping[str, Any] | str,
+        *,
+        cache_dir: str | None = None
     ) -> "Box":
         """Construct a Box from JSON-compatible configuration."""
         if isinstance(config, str):
@@ -280,7 +298,10 @@ class Box:
         input_map = ColumnMap.from_config(input_map_config)
 
         pipeline_config = config.get("pipeline", {})
-        pipeline = DataPipeline.from_config(pipeline_config)
+        pipeline = DataPipeline.from_config(
+            pipeline_config,
+            cache_dir=cache_dir,
+        )
         return cls(
             model=model,
             input_map=input_map,

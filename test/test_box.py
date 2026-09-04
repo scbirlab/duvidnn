@@ -12,9 +12,9 @@ def test_experiment_composes_model_and_mapping():
 
     box = Box(
         model=MLP(
-            input_dim=2,
+            in_features=2,
             hidden_dims=4,
-            output_dim=1,
+            out_features=1,
         ),
         input_map=ColumnMap(
             inputs={"x": "input_x"},
@@ -47,9 +47,9 @@ def test_box_prepares_data_with_pipeline():
     box = Box(
         pipeline=pipeline,
         model=MLP(
-            input_dim=2,
+            in_features=2,
             hidden_dims=4,
-            output_dim=1,
+            out_features=1,
         ),
         input_map=ColumnMap(
             inputs={"x": "logx"},
@@ -68,3 +68,11 @@ def test_box_prepares_data_with_pipeline():
 
     assert "logx" in prepared.column_names
     assert "renamed_x" in prepared.column_names
+
+
+def test_pipeline_clone_retains_cache(tmp_path):
+
+    pipeline = DataPipeline(cache_dir=str(tmp_path))
+    cloned = pipeline.clone()
+
+    assert cloned.cache_dir == pipeline.cache_dir

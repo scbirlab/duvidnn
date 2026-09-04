@@ -37,7 +37,10 @@ def _train(args: Namespace) -> None:
             "a `trainer` section."
         ) from error
 
-    box = Box.from_config(box_config)
+    box = Box.from_config(
+        box_config,
+        cache_dir=args.cache,
+    )
     box.trainer = instantiate_trainer(trainer_config)
 
     fit_kwargs = dict(config.get("fit", {}))

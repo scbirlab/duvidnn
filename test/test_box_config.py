@@ -292,3 +292,13 @@ def test_instantiate_trainer_regularizer_scheduler():
     assert isinstance(trainer.regularizer, L1Regularizer)
     assert (trainer.scheduler is torch.optim.lr_scheduler.StepLR)
     assert trainer.scheduler_kwargs == {"step_size": 10}
+
+
+def test_box_from_config_cache_override(tmp_path):
+
+    box = Box.from_config(
+        BOX_CONFIG,
+        cache_dir=str(tmp_path),
+    )
+
+    assert box.pipeline.cache_dir == str(tmp_path)

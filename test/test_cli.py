@@ -157,6 +157,7 @@ def test_config_cli_train_predict(tmp_path):
                 "trainer.max_epochs=1",
                 "fit.batch_size=2",
             ],
+            cache=str(tmp_path / "cache"),
         )
     )
 
@@ -168,8 +169,8 @@ def test_config_cli_train_predict(tmp_path):
             data=str(prediction),
             config=None,
             output=str(output),
-            cache=None,
             set=None,
+            cache=str(tmp_path / "cache"),
         )
     )
 

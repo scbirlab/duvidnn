@@ -22,12 +22,23 @@ def main() -> None:
         required=True,
         type=str,
     )
+    set_opt = CLIOption(
+        "--set",
+        dest="set",
+        action="append",
+        default=None,
+        type=str,
+        help=(
+            "Override configuration with "
+            "dotted.path=value. May be repeated."
+        ),
+    )
 
     train = CLICommand(
         "train",
         description="Train a model from configuration.",
         options=[
-            config_opt.replace({"required": False, "default": None}),
+            config_opt,
             CLIOption(
                 "--training",
                 "-1",
@@ -59,16 +70,12 @@ def main() -> None:
                 type=str,
                 help="Where to save model",
             ),
+            set_opt,
             CLIOption(
-                "--set",
-                dest="set",
-                action="append",
+                "--cache",
                 default=None,
                 type=str,
-                help=(
-                    "Override configuration with "
-                    "dotted.path=value. May be repeated."
-                ),
+                help="Cache directory for data loading and preprocessing.",
             ),
         ],
         main=_train,
@@ -92,7 +99,11 @@ def main() -> None:
                 required=True,
                 type=str,
             ),
-            config_opt,
+            config_opt.replace({
+                "required": False, 
+                "default": None,
+            }),
+            set_opt,
             CLIOption(
                 "--output",
                 "-o",
