@@ -23,20 +23,17 @@ class FiLM(nn.Module):
         self,
         modulator: nn.Module,
         soft: bool = False,
-    ) -> None:
+    ):
         super().__init__()
-
         self.modulator = modulator
         self.soft = soft
 
     def forward(
         self,
         input: Tensor,
-        context,
+        context: Tensor
     ) -> Tensor:
-        modulation = self.modulator(
-            context
-        )
+        modulation = self.modulator(context)
 
         if modulation.shape[-1] % 2:
             raise ValueError(
@@ -44,12 +41,7 @@ class FiLM(nn.Module):
                 f"but was {modulation.shape[-1]}."
             )
 
-        gamma, beta = torch.chunk(
-            modulation,
-            2,
-            dim=-1,
-        )
-
+        gamma, beta = torch.chunk(modulation, 2, dim=-1)
         if gamma.shape[-1] != input.shape[-1]:
             raise ValueError(
                 "FiLM modulation width must match input width: "
@@ -57,17 +49,7 @@ class FiLM(nn.Module):
             )
 
         if self.soft:
-            gamma = (
-                2.
-                * torch.sigmoid(
-                    gamma
-                )
-            )
-            beta = torch.tanh(
-                beta
-            )
+            gamma = 2. * torch.sigmoid(gamma)
+            beta = torch.tanh(beta)
 
-        return (
-            gamma * input
-            + beta
-        )
+        return gamma * input + beta
