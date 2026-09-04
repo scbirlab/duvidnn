@@ -41,9 +41,9 @@ class MLP(nn.Module):
 
     def __init__(
         self,
-        output_dim: int = 1,
+        out_features: int = 1,
         hidden_dims: int | Sequence[int] = DEFAULT_HIDDEN_DIMS,
-        input_dim: int | None = None,
+        in_features: int | None = None,
         activation: str = DEFAULT_ACTIVATION,
         final_activation: str = DEFAULT_OUTPUT_ACTIVATION,
         dropout: float = 0.,
@@ -56,13 +56,13 @@ class MLP(nn.Module):
         else:
             hidden_dims = tuple(hidden_dims)
 
-        if input_dim is not None and input_dim <= 0:
+        if in_features is not None and in_features <= 0:
             raise ValueError(
-                f"`input_dim` must be positive when provided, but was {input_dim}."
+                f"`input_dim` must be positive when provided, but was {in_features}."
             )
 
-        if output_dim <= 0:
-            raise ValueError(f"`output_dim` must be positive, but was {output_dim}.")
+        if out_features <= 0:
+            raise ValueError(f"`output_dim` must be positive, but was {out_features}.")
 
         if any(width <= 0 for width in hidden_dims):
             raise ValueError(
@@ -74,8 +74,8 @@ class MLP(nn.Module):
                 f"`dropout` must satisfy 0 <= dropout < 1, but was {dropout}."
             )
 
-        self.input_dim = input_dim
-        self.output_dim = output_dim
+        self.input_dim = in_features
+        self.output_dim = out_features
         self.hidden_dims = hidden_dims
         self.activation = resolve_activation(activation)
         self.final_activation = resolve_activation(final_activation)

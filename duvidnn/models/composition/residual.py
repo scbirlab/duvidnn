@@ -1,10 +1,10 @@
 
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 
 from torch import Tensor, nn
 
-from ..mlp.base import resolve_activation
+from ..mlp.base import DEFAULT_ACTIVATION, resolve_activation
 
 
 class ResidualBlock(nn.Module):
@@ -16,7 +16,7 @@ class ResidualBlock(nn.Module):
         in_features: int | None = None,
         out_features: int | None = None,
         projection: nn.Module | None = None,
-        activation: str | Callable = "silu"
+        activation: str | Callable = DEFAULT_ACTIVATION
     ):
         super().__init__()
 
@@ -26,9 +26,9 @@ class ResidualBlock(nn.Module):
         if projection is not None:
             self.projection = projection
         elif (
-            input_dim is None
-            or output_dim is None
-            or input_dim == output_dim
+            in_features is None
+            or out_features is None
+            or in_features == out_features
         ):
             self.projection = nn.Identity()
         else:
@@ -49,13 +49,13 @@ class ResidualStack(nn.Module):
     def __init__(
         self,
         module_class: Callable = nn.Linear,
-        module_kwargs: Mapping[str, Any] | None = None,
+        module_kwargs: Mapping[str, ...] | None = None,
         depth: int = 1,
         in_features: int | None = None,
         out_features: int | None = None,
         projection: nn.Module | None = None,
-        activation: str | Callable = "silu"
-    ) -> None:
+        activation: str | Callable = DEFAULT_ACTIVATION
+    ):
         super().__init__()
 
         self.activation = resolve_activation(activation)()
