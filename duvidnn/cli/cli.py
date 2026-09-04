@@ -27,24 +27,48 @@ def main() -> None:
         "train",
         description="Train a model from configuration.",
         options=[
-            config_opt,
+            config_opt.replace({"required": False, "default": None}),
             CLIOption(
                 "--training",
                 "-1",
                 required=True,
                 type=str,
+                help="Training dataset",
             ),
             CLIOption(
                 "--validation",
                 "-2",
                 default=None,
                 type=str,
+                help="Validation dataset",
+            ),
+            CLIOption(
+                "--model",
+                "-m",
+                default=None,
+                type=str,
+                help=(
+                    "Bundled model configuration alias "
+                    "used to override box.model."
+                ),
             ),
             CLIOption(
                 "--output",
                 "-o",
                 required=True,
                 type=str,
+                help="Where to save model",
+            ),
+            CLIOption(
+                "--set",
+                dest="set",
+                action="append",
+                default=None,
+                type=str,
+                help=(
+                    "Override configuration with "
+                    "dotted.path=value. May be repeated."
+                ),
             ),
         ],
         main=_train,

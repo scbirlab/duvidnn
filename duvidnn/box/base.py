@@ -113,7 +113,7 @@ def _predict_map_batch(
     pipeline: DataPipeline,
     device,
     uncertainty,
-    uncertainty_state,
+    uncertainty_state: Mapping[str, Any],
     prediction_column: str = DEFAULT_PREDICTION_COLUMN
 ) -> dict[str, ...]:
     runtime_batch = pipeline.collate(batch)
@@ -122,7 +122,6 @@ def _predict_map_batch(
 
     with torch.inference_mode():
         prediction = box.model(**inputs)
-    print(prediction)
     result = {
         prediction_column: (
             prediction

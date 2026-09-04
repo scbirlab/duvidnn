@@ -67,13 +67,15 @@ dev = ["duvidnn[chem,bio,splits,transformers]", "pytest>=7.4", "flake8"]
 "Bug Tracker" = "https://github.com/scbirlab/duvidnn/issues"
 
 [project.scripts] 
-duvidnn = "duvidnn.cli_module.cli:main"
+duvidnn = "duvidnn.cli.cli:main"
 
 [tool.setuptools]
-#packages = ["duvida"]
 # If there are data files included in your packages that need to be
 # installed, specify them here.
-package-data = {duvidnn = ["data/*.json"]}
+package-data = {"duvidnn" = [
+  "data/*.json",
+  "data/models/*.json"
+]}
 
 [build-system]
 # These are the assumed default build requirements from pip:

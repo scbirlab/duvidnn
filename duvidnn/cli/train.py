@@ -6,13 +6,20 @@ from carabiner.cliutils import clicommand
 
 from ..box import Box
 from ..checkpoint_utils import load_json
-from ..config import instantiate_trainer
+from ..config import (
+    instantiate_trainer,
+    resolve_experiment_config,
+)
 
 
 @clicommand(message="Training model")
 def _train(args: Namespace) -> None:
 
-    config = load_json(args.config)
+    config = resolve_experiment_config(
+        load_json(args.config),
+        model=args.model,
+        overrides=args.set,
+    )
 
     try:
         box_config = config["box"]

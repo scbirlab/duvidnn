@@ -6,8 +6,11 @@ from carabiner.cliutils import clicommand
 
 from ..box import Box
 from ..checkpoint_utils import load_json
-from ..config import instantiate_uncertainty
-from .io import _save_dataset
+from ..config import (
+    apply_overrides,
+    instantiate_uncertainty,
+)
+from .io import save_dataset
 
 
 @clicommand(message="Predicting")
@@ -23,6 +26,7 @@ def _predict(args: Namespace) -> None:
         if args.config is not None
         else {}
     )
+    config = apply_overrides(config, args.set)
 
     uncertainty = instantiate_uncertainty(
         config.get("uncertainty")
@@ -40,7 +44,7 @@ def _predict(args: Namespace) -> None:
         ),
     )
 
-    _save_dataset(
+    save_dataset(
         result,
         args.output,
     )
